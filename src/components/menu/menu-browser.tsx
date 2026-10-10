@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Dumbbell, Feather, Search, Star, X } from "lucide-react";
+import { ChevronLeft, Dumbbell, FileText, Feather, Search, Star, X } from "lucide-react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -139,6 +139,16 @@ export function MenuBrowser({
                 ? "Pick the dishes with the guest, then add their name."
                 : "100% vegetarian · protein from real food"}
             </p>
+            {!counter && (
+              <a
+                href="/menu/pdf"
+                target="_blank"
+                rel="noopener"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-sm text-white hover:bg-white/25"
+              >
+                <FileText className="size-4" aria-hidden /> Menu as PDF
+              </a>
+            )}
             {!orderingEnabled && (
               <p className="mt-3 inline-block rounded-full bg-white/15 px-3 py-1 text-sm">
                 The menu is view-only right now – please order at the counter.

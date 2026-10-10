@@ -1,16 +1,20 @@
-import { Printer } from "lucide-react";
+import { FileText, Printer } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
-import { menuUrl, qrSvg, siteUrlIsLocal } from "@/lib/qr";
+import { menuPdfUrl, menuUrl, qrSvg, siteUrlIsLocal } from "@/lib/qr";
 
 export const metadata = { title: "QR code" };
 
-/** The one café QR: every guest scans it, picks dine-in or takeaway and orders. */
+/**
+ * The café QR: every guest scans it, picks dine-in or takeaway and orders.
+ * The PDF QR is view-only – it opens the menu as a PDF built from the live menu.
+ */
 export default async function QrPage() {
   await requireUser("OWNER");
   const url = menuUrl();
-  const qr = await qrSvg(url);
+  const pdfUrl = menuPdfUrl();
+  const [qr, pdfQr] = await Promise.all([qrSvg(url), qrSvg(pdfUrl)]);
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -40,6 +44,37 @@ export default async function QrPage() {
           dangerouslySetInnerHTML={{ __html: qr }}
         />
         <p className="text-sm break-all text-muted-foreground">{url}</p>
+      </div>
+
+      <div className="flex flex-wrap items-end justify-between gap-3 pt-4">
+        <div>
+          <h2 className="text-2xl font-bold">PDF menu QR</h2>
+          <p className="text-sm text-muted-foreground">
+            Opens the menu as a PDF on the guest&apos;s phone – view only, no ordering. It&apos;s made from
+            your menu each time, so a price you change under Menu shows in the PDF straight away.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="rounded-full">
+            <a href="/menu/pdf" target="_blank" rel="noopener">
+              <FileText data-icon="inline-start" /> Open PDF
+            </a>
+          </Button>
+          <Button asChild className="rounded-full">
+            <Link href="/admin/print/qr?for=pdf" target="_blank">
+              <Printer data-icon="inline-start" /> Print cards
+            </Link>
+          </Button>
+        </div>
+      </div>
+      <div className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-8">
+        <div
+          className="w-56 rounded-2xl bg-white p-4 [&_svg]:h-auto [&_svg]:w-full"
+          role="img"
+          aria-label={`QR code for ${pdfUrl}`}
+          dangerouslySetInnerHTML={{ __html: pdfQr }}
+        />
+        <p className="text-sm break-all text-muted-foreground">{pdfUrl}</p>
       </div>
     </div>
   );

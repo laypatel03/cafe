@@ -1,13 +1,9 @@
 "use client";
 
-import { EyeOff, Pencil, Plus, Search } from "lucide-react";
+import { EyeOff, FileText, Pencil, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import {
-  moveMenuItem,
-  setAddOnAvailable,
-  setItemAvailable,
-} from "@/app/admin/(dashboard)/menu/actions";
+import { moveMenuItem, setAddOnAvailable, setItemAvailable } from "@/app/admin/(dashboard)/menu/actions";
 import { ActionSwitch } from "@/components/admin/action-switch";
 import { MoveButtons } from "@/components/admin/move-buttons";
 import { ItemImage } from "@/components/menu/item-art";
@@ -35,13 +31,20 @@ export function MenuManager({ menu, isOwner }: { menu: AdminMenu; isOwner: boole
             {soldOut > 0 && <span className="ml-1 font-medium text-brand-text">{soldOut} sold out now.</span>}
           </p>
         </div>
-        {isOwner && (
-          <Button asChild className="rounded-full">
-            <Link href="/admin/menu/items/new">
-              <Plus data-icon="inline-start" /> Add item
-            </Link>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="rounded-full">
+            <a href="/menu/pdf" target="_blank" rel="noopener">
+              <FileText data-icon="inline-start" /> Menu PDF
+            </a>
           </Button>
-        )}
+          {isOwner && (
+            <Button asChild className="rounded-full">
+              <Link href="/admin/menu/items/new">
+                <Plus data-icon="inline-start" /> Add item
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs defaultValue="items" className="mt-6">
@@ -54,7 +57,10 @@ export function MenuManager({ menu, isOwner }: { menu: AdminMenu; isOwner: boole
         <TabsContent value="items" className="mt-4">
           <label className="relative mb-5 block max-w-sm">
             <span className="sr-only">Search items</span>
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
             <input
               type="search"
               value={query}

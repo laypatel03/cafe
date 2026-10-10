@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
 import { LogoWordmark } from "@/components/brand/logo";
 import { requireUser } from "@/lib/auth/dal";
-import { menuUrl, qrSvg, siteUrlIsLocal } from "@/lib/qr";
+import { menuPdfUrl, menuUrl, qrSvg, siteUrlIsLocal } from "@/lib/qr";
 import { PrintButton } from "../print-button";
 
 export const metadata: Metadata = { title: "QR cards", robots: { index: false } };
 
-/** Four copies of the café QR card per A4 sheet. Outside the dashboard layout so nothing else prints. */
-export default async function PrintQrPage() {
+/**
+ * Four copies of the café QR card per A4 sheet. Outside the dashboard layout so nothing else prints.
+ * `?for=pdf` prints the view-only PDF menu code instead of the ordering one.
+ */
+export default async function PrintQrPage({ searchParams }: PageProps<"/admin/print/qr">) {
   await requireUser("OWNER");
-  const url = menuUrl();
+  const pdf = (await searchParams).for === "pdf";
+  const url = pdf ? menuPdfUrl() : menuUrl();
   const qr = await qrSvg(url);
 
   return (
@@ -38,8 +42,12 @@ export default async function PrintQrPage() {
           >
             <LogoWordmark className="h-auto w-[62mm]" />
             <div>
-              <p className="font-heading text-[7mm] leading-none font-bold">Scan to order</p>
-              <p className="mt-[2mm] text-[3.4mm] text-[#566b5d]">Dine-in or takeaway · from your phone</p>
+              <p className="font-heading text-[7mm] leading-none font-bold">
+                {pdf ? "Scan for our menu" : "Scan to order"}
+              </p>
+              <p className="mt-[2mm] text-[3.4mm] text-[#566b5d]">
+                {pdf ? "Protein & calories on every item" : "Dine-in or takeaway · from your phone"}
+              </p>
             </div>
             <div
               className="w-[52mm] [&_svg]:h-auto [&_svg]:w-full"
