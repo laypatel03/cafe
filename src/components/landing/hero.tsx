@@ -1,200 +1,244 @@
 "use client";
 
-import { ArrowRight, Leaf } from "lucide-react";
-import { motion, useScroll, useTransform } from "motion/react";
-import dynamic from "next/dynamic";
+import { ArrowRight, Dumbbell, Flame, Leaf, Star } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { PlaceLabel, SceneQuality, ToppingGroup } from "@/components/three/hero-scene";
+import { useEffect, useState } from "react";
 import { LogoWordmark } from "@/components/brand/logo";
+import { ItemImage } from "@/components/menu/item-art";
 import { Button } from "@/components/ui/button";
-import { BowlPoster } from "./bowl-poster";
+import { formatINR } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-const HeroScene = dynamic(() => import("@/components/three/hero-scene"), { ssr: false });
-
-type Tier = SceneQuality | "off";
-
-// Kept in sync with TOPPINGS in hero-scene (imported as a type only so three.js stays out of this chunk).
-const LABELS: Pick<ToppingGroup, "label" | "value">[] = [
-  { label: "Paneer", value: "+12 g protein" },
-  { label: "Chickpeas & corn", value: "+7 g protein" },
-  { label: "Cherry tomatoes", value: "Vitamin C" },
-  { label: "Cucumber & avocado", value: "Fresh crunch" },
-];
-
-function pickTier(): Tier {
-  if (typeof window === "undefined") return "off";
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return "off";
-  const nav = navigator as Navigator & { connection?: { saveData?: boolean }; deviceMemory?: number };
-  if (nav.connection?.saveData) return "off";
-  const canvas = document.createElement("canvas");
-  if (!canvas.getContext("webgl2") && !canvas.getContext("webgl")) return "off";
-  const cores = nav.hardwareConcurrency ?? 4;
-  const memory = nav.deviceMemory ?? 4;
-  return cores <= 4 || memory <= 3 ? "low" : "high";
-}
-
-type HeroProps = {
-  pick: { name: string; protein: number; kcal: number };
+export type HeroDish = {
+  id: string;
+  name: string;
+  category: string;
+  categoryName: string;
+  price: number;
+  protein: number;
+  kcal: number;
+  photo?: string;
+  bestseller: boolean;
 };
 
-export function Hero({ pick }: HeroProps) {
-  const sectionRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end end"] });
-  const [tier, setTier] = useState<Tier | null>(null);
-  const [active, setActive] = useState(true);
-  const [sceneReady, setSceneReady] = useState(false);
-  const labelRefs = useRef<(HTMLDivElement | null)[]>([]);
+const ADVANCE_MS = 3600;
 
-  const placeLabel = useCallback<PlaceLabel>((index, x, y, visibility) => {
-    const el = labelRefs.current[index];
-    if (!el) return;
-    // keep labels on screen on narrow phones
-    const half = el.offsetWidth / 2 + 8;
-    const clampedX = Math.min(Math.max(x, half), window.innerWidth - half);
-    el.style.opacity = String(visibility);
-    el.style.transform = `translate3d(${clampedX}px, ${y}px, 0) translate(-50%, -50%)`;
-  }, []);
+// Where each card sits in the fanned stack: front card first.
+const SLOTS = [
+  { x: 0, y: 0, rotate: -2, scale: 1, opacity: 1, zIndex: 30 },
+  { x: 46, y: 18, rotate: 7, scale: 0.92, opacity: 0.95, zIndex: 20 },
+  { x: -44, y: 30, rotate: -9, scale: 0.86, opacity: 0.85, zIndex: 10 },
+];
+const HIDDEN = { x: 0, y: 46, rotate: 0, scale: 0.8, opacity: 0, zIndex: 0 };
 
-  // Mount WebGL only after the first paint so the poster is the LCP element.
+function DishCard({ dish, front }: { dish: HeroDish; front: boolean }) {
+  const hasNumbers = dish.protein > 0 || dish.kcal > 0;
+  return (
+    <Link
+      href={`/menu?item=${encodeURIComponent(dish.id)}`}
+      tabIndex={front ? 0 : -1}
+      aria-hidden={!front}
+      className="block rounded-[2rem] border border-border/70 bg-card p-3 text-card-foreground shadow-[0_30px_60px_-28px_rgba(15,92,44,0.55)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <div className="relative">
+        <ItemImage
+          item={dish}
+          sizes="(min-width: 768px) 360px, 80vw"
+          priority={front}
+          className="aspect-[4/3] w-full rounded-[1.5rem]"
+        />
+        {dish.bestseller && (
+          <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-cta px-2.5 py-1 text-xs font-semibold text-cta-foreground shadow">
+            <Star className="size-3.5 fill-current" aria-hidden /> Bestseller
+          </span>
+        )}
+      </div>
+      <div className={cn("px-2 pt-4 pb-2 transition-opacity duration-300", !front && "opacity-0")}>
+        <p className="text-[11px] font-semibold tracking-wider text-hh-green uppercase dark:text-hh-green-light">
+          {dish.categoryName}
+        </p>
+        <h3 className="mt-1 line-clamp-2 font-heading text-2xl leading-tight font-bold">{dish.name}</h3>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="mr-auto tabular text-2xl font-bold text-brand-text">{formatINR(dish.price)}</span>
+          {hasNumbers && dish.protein > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-hh-green/10 px-2.5 py-1 tabular text-xs font-semibold text-secondary-foreground">
+              <Dumbbell className="size-3.5" aria-hidden /> {dish.protein} g protein
+            </span>
+          )}
+          {hasNumbers && dish.kcal > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 tabular text-xs font-semibold text-muted-foreground">
+              <Flame className="size-3.5" aria-hidden /> {dish.kcal} kcal
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/** Fanned stack of real dishes from the menu; the front card changes every few seconds. */
+function DishStack({ dishes }: { dishes: HeroDish[] }) {
+  const reduce = useReducedMotion();
+  const [front, setFront] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  const n = dishes.length;
+
+  // smaller sideways fan on phones so the back cards stay on screen
   useEffect(() => {
-    const run = () => setTier(pickTier());
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(run, { timeout: 1200 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const id = setTimeout(run, 300);
-    return () => clearTimeout(id);
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setNarrow(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, []);
 
-  // Stop rendering when the hero is off-screen.
   useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([entry]) => setActive(entry.isIntersecting), { rootMargin: "100px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-
-  const introOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
-  const introY = useTransform(scrollYProgress, [0, 0.3], [0, -40]);
-  const storyOpacity = useTransform(scrollYProgress, [0.45, 0.62, 0.92, 1], [0, 1, 1, 0.9]);
-  const storyY = useTransform(scrollYProgress, [0.45, 0.62], [40, 0]);
-  const cueOpacity = useTransform(scrollYProgress, [0, 0.08], [1, 0]);
-
-  const showCanvas = tier === "high" || tier === "low";
+    if (reduce || paused || n < 2) return;
+    const id = setInterval(() => setFront((f) => (f + 1) % n), ADVANCE_MS);
+    return () => clearInterval(id);
+  }, [reduce, paused, n]);
 
   return (
-    <section ref={sectionRef} className="relative h-[240svh] bg-background text-foreground">
-      <div className="sticky top-0 h-svh overflow-hidden">
-        {/* fresh studio backdrop: green and orange light washes, like the logo */}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-90 dark:opacity-60"
-          style={{
-            background:
-              "radial-gradient(55% 55% at 74% 58%, rgba(255,169,51,0.30), transparent 70%), radial-gradient(45% 45% at 12% 12%, rgba(34,197,94,0.22), transparent 70%), radial-gradient(35% 35% at 95% 5%, rgba(21,128,61,0.18), transparent 70%)",
-          }}
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.05] mix-blend-multiply dark:mix-blend-overlay"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E\")",
-          }}
-        />
-
-        <div
-          className={`absolute inset-0 transition-opacity duration-700 ${sceneReady ? "opacity-0" : "opacity-100"}`}
-        >
-          <BowlPoster />
-        </div>
-        {showCanvas && (
-          <div
-            className={`absolute inset-0 transition-opacity duration-700 ${sceneReady ? "opacity-100" : "opacity-0"}`}
-          >
-            <HeroScene progress={scrollYProgress} quality={tier} active={active} placeLabel={placeLabel} onReady={() => setSceneReady(true)} />
-            <div className="pointer-events-none absolute inset-0 z-10" aria-hidden>
-              {LABELS.map((l, i) => (
-                <div
-                  key={l.label}
-                  ref={(el) => {
-                    labelRefs.current[i] = el;
-                  }}
-                  className="absolute top-0 left-0 rounded-full border border-white/60 bg-white/85 px-3 py-1 text-xs whitespace-nowrap text-hh-ink shadow-lg shadow-hh-green-deep/15 backdrop-blur-md will-change-transform dark:border-white/10 dark:bg-hh-ink/80 dark:text-white"
-                  style={{ opacity: 0 }}
-                >
-                  <span className="font-semibold">{l.label}</span>
-                  <span className="tabular ml-2 text-brand-text">{l.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="relative mx-auto flex h-full max-w-6xl flex-col px-5 pt-24 md:justify-center md:pt-0">
-          <motion.div style={{ opacity: introOpacity, y: introY }} className="max-w-xl">
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-hh-green/20 bg-hh-green/10 px-3 py-1 text-xs font-semibold tracking-wide text-secondary-foreground uppercase backdrop-blur">
-              <Leaf className="size-3.5" aria-hidden /> 100% vegetarian café
-            </p>
-            <h1>
-              <LogoWordmark priority className="h-auto w-[min(88vw,24rem)] lg:w-[30rem] drop-shadow-[0_10px_18px_rgba(21,128,61,0.18)]" />
-            </h1>
-            <p className="mt-5 max-w-md text-lg text-pretty text-muted-foreground md:text-xl">
-              Protein from real food. Salads, chaats, sandwiches and oats bowls made fresh every day.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button
-                asChild
-                size="lg"
-                className="h-12 rounded-full bg-cta px-6 text-base font-semibold text-cta-foreground shadow-lg shadow-hh-orange/30 hover:bg-hh-orange-light"
-              >
-                <Link href="/menu">
-                  View menu <ArrowRight data-icon="inline-end" />
-                </Link>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="h-12 rounded-full border-hh-green/30 bg-transparent px-6 text-base text-secondary-foreground hover:bg-hh-green/10"
-              >
-                <a href="#visit">Visit us</a>
-              </Button>
-            </div>
-          </motion.div>
-
-          <motion.div
-            style={{ opacity: storyOpacity, y: storyY }}
-            className="pointer-events-none absolute inset-x-5 top-24 max-w-md md:top-1/2 md:-translate-y-1/2"
-          >
-            <p className="tagline text-xs text-hh-green dark:text-hh-green-light">Today&apos;s pick, unpacked</p>
-            <h2 className="mt-3 text-4xl font-bold text-balance md:text-5xl">{pick.name}</h2>
-            <dl className="mt-6 flex gap-8">
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase">Protein</dt>
-                <dd className="tabular text-3xl font-semibold text-hh-green dark:text-hh-green-light">{pick.protein} g</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground uppercase">Energy</dt>
-                <dd className="tabular text-3xl font-semibold text-brand-text">{pick.kcal} kcal</dd>
-              </div>
-            </dl>
-            <p className="mt-4 text-sm text-muted-foreground">Every gram comes from the bowl, not a powder tub.</p>
-          </motion.div>
-        </div>
-
-        <motion.div
-          style={{ opacity: cueOpacity }}
-          className="absolute bottom-6 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-xs text-muted-foreground"
-          aria-hidden
-        >
-          Scroll to unpack the salad
-          <span className="h-8 w-px animate-pulse bg-hh-green/50" />
-        </motion.div>
+    <div
+      className="relative mx-auto w-full max-w-[22rem] md:max-w-[24rem]"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      {/* invisible copy of a card sets the stage height */}
+      <div aria-hidden className="invisible">
+        <DishCard dish={dishes[0]} front={false} />
       </div>
+      {dishes.map((dish, i) => {
+        const pos = (i - front + n) % n;
+        const slot = SLOTS[pos] ?? HIDDEN;
+        return (
+          <motion.div
+            key={dish.id}
+            className="absolute inset-x-0 top-0"
+            style={{ zIndex: slot.zIndex }}
+            initial={false}
+            animate={{
+              x: narrow ? slot.x * 0.55 : slot.x,
+              y: slot.y,
+              rotate: narrow ? slot.rotate * 0.7 : slot.rotate,
+              scale: slot.scale,
+              opacity: slot.opacity,
+            }}
+            transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 160, damping: 22 }}
+          >
+            <DishCard dish={dish} front={pos === 0} />
+          </motion.div>
+        );
+      })}
+
+      {n > 1 && (
+        <div className="relative mt-16 flex justify-center gap-2" role="group" aria-label="Choose a dish">
+          {dishes.map((d, i) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setFront(i)}
+              aria-label={`Show ${d.name}`}
+              aria-current={i === front}
+              className={cn(
+                "h-2 rounded-full transition-all focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                i === front ? "w-6 bg-hh-green" : "w-2 bg-hh-green/25 hover:bg-hh-green/50",
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const CHIPS = [
+  { label: "100% veg", className: "-top-3 -left-2 md:-left-10" },
+  { label: "Made fresh daily", className: "top-1/3 -right-2 md:-right-12 [animation-delay:1.2s]" },
+  { label: "Protein from real food", className: "bottom-24 -left-3 md:-left-14 [animation-delay:2.1s]" },
+];
+
+export function Hero({ dishes }: { dishes: HeroDish[] }) {
+  return (
+    <section className="relative overflow-hidden bg-background text-foreground">
+      {/* fresh studio backdrop: green and orange light washes, like the logo */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-90 dark:opacity-60"
+        style={{
+          background:
+            "radial-gradient(50% 55% at 78% 50%, rgba(255,169,51,0.32), transparent 70%), radial-gradient(45% 45% at 10% 10%, rgba(34,197,94,0.22), transparent 70%), radial-gradient(35% 35% at 95% 5%, rgba(21,128,61,0.18), transparent 70%)",
+        }}
+      />
+
+      <div className="relative mx-auto grid min-h-[92svh] max-w-6xl items-center gap-12 px-5 pt-28 pb-16 md:grid-cols-[1.05fr_1fr] md:gap-8 md:pt-24">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="max-w-xl"
+        >
+          <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-hh-green/20 bg-hh-green/10 px-3 py-1 text-xs font-semibold tracking-wide text-secondary-foreground uppercase backdrop-blur">
+            <Leaf className="size-3.5" aria-hidden /> 100% vegetarian café
+          </p>
+          <h1>
+            <LogoWordmark
+              priority
+              className="h-auto w-[min(88vw,24rem)] drop-shadow-[0_10px_18px_rgba(21,128,61,0.18)] lg:w-[30rem]"
+            />
+          </h1>
+          <p className="mt-5 max-w-md text-lg text-pretty text-muted-foreground md:text-xl">
+            Protein from real food. Salads, chaats, sandwiches and oats bowls made fresh every day.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button
+              asChild
+              size="lg"
+              className="h-12 rounded-full bg-cta px-6 text-base font-semibold text-cta-foreground shadow-lg shadow-hh-orange/30 hover:bg-hh-orange-light"
+            >
+              <Link href="/menu">
+                View menu <ArrowRight data-icon="inline-end" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-12 rounded-full border-hh-green/30 bg-transparent px-6 text-base text-secondary-foreground hover:bg-hh-green/10"
+            >
+              <a href="#visit">Visit us</a>
+            </Button>
+          </div>
+        </motion.div>
+
+        {dishes.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.15, ease: "easeOut" }}
+            className="relative px-6 md:px-0"
+          >
+            <DishStack dishes={dishes} />
+            {CHIPS.map((c) => (
+              <span
+                key={c.label}
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute z-40 hidden rounded-full border border-white/60 bg-white/85 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-hh-ink shadow-lg shadow-hh-green-deep/15 backdrop-blur-md motion-safe:animate-[hh-bob_5s_ease-in-out_infinite] sm:block dark:border-white/10 dark:bg-hh-ink/80 dark:text-white",
+                  c.className,
+                )}
+              >
+                {c.label}
+              </span>
+            ))}
+          </motion.div>
+        )}
+      </div>
+      <style>{`@keyframes hh-bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }`}</style>
     </section>
   );
 }

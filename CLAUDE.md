@@ -6,11 +6,11 @@ Café landing page + phone-first QR menu + staff dashboard. One Next.js app, Pos
 Scope: `doc/goal` · Phases & design: `doc/PLAN.md` · **Work queue: `doc/TASKS.md`** (do one task per session).
 
 ## Stack
-Next.js 16 (App Router, RSC, `src/proxy.ts` not middleware) · React 19 · TypeScript strict · Tailwind v4 (tokens in `src/app/globals.css`) · shadcn/ui (radix-nova, `src/components/ui`) · Motion · zustand (cart) · Zod 4 · Prisma 7 + `@prisma/adapter-pg` (client generated to `src/generated/prisma` – never edit) · jose JWT sessions + argon2 · sharp · R3F/drei/three (landing hero only).
+Next.js 16 (App Router, RSC, `src/proxy.ts` not middleware) · React 19 · TypeScript strict · Tailwind v4 (tokens in `src/app/globals.css`) · shadcn/ui (radix-nova, `src/components/ui`) · Motion · zustand (cart) · Zod 4 · Prisma 7 + `@prisma/adapter-pg` (client generated to `src/generated/prisma` – never edit) · jose JWT sessions + argon2 · sharp.
 
 ## Layout
 - `src/app/` – routes: `/` landing, `/menu`, `/media/[...path]` (serves uploads). Admin goes under `src/app/admin/`.
-- `src/components/` – `landing/`, `menu/`, `three/`, `brand/`, `theme/`, `ui/` (shadcn).
+- `src/components/` – `landing/`, `menu/`, `brand/`, `theme/`, `ui/` (shadcn).
 - `src/lib/` – `db.ts` (Prisma singleton), `auth/` (`session.ts` JWT cookie, `dal.ts` `getCurrentUser`/`requireUser`, `password.ts`), `data/menu.ts` (cached public reads, tags `menu`/`settings`), `money.ts` (paise ↔ ₹), `rate-limit.ts` (Postgres), `uploads.ts` (WebP via sharp), `cart-store.ts`.
 - `prisma/` – `schema.prisma`, `migrations/`, `seed.ts`.
 
@@ -21,7 +21,7 @@ Next.js 16 (App Router, RSC, `src/proxy.ts` not middleware) · React 19 · TypeS
 - Validate every server input with Zod. Money is stored as integer paise; convert with `lib/money.ts`.
 - Prices are copied into `OrderItem`; totals are computed on the server only.
 - After a menu/settings write call `updateTag(MENU_TAG | SETTINGS_TAG)`.
-- Three.js loads only on `/` (dynamic, `ssr: false`). No WebGL on `/menu`, `/t/*`, `/admin`.
+- The landing hero is a stack of dish cards from the live menu (`landing/hero.tsx`); no WebGL anywhere.
 - Brand: green `#15803D`, orange `#FF8A00` (dark text on orange; orange text = `#C2410C`). Status colours always with a text label.
 - Match surrounding code style; short comments only where the "why" isn't obvious.
 

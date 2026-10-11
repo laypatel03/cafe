@@ -1,4 +1,4 @@
-import { CupSoda, Salad, Sandwich, Soup, Wheat } from "lucide-react";
+import { Citrus, CupSoda, GlassWater, Salad, Sandwich, Snowflake, Soup, Sparkles, Wheat } from "lucide-react";
 import Image from "next/image";
 import type { CategorySlug } from "@/lib/menu-types";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,10 @@ const art: Record<string, { icon: typeof Soup; from: string; to: string }> = {
   toast: { icon: Wheat, from: "#ffb347", to: "#ea580c" },
   "oats-bowls": { icon: Soup, from: "#86efac", to: "#16a34a" },
   drinks: { icon: CupSoda, from: "#4ade80", to: "#15803d" },
+  navratri: { icon: Sparkles, from: "#fb923c", to: "#db2777" },
+  "oats-overnight": { icon: Snowflake, from: "#6ee7b7", to: "#0f766e" },
+  smoothies: { icon: Citrus, from: "#fdba74", to: "#f97316" },
+  "cold-drinks": { icon: GlassWater, from: "#7dd3fc", to: "#0369a1" },
 };
 
 const FALLBACK = { icon: Salad, from: "#86efac", to: "#15803d" };

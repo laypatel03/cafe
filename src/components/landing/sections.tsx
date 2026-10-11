@@ -33,7 +33,7 @@ export function TodaysPick({ item }: { item: MenuItem }) {
             </h2>
             <p className="mt-4 max-w-lg text-lg text-muted-foreground">{item.description}</p>
             <ul className="mt-5 flex flex-wrap gap-2">
-              {item.ingredients.map((ing) => (
+              {[...new Set(item.ingredients)].map((ing) => (
                 <li key={ing} className="rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground">
                   {ing}
                 </li>
