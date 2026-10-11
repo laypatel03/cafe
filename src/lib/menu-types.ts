@@ -42,5 +42,10 @@ export function isHighProtein(item: Pick<MenuItem, "protein">) {
 }
 
 export function isLight(item: Pick<MenuItem, "kcal">) {
-  return item.kcal < LIGHT_MAX_KCAL;
+  return item.kcal > 0 && item.kcal < LIGHT_MAX_KCAL;
+}
+
+/** Items can be listed without protein and calories (entered as 0) – the menu then leaves them out. */
+export function hasNutrition(item: Pick<MenuItem, "protein" | "kcal">) {
+  return item.protein > 0 || item.kcal > 0;
 }

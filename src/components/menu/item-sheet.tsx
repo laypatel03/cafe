@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useCartStore } from "@/lib/cart-store";
 import { formatINR } from "@/lib/format";
-import type { AddOn, MenuItem } from "@/lib/menu-types";
+import { hasNutrition, type AddOn, type MenuItem } from "@/lib/menu-types";
 import { ItemImage } from "./item-art";
 import { QuantityStepper } from "./quantity-stepper";
 
@@ -85,10 +85,16 @@ function ItemSheetBody({
         <SheetTitle className="mt-2 font-heading text-3xl font-bold">{item.name}</SheetTitle>
         <SheetDescription className="mt-1 text-base">{item.description}</SheetDescription>
 
-        <dl className="mt-4 grid grid-cols-3 gap-2 text-center tabular">
+        <dl
+          className={`mt-4 grid gap-2 text-center tabular ${hasNutrition(item) ? "grid-cols-3" : "grid-cols-1"}`}
+        >
           {[
-            ["Protein", `${protein} g`],
-            ["Energy", `${kcal} kcal`],
+            ...(hasNutrition(item)
+              ? [
+                  ["Protein", `${protein} g`],
+                  ["Energy", `${kcal} kcal`],
+                ]
+              : []),
             ["Price", formatINR(item.price)],
           ].map(([k, v]) => (
             <div key={k} className="rounded-2xl bg-secondary/60 px-2 py-3">
@@ -98,10 +104,14 @@ function ItemSheetBody({
           ))}
         </dl>
 
-        <h4 className="mt-6 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-          Ingredients
-        </h4>
-        <p className="mt-1">{item.ingredients.join(", ")}</p>
+        {item.ingredients.length > 0 && (
+          <>
+            <h4 className="mt-6 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+              Ingredients
+            </h4>
+            <p className="mt-1">{item.ingredients.join(", ")}</p>
+          </>
+        )}
 
         {options.length > 0 && (
           <fieldset className="mt-6">

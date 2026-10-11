@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { VegMark } from "@/components/brand/veg-mark";
 import { formatINR } from "@/lib/format";
-import { isHighProtein, type MenuItem } from "@/lib/menu-types";
+import { hasNutrition, isHighProtein, type MenuItem } from "@/lib/menu-types";
 import { cn } from "@/lib/utils";
 import { ItemImage } from "./item-art";
 
@@ -51,11 +51,20 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
         </div>
         <h3 className="mt-2 text-lg leading-tight font-semibold">{item.name}</h3>
         <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{item.description}</p>
-        <p className="tabular mt-auto pt-3 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{item.protein} g</span> protein ·{" "}
-          <span className="font-semibold text-foreground">{item.kcal}</span> kcal
+        {hasNutrition(item) && (
+          <p className="mt-auto pt-3 tabular text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">{item.protein} g</span> protein ·{" "}
+            <span className="font-semibold text-foreground">{item.kcal}</span> kcal
+          </p>
+        )}
+        <p
+          className={cn(
+            "tabular text-lg font-semibold text-brand-text",
+            hasNutrition(item) ? "mt-1" : "mt-auto pt-3",
+          )}
+        >
+          {formatINR(item.price)}
         </p>
-        <p className="tabular mt-1 text-lg font-semibold text-brand-text">{formatINR(item.price)}</p>
       </div>
       <div className="relative z-10 w-28 shrink-0 sm:w-32">
         <div className="pointer-events-none overflow-hidden rounded-2xl shadow-md transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-[-1.5deg]">

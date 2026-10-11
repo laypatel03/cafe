@@ -1,23 +1,28 @@
-// The café's menu, from the owner's printed menus (PDFs + Tea & Coffee card, 10 Oct 2026).
+// The café's menu, from the owner's printed menu "Healthy Hunger Menu – Navratri" (11 Oct 2026).
 // `pnpm db:seed` only adds what is missing; `pnpm menu:load` overwrites the menu with this file
 // (photos are kept). Day to day, the owner edits the menu in the dashboard.
 //
 // Not on the printed menus, so filled in here:
-// - Items with no price yet (overnight oats, sandwiches, MRP drinks) are in `hiddenUntilPriced`:
-//   added but hidden from guests until the owner enters a price and shows them.
+// - Cold drinks are sold at MRP, so they are in `hiddenUntilPriced`: added but hidden from guests
+//   until the owner enters the MRP as the price and shows them.
+// - Navratri Special has no protein or calories on the printed menu, so they are 0 (the site
+//   then leaves the numbers out).
 // - Two-size dishes (toasts, smoothies) are separate items. The 250 ml smoothies' protein and
 //   kcal are scaled from the 350 ml figures – the menu gives no numbers for the small size.
 // - Add-ons have no nutrition on the menu, so theirs is 0.
 import type { AddOn, Category, CategorySlug, MenuItem, MenuTag } from "../src/lib/menu-types";
 
 export const categories: Category[] = [
+  { slug: "navratri", name: "Navratri special" },
   { slug: "salads", name: "Salads & bowls" },
   { slug: "chaat", name: "Chaat" },
   { slug: "sandwiches", name: "Sandwiches" },
   { slug: "toast", name: "Healthy toasts" },
-  { slug: "oats-bowls", name: "Oats" },
+  { slug: "oats-bowls", name: "Oats – hot" },
+  { slug: "oats-overnight", name: "Oats – overnight (chilled)" },
   { slug: "smoothies", name: "Smoothies & bowls" },
   { slug: "drinks", name: "Tea & coffee" },
+  { slug: "cold-drinks", name: "Cold drinks" },
 ];
 
 const addOn = (id: string, name: string, price: number): AddOn => ({
@@ -32,13 +37,9 @@ const addOn = (id: string, name: string, price: number): AddOn => ({
 export const addOns: AddOn[] = [
   addOn("ao-paneer", "Extra paneer", 40),
   addOn("ao-sweet-corn", "Sweet corn", 30),
-  addOn("ao-jalapenos", "Jalapeños", 30),
   addOn("ao-cheese", "Extra cheese", 50),
-  addOn("ao-vegan-almond", "Make it vegan (almond milk)", 40),
   addOn("ao-peanut-butter", "Peanut butter", 30),
-  addOn("ao-whey", "Whey protein", 50),
   addOn("ao-seasonal-fruit", "Seasonal fruit", 30),
-  addOn("ao-vegan-coconut", "Make it vegan (almond milk + coconut yogurt)", 50),
   addOn("ao-honey", "Extra honey", 10),
   addOn("ao-coffee-shot", "Extra coffee shot", 20),
   addOn("ao-large", "Large size", 20),
@@ -75,18 +76,28 @@ const section = (category: CategorySlug, defaults: Partial<Row>, rows: Row[]): M
 const list = (s: string) => s.split(",").map((x) => x.trim());
 
 export const menuItems: MenuItem[] = [
-  ...section("salads", {}, [
+  ...section("navratri", {}, [
     {
-      id: "s-tofu-salad",
-      name: "Tofu Salad",
-      description: "Pan-seared tofu with crunchy veggies and a yogurt, onion & coriander dressing. 340 g.",
-      ingredients: list(
-        "Firm tofu, red & yellow bell peppers, cherry tomatoes, red onion, baby corn, broccoli, hung curd, fresh coriander, lemon juice, olive oil",
-      ),
-      price: 149,
-      protein: 17,
-      kcal: 295,
+      id: "n-pani-puri",
+      name: "Pani Puri",
+      description: "",
+      ingredients: [],
+      price: 49,
+      protein: 0,
+      kcal: 0,
     },
+    {
+      id: "n-fruit-bowl",
+      name: "Seasonal Fruit Bowl (200 g)",
+      description: "",
+      ingredients: [],
+      price: 69,
+      protein: 0,
+      kcal: 0,
+    },
+  ]),
+
+  ...section("salads", {}, [
     {
       id: "s-quinoa-peanut-chaat",
       name: "Quinoa Peanut Chaat Salad",
@@ -229,7 +240,6 @@ export const menuItems: MenuItem[] = [
     },
   ]),
 
-  // No prices on the printed menu yet – see hiddenUntilPriced.
   ...section("sandwiches", {}, [
     {
       id: "w-veg-exotic",
@@ -239,7 +249,7 @@ export const menuItems: MenuItem[] = [
       ingredients: list(
         "Brown bread, green chutney, lettuce, baby corn, red & yellow bell peppers, broccoli, paneer, mozzarella cheese",
       ),
-      price: 0,
+      price: 169,
       protein: 23,
       kcal: 430,
     },
@@ -250,7 +260,7 @@ export const menuItems: MenuItem[] = [
       ingredients: list(
         "Brown bread, crunchy & smooth peanut butter, banana, raisins (kismis), honey, walnuts, mixed seeds (chia, flax, sesame)",
       ),
-      price: 0,
+      price: 119,
       protein: 17,
       kcal: 570,
     },
@@ -262,7 +272,7 @@ export const menuItems: MenuItem[] = [
       ingredients: list(
         "Multigrain bread, red hummus (hummus + beetroot), cream cheese, hung curd, lemon juice, cucumber, carrot, green bell pepper, onion, extra virgin olive oil",
       ),
-      price: 0,
+      price: 149,
       protein: 14,
       kcal: 400,
     },
@@ -277,7 +287,7 @@ export const menuItems: MenuItem[] = [
       ingredients: list(
         "Multigrain bread, avocado, low-fat paneer, tomato, red onion, lemon juice, olive oil, pumpkin & sunflower seeds, fresh coriander, green chilli",
       ),
-      price: 349,
+      price: 249,
       protein: 19,
       kcal: 470,
       addOnIds: ["ao-paneer"],
@@ -306,7 +316,7 @@ export const menuItems: MenuItem[] = [
       price: 249,
       protein: 27,
       kcal: 465,
-      addOnIds: ["ao-sweet-corn", "ao-jalapenos", "ao-cheese"],
+      addOnIds: ["ao-sweet-corn", "ao-cheese"],
     },
     {
       id: "t-hariyali-single",
@@ -319,7 +329,7 @@ export const menuItems: MenuItem[] = [
       price: 129,
       protein: 14,
       kcal: 233,
-      addOnIds: ["ao-sweet-corn", "ao-jalapenos", "ao-cheese"],
+      addOnIds: ["ao-sweet-corn", "ao-cheese"],
     },
   ]),
 
@@ -356,7 +366,9 @@ export const menuItems: MenuItem[] = [
       kcal: 450,
       tags: ["bestseller"],
     },
-    // Overnight oats: no prices on the printed menu yet – see hiddenUntilPriced.
+  ]),
+
+  ...section("oats-overnight", {}, [
     {
       id: "o-on-dry-fruits",
       name: "Dry Fruits Overnight Bowl",
@@ -364,7 +376,7 @@ export const menuItems: MenuItem[] = [
       ingredients: list(
         "Quaker oats, black kishmish (raisins), anjeer (dried fig), walnut kernels, pumpkin seeds, almonds, Amul Taaza milk, chia seeds",
       ),
-      price: 0,
+      price: 139,
       protein: 13,
       kcal: 306,
     },
@@ -375,7 +387,7 @@ export const menuItems: MenuItem[] = [
       ingredients: list(
         "Pintola oats, Amul Taaza milk, curd, Hershey's unsweetened cocoa, MyFitness crunchy peanut butter, honey, banana",
       ),
-      price: 0,
+      price: 129,
       protein: 16,
       kcal: 400,
     },
@@ -386,7 +398,7 @@ export const menuItems: MenuItem[] = [
       ingredients: list(
         "Pintola oats, Amul Taaza milk, Nescafé Classic coffee, curd, Hershey's unsweetened cocoa, jaggery or honey, chia seeds",
       ),
-      price: 0,
+      price: 99,
       protein: 13,
       kcal: 340,
     },
@@ -404,7 +416,7 @@ export const menuItems: MenuItem[] = [
       price: 179,
       protein: 13,
       kcal: 410,
-      addOnIds: ["ao-vegan-almond", "ao-peanut-butter"],
+      addOnIds: ["ao-peanut-butter"],
     },
     {
       id: "m-apple-oats-small",
@@ -417,7 +429,7 @@ export const menuItems: MenuItem[] = [
       price: 129,
       protein: 9, // scaled from 350 ml
       kcal: 293,
-      addOnIds: ["ao-vegan-almond", "ao-peanut-butter"],
+      addOnIds: ["ao-peanut-butter"],
     },
     {
       id: "m-choco-pb",
@@ -430,7 +442,7 @@ export const menuItems: MenuItem[] = [
       price: 189,
       protein: 18,
       kcal: 510,
-      addOnIds: ["ao-whey", "ao-vegan-almond"],
+      addOnIds: ["ao-peanut-butter"],
     },
     {
       id: "m-choco-pb-small",
@@ -443,7 +455,7 @@ export const menuItems: MenuItem[] = [
       price: 139,
       protein: 13, // scaled from 350 ml
       kcal: 364,
-      addOnIds: ["ao-whey", "ao-vegan-almond"],
+      addOnIds: ["ao-peanut-butter"],
     },
     {
       id: "m-banana-chia",
@@ -456,7 +468,7 @@ export const menuItems: MenuItem[] = [
       price: 189,
       protein: 16,
       kcal: 520,
-      addOnIds: ["ao-seasonal-fruit", "ao-peanut-butter", "ao-vegan-coconut"],
+      addOnIds: ["ao-seasonal-fruit", "ao-peanut-butter"],
     },
   ]),
 
@@ -522,20 +534,14 @@ export const menuItems: MenuItem[] = [
       kcal: 35,
       addOnIds: COFFEE_ADDONS,
     },
-    // Sold at the MRP printed on the pack – the owner enters the price. See hiddenUntilPriced.
+  ]),
+
+  // Sold at the MRP printed on the pack – the owner enters the price. See hiddenUntilPriced.
+  ...section("cold-drinks", {}, [
     {
       id: "d-diet-coke",
       name: "Diet Coke (Can)",
       description: "Served chilled, sold at the MRP printed on the can.",
-      ingredients: [],
-      price: 0,
-      protein: 0,
-      kcal: 1,
-    },
-    {
-      id: "d-coke-zero",
-      name: "Coca-Cola Zero Sugar (Can)",
-      description: "Classic Coke taste with no sugar, sold at MRP.",
       ingredients: [],
       price: 0,
       protein: 0,
@@ -553,18 +559,8 @@ export const menuItems: MenuItem[] = [
   ]),
 ];
 
-/** Added but hidden from guests: the printed menus give no price for these yet. */
-export const hiddenUntilPriced = [
-  "w-veg-exotic",
-  "w-pb-banana",
-  "w-red-velvet",
-  "o-on-dry-fruits",
-  "o-on-choco-pb",
-  "o-on-cold-coffee",
-  "d-diet-coke",
-  "d-coke-zero",
-  "d-water",
-];
+/** Added but hidden from guests: sold at MRP, so the owner enters the price first. */
+export const hiddenUntilPriced = ["d-diet-coke", "d-water"];
 
 export const todaysPickId = "s-hp-meal";
 
