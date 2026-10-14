@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import type { LiveBill, LiveOrder } from "@/lib/data/live";
 import type { PublicMenu } from "@/lib/data/menu";
-import { formatINR } from "@/lib/format";
+import { CAFE_TZ, formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { ACTION_LABEL, availableActions, canCancel, canEditItems } from "@/lib/order-flow";
 import { cn } from "@/lib/utils";
@@ -144,7 +144,11 @@ function OrderCard({
           <p className="text-xs text-muted-foreground">
             {o.customerName}
             {o.customerPhone && ` · ${o.customerPhone}`} ·{" "}
-            {new Date(o.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
+            {new Date(o.createdAt).toLocaleTimeString("en-IN", {
+              hour: "numeric",
+              minute: "2-digit",
+              timeZone: CAFE_TZ,
+            })}
           </p>
         </div>
         <OrderStatusBadge status={o.status} />

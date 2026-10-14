@@ -21,6 +21,8 @@ export function LogoWordmark({ className, priority }: Props) {
       draggable={false}
       // served as-is: the image optimiser's re-compression softens the letter edges
       unoptimized
+      // logos sit at the top of the page – load them straight away
+      loading="eager"
     />
   );
 }
@@ -37,6 +39,8 @@ export function BrandName({ className }: { className?: string }) {
       draggable={false}
       // served as-is: the image optimiser's re-compression softens the letter edges
       unoptimized
+      // logos sit at the top of the page – load them straight away
+      loading="eager"
     />
   );
 }
@@ -54,6 +58,8 @@ export function LogoIcon({ className, priority, alt = "Healthy Hunger" }: Props 
       draggable={false}
       // served as-is: the image optimiser's re-compression softens the letter edges
       unoptimized
+      // logos sit at the top of the page – load them straight away
+      loading="eager"
     />
   );
 }

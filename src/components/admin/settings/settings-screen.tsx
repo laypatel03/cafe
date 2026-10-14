@@ -21,6 +21,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormAction } from "@/hooks/use-form-action";
+import { CAFE_TZ } from "@/lib/format";
 
 type Cafe = {
   name: string;
@@ -380,7 +381,7 @@ function StaffPanel({ staff, meId }: { staff: Staff[]; meId: string }) {
                 {s.username}
                 {s.phone && ` · ${s.phone}`} · {s.role === "OWNER" ? "Owner" : "Staff"} ·{" "}
                 {s.lastLoginAt
-                  ? `last login ${new Date(s.lastLoginAt).toLocaleDateString("en-IN")}`
+                  ? `last login ${new Date(s.lastLoginAt).toLocaleDateString("en-IN", { timeZone: CAFE_TZ })}`
                   : "never logged in"}
               </p>
             </div>
