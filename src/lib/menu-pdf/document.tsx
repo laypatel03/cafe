@@ -23,14 +23,14 @@ Font.registerHyphenationCallback((word) => [word]);
 const LOGO = path.join(process.cwd(), "public/brand/hh-wordmark.png");
 
 const C = {
-  paper: "#FBF8EF",
+  paper: "#FBF9F1",
   ink: "#1C2B22",
   muted: "#566B5D",
-  green: "#15803D",
-  deep: "#0F5C2C",
-  band: "#E4F1E5",
-  orange: "#C2410C",
-  rule: "#B9D3BE",
+  green: "#167A24",
+  deep: "#0E5518",
+  band: "#EAF4E0",
+  orange: "#B85400",
+  rule: "#BFD8AE",
 };
 
 const s = StyleSheet.create({

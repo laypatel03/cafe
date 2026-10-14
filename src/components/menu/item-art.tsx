@@ -4,19 +4,19 @@ import type { CategorySlug } from "@/lib/menu-types";
 import { cn } from "@/lib/utils";
 
 const art: Record<string, { icon: typeof Soup; from: string; to: string }> = {
-  salads: { icon: Salad, from: "#22c55e", to: "#0f5c2c" },
-  chaat: { icon: Soup, from: "#ffa933", to: "#ff8a00" },
-  sandwiches: { icon: Sandwich, from: "#ffc870", to: "#f59e0b" },
-  toast: { icon: Wheat, from: "#ffb347", to: "#ea580c" },
-  "oats-bowls": { icon: Soup, from: "#86efac", to: "#16a34a" },
-  drinks: { icon: CupSoda, from: "#4ade80", to: "#15803d" },
+  salads: { icon: Salad, from: "#78b90c", to: "#167a24" },
+  chaat: { icon: Soup, from: "#ffb900", to: "#ff7800" },
+  sandwiches: { icon: Sandwich, from: "#ffd04d", to: "#ff9a00" },
+  toast: { icon: Wheat, from: "#ff9a2e", to: "#e05f00" },
+  "oats-bowls": { icon: Soup, from: "#a3cf4a", to: "#55a90d" },
+  drinks: { icon: CupSoda, from: "#55a90d", to: "#0e5518" },
   navratri: { icon: Sparkles, from: "#fb923c", to: "#db2777" },
   "oats-overnight": { icon: Snowflake, from: "#6ee7b7", to: "#0f766e" },
   smoothies: { icon: Citrus, from: "#fdba74", to: "#f97316" },
   "cold-drinks": { icon: GlassWater, from: "#7dd3fc", to: "#0369a1" },
 };
 
-const FALLBACK = { icon: Salad, from: "#86efac", to: "#15803d" };
+const FALLBACK = { icon: Salad, from: "#78b90c", to: "#167a24" };
 
 /** Stand-in artwork until the owner uploads photos (photos are optional per item). */
 export function ItemArt({ category, className }: { category: CategorySlug; className?: string }) {
@@ -48,7 +48,14 @@ export function ItemImage({
   if (!item.photo) return <ItemArt category={item.category} className={className} />;
   return (
     <div className={cn("relative overflow-hidden bg-muted", className)}>
-      <Image src={item.photo} alt={item.name} fill sizes={sizes} priority={priority} className="object-cover" />
+      <Image
+        src={item.photo}
+        alt={item.name}
+        fill
+        sizes={sizes}
+        priority={priority}
+        className="object-cover"
+      />
     </div>
   );
 }

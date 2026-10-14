@@ -143,7 +143,7 @@ export function CartBar({
             <button
               type="button"
               onClick={openSheet}
-              className="mx-auto flex h-16 w-full max-w-xl items-center gap-3 rounded-full bg-hh-green-deep pr-2 pl-5 text-left text-white shadow-[0_20px_40px_-12px_rgba(15,92,44,0.6)] ring-1 ring-white/10"
+              className="mx-auto flex h-16 w-full max-w-xl items-center gap-3 rounded-full bg-hh-green-deep pr-2 pl-5 text-left text-white shadow-[0_20px_40px_-12px_rgba(14,85,24,0.6)] ring-1 ring-white/10"
             >
               {count > 0 ? (
                 <motion.span

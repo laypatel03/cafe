@@ -25,7 +25,7 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       whileTap={soldOut ? undefined : { scale: 0.985 }}
       className={cn(
-        "group relative flex gap-4 rounded-3xl border border-border bg-card p-3 shadow-[0_14px_30px_-22px_rgba(15,92,44,0.45)] transition-shadow hover:shadow-[0_22px_40px_-24px_rgba(15,92,44,0.5)]",
+        "group relative flex gap-4 rounded-3xl border border-border bg-card p-3 shadow-[0_14px_30px_-22px_rgba(14,85,24,0.45)] transition-shadow hover:shadow-[0_22px_40px_-24px_rgba(14,85,24,0.5)]",
         soldOut && "opacity-70",
       )}
     >

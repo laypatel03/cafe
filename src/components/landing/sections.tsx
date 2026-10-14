@@ -24,7 +24,7 @@ export function TodaysPick({ item }: { item: MenuItem }) {
       <Reveal>
         <TiltCard
           max={5}
-          className="grid gap-8 overflow-hidden rounded-[2rem] border border-border bg-card p-6 shadow-[0_30px_60px_-30px_rgba(15,92,44,0.35)] md:grid-cols-[1.4fr_1fr] md:p-10"
+          className="grid gap-8 overflow-hidden rounded-[2rem] border border-border bg-card p-6 shadow-[0_30px_60px_-30px_rgba(14,85,24,0.35)] md:grid-cols-[1.4fr_1fr] md:p-10"
         >
           <div className="translate-z-10">
             <p className="tagline text-xs text-hh-green dark:text-hh-green-light">Today&apos;s pick</p>
@@ -114,7 +114,7 @@ export function Bestsellers({ items }: { items: MenuItem[] }) {
       <div className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-5 overflow-x-auto px-5 pb-6 [scrollbar-width:none]">
         {items.map((item, i) => (
           <Reveal key={item.id} delay={i * 0.06} className="w-[78%] shrink-0 snap-start sm:w-[46%] lg:w-[31%]">
-            <TiltCard className="flex h-full flex-col rounded-3xl border border-border bg-card p-6 shadow-[0_20px_40px_-28px_rgba(15,92,44,0.4)]">
+            <TiltCard className="flex h-full flex-col rounded-3xl border border-border bg-card p-6 shadow-[0_20px_40px_-28px_rgba(14,85,24,0.4)]">
               <div className="flex items-center gap-2">
                 <VegMark />
                 <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-brand-text">

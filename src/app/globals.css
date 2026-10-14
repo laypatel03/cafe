@@ -19,6 +19,7 @@
   --color-cta-foreground: var(--cta-foreground);
   --color-hh-green: var(--hh-green);
   --color-hh-green-light: var(--hh-green-light);
+  --color-hh-lime: var(--hh-lime);
   --color-hh-green-deep: var(--hh-green-deep);
   --color-hh-orange: var(--hh-orange);
   --color-hh-orange-light: var(--hh-orange-light);
@@ -69,17 +70,18 @@
 }
 
 :root {
-  /* Brand palette – see doc/brand-guide.jpg */
-  --hh-green: #15803d;
-  --hh-green-light: #22c55e;
-  --hh-green-deep: #0f5c2c;
-  --hh-orange: #ff8a00;
-  --hh-orange-light: #ffa933;
-  /* orange is too light for text on light backgrounds (2.2:1); this deeper tone passes AA */
-  --hh-orange-text: #c2410c;
+  /* Brand palette – see doc/brand-palette.jpg */
+  --hh-green: #167a24; /* Deep Leaf Green */
+  --hh-green-light: #55a90d; /* Fresh Green */
+  --hh-lime: #78b90c; /* Bright Lime Green */
+  --hh-green-deep: #0e5518; /* darker step of Deep Leaf, for footer and sidebar */
+  --hh-orange: #ff7800; /* Tangerine Orange */
+  --hh-orange-light: #ffb900; /* Golden Yellow */
+  /* tangerine is too light for text on light backgrounds (2.7:1); this deeper tone passes AA */
+  --hh-orange-text: #b85400;
   --hh-ink: #1c2b22;
-  --hh-cream: #fff8ee;
-  --hh-veg: #0f8a3b;
+  --hh-cream: #fbf9f1;
+  --hh-veg: #167a24;
 
   --background: var(--hh-cream);
   --foreground: var(--hh-ink);
@@ -92,26 +94,26 @@
   /* orange call-to-action: white text fails on orange, so it carries dark ink */
   --cta: var(--hh-orange);
   --cta-foreground: var(--hh-ink);
-  --secondary: #eef6ee;
+  --secondary: #eef6e6;
   --secondary-foreground: var(--hh-green-deep);
-  --muted: #f3ede3;
+  --muted: #f2efe4;
   --muted-foreground: #566b5d;
-  --accent: #ffefd9;
+  --accent: #fff1d6;
   --accent-foreground: var(--hh-ink);
   --brand: var(--hh-orange);
   --brand-text: var(--hh-orange-text);
   --surface: var(--hh-green-deep);
   --surface-foreground: #ffffff;
-  --surface-accent: #ffc870;
+  --surface-accent: var(--hh-orange-light);
   --destructive: #b42318;
-  --border: #eadfce;
-  --input: #e2d6c4;
+  --border: #e6e0cf;
+  --input: #ddd6c2;
   --ring: var(--hh-green-light);
 
   /* Order status signals – always paired with a text label */
   --status-new: #1d63b8;
   --status-accepted: #566b5d;
-  --status-preparing: #c2410c;
+  --status-preparing: var(--hh-orange-text);
   --status-ready: var(--hh-green);
   --status-done: #7b8a80;
   --status-cancelled: #b42318;
@@ -126,14 +128,14 @@
   --sidebar-foreground: #ffffff;
   --sidebar-primary: var(--hh-orange);
   --sidebar-primary-foreground: var(--hh-ink);
-  --sidebar-accent: #13703a;
+  --sidebar-accent: #146a20;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #1d7a43;
+  --sidebar-border: #1f7a2a;
   --sidebar-ring: var(--hh-green-light);
 }
 
 .dark {
-  --background: #0e1a13;
+  --background: #0e1a12;
   --foreground: #eef5ef;
   --card: #16251b;
   --card-foreground: #eef5ef;
@@ -144,16 +146,16 @@
   --cta: var(--hh-orange);
   --cta-foreground: var(--hh-ink);
   --secondary: #1d3325;
-  --secondary-foreground: #bbf7d0;
+  --secondary-foreground: #d4edb8;
   --muted: #1a2b20;
   --muted-foreground: #a7b8ac;
   --accent: #2a2416;
   --accent-foreground: #eef5ef;
   --brand: var(--hh-orange);
   --brand-text: var(--hh-orange-light);
-  --surface: #0a2615;
+  --surface: #0a2810;
   --surface-foreground: #eef5ef;
-  --surface-accent: #ffc870;
+  --surface-accent: var(--hh-orange-light);
   --destructive: #f97066;
   --border: #24392b;
   --input: #2b4334;
@@ -165,8 +167,8 @@
   --status-done: #7b8a80;
   --status-cancelled: #f97066;
   /* report bars: validated against the dark card (dataviz validator) */
-  --chart-1: #16a34a;
-  --sidebar: #0a2615;
+  --chart-1: #55a90d;
+  --sidebar: #0a2810;
   --sidebar-foreground: #eef5ef;
   --sidebar-primary: var(--hh-orange);
   --sidebar-primary-foreground: var(--hh-ink);

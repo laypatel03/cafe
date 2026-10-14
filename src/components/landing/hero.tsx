@@ -39,7 +39,7 @@ function DishCard({ dish, front }: { dish: HeroDish; front: boolean }) {
       href={`/menu?item=${encodeURIComponent(dish.id)}`}
       tabIndex={front ? 0 : -1}
       aria-hidden={!front}
-      className="block rounded-[2rem] border border-border/70 bg-card p-3 text-card-foreground shadow-[0_30px_60px_-28px_rgba(15,92,44,0.55)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="block rounded-[2rem] border border-border/70 bg-card p-3 text-card-foreground shadow-[0_30px_60px_-28px_rgba(14,85,24,0.55)] outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <div className="relative">
         <ItemImage
@@ -171,7 +171,7 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
         className="absolute inset-0 opacity-90 dark:opacity-60"
         style={{
           background:
-            "radial-gradient(50% 55% at 78% 50%, rgba(255,169,51,0.32), transparent 70%), radial-gradient(45% 45% at 10% 10%, rgba(34,197,94,0.22), transparent 70%), radial-gradient(35% 35% at 95% 5%, rgba(21,128,61,0.18), transparent 70%)",
+            "radial-gradient(50% 55% at 78% 50%, rgba(255,185,0,0.3), transparent 70%), radial-gradient(45% 45% at 10% 10%, rgba(120,185,12,0.22), transparent 70%), radial-gradient(35% 35% at 95% 5%, rgba(22,122,36,0.18), transparent 70%)",
         }}
       />
 

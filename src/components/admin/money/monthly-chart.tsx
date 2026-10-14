@@ -13,8 +13,8 @@ export type ChartMonth = {
   profit: number;
 };
 
-// Brand green / orange plus a blue for profit; checked for colour-blind separation on both themes.
-// Dark mode uses its own steps (orange and blue a little deeper) so the bars sit evenly on the dark card.
+// Brand Deep Leaf Green / Tangerine plus a blue for profit; checked for colour-blind separation on both
+// themes (dataviz validator). Dark mode uses a deeper orange; the legend, hover card and table carry the names.
 const SERIES = [
   { key: "sales", label: "Sales", color: "var(--mb-sales)" },
   { key: "expenses", label: "Expenses", color: "var(--mb-expenses)" },
@@ -80,7 +80,7 @@ export function MonthlyChart({ months }: { months: ChartMonth[] }) {
 
   return (
     <figure
-      className="space-y-3 [--mb-expenses:#FF8A00] [--mb-profit:#0369A1] [--mb-sales:#15803D] dark:[--mb-expenses:#D6780F] dark:[--mb-profit:#3D8EDB]"
+      className="space-y-3 [--mb-expenses:#FF7800] [--mb-profit:#0369A1] [--mb-sales:#167A24] dark:[--mb-expenses:#E0700A] dark:[--mb-profit:#3D8EDB]"
       aria-label="Sales, expenses and profit by month"
     >
       <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm">

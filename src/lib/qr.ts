@@ -17,6 +17,6 @@ export function qrSvg(text: string) {
     type: "svg",
     margin: 0,
     errorCorrectionLevel: "M",
-    color: { dark: "#0f5c2c", light: "#0000" },
+    color: { dark: "#0e5518", light: "#0000" },
   });
 }

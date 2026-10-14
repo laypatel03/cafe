@@ -112,7 +112,7 @@ export function MenuBrowser({
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(70% 90% at 90% 0%, rgba(255,138,0,0.38), transparent 60%), radial-gradient(50% 70% at 0% 100%, rgba(34,197,94,0.3), transparent 60%)",
+                "radial-gradient(70% 90% at 90% 0%, rgba(255,120,0,0.38), transparent 60%), radial-gradient(50% 70% at 0% 100%, rgba(120,185,12,0.3), transparent 60%)",
             }}
           />
           <div className="relative mx-auto flex max-w-2xl items-center justify-between">
@@ -158,7 +158,7 @@ export function MenuBrowser({
         </header>
 
         <div className="sticky top-0 z-30 -mt-8 px-4">
-          <div className="mx-auto max-w-2xl rounded-3xl border border-border bg-background/85 p-2 shadow-[0_18px_40px_-26px_rgba(15,92,44,0.5)] backdrop-blur-xl">
+          <div className="mx-auto max-w-2xl rounded-3xl border border-border bg-background/85 p-2 shadow-[0_18px_40px_-26px_rgba(14,85,24,0.5)] backdrop-blur-xl">
             <label className="relative block">
               <span className="sr-only">Search the menu</span>
               <Search
