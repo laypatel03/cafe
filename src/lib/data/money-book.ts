@@ -36,6 +36,8 @@ export type MoneyBook = {
   months: MoneyRow[];
   byCategory: { category: ExpenseCategory; paise: number }[];
   extraSales: ExtraSaleRow[];
+  /** bills completed with "pay later" and not paid yet (any date): not in sales until paid */
+  payLater: { bills: number; paise: number };
 };
 
 const monthStart = (month: string) => {
@@ -49,7 +51,7 @@ export async function getMoneyBook(month: string): Promise<MoneyBook> {
   const end = monthStart(shiftMonth(month, 1));
   const monthFrom = monthStart(month);
 
-  const [settings, billSales, extraSales, spend, byCategory, extraList] = await Promise.all([
+  const [settings, billSales, extraSales, spend, byCategory, extraList, due] = await Promise.all([
     db.cafeSettings.findUnique({
       where: { id: 1 },
       select: { creditCardFeeBps: true, debitCardFeeBps: true },
@@ -78,6 +80,11 @@ export async function getMoneyBook(month: string): Promise<MoneyBook> {
       where: { soldAt: { gte: monthFrom, lt: end } },
       orderBy: [{ soldAt: "desc" }, { createdAt: "desc" }],
       include: { createdBy: { select: { name: true } } },
+    }),
+    db.bill.aggregate({
+      where: { payLaterAt: { not: null }, paidAt: null, voidedAt: null },
+      _count: true,
+      _sum: { totalPaise: true },
     }),
   ]);
 
@@ -118,6 +125,7 @@ export async function getMoneyBook(month: string): Promise<MoneyBook> {
       .map((c) => ({ category: c.category, paise: c._sum.amountPaise ?? 0 }))
       .filter((c) => c.paise > 0)
       .sort((a, b) => b.paise - a.paise),
+    payLater: { bills: due._count, paise: due._sum.totalPaise ?? 0 },
     extraSales: extraList.map((s) => ({
       id: s.id,
       day: `${s.soldAt.getFullYear()}-${String(s.soldAt.getMonth() + 1).padStart(2, "0")}-${String(s.soldAt.getDate()).padStart(2, "0")}`,

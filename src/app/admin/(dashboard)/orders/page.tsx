@@ -7,6 +7,7 @@ import {
   DeleteOrderButton,
   EditOrderButton,
 } from "@/components/admin/orders/order-record-dialog";
+import { RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
 import { TextReceiptButton } from "@/components/admin/receipt-sms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ const Filters = z.object({
   q: z.string().trim().max(60).optional().catch(undefined),
   type: z.enum(["DINE_IN", "PARCEL"]).optional().catch(undefined),
   status: z
-    .enum(["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED", "PAID", "CANCELLED"])
+    .enum(["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED", "PAID", "CANCELLED", "PAY_LATER"])
     .optional()
     .catch(undefined),
   page: z.coerce.number().int().min(1).max(1000).catch(1),
@@ -68,10 +69,12 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         : { customerName: { contains: q, mode: "insensitive" } };
 
   const where: Prisma.OrderWhereInput = {
-    // a number or phone search looks across all dates
-    ...(q && /^\d+$/.test(q) ? {} : { createdAt: { gte: start, lt: end } }),
+    // a number or phone search, or "Pay later – not paid", looks across all dates
+    ...((q && /^\d+$/.test(q)) || f.status === "PAY_LATER" ? {} : { createdAt: { gte: start, lt: end } }),
     ...(f.type && { type: f.type }),
-    ...(f.status && { status: f.status }),
+    ...(f.status === "PAY_LATER"
+      ? { bill: { is: { payLaterAt: { not: null }, paidAt: null, voidedAt: null } } }
+      : f.status && { status: f.status }),
     ...search,
   };
 
@@ -97,6 +100,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             totalPaise: true,
             customerPhone: true,
             voidedAt: true,
+            payLaterAt: true,
             _count: { select: { orders: { where: { deletedAt: null } } } },
           },
         },
@@ -134,7 +138,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
 
       <form
         method="get"
-        className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_9rem_auto]"
+        className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_11rem_auto]"
       >
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           Search
@@ -176,6 +180,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                 {v.label}
               </option>
             ))}
+            <option value="PAY_LATER">Pay later – not paid</option>
           </NativeSelect>
         </label>
         <div className="flex gap-2">
@@ -233,7 +238,9 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                       ? " · bill voided"
                       : o.bill.paidAt
                         ? ` · paid by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}`
-                        : " · not paid yet"}
+                        : o.bill.payLaterAt
+                          ? " · pay later – not paid yet"
+                          : " · not paid yet"}
                   </>
                 )}
               </p>
@@ -291,6 +298,11 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                     {o.bill.number}
                   </Link>
                 </Button>
+              )}
+              {o.bill && !o.bill.paidAt && !o.bill.voidedAt && !o.deletedAt && (
+                <RecordPaymentButton
+                  bill={{ id: o.bill.id, number: o.bill.number, totalPaise: o.bill.totalPaise }}
+                />
               )}
               {RECEIPT_SMS_ENABLED && o.bill?.paidAt && o.bill.customerPhone && (
                 <TextReceiptButton bill={{ id: o.bill.id, number: o.bill.number }} />

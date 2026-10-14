@@ -150,7 +150,13 @@ export function LiveBoard({ initial, menu }: { initial: LiveBoardData; menu: Pub
         </div>
       </div>
 
-      <OrdersPanel orders={data.orders} bills={data.bills} menu={menu} onChanged={refresh} />
+      <OrdersPanel
+        orders={data.orders}
+        bills={data.bills}
+        payLater={data.payLater}
+        menu={menu}
+        onChanged={refresh}
+      />
       <section aria-labelledby="picking-h" className="space-y-3">
         <h2 id="picking-h" className="flex items-center gap-2 text-lg font-bold">
           <Eye className="size-5 text-hh-green dark:text-hh-green-light" aria-hidden /> Selecting now

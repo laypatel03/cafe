@@ -119,6 +119,17 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
         ))}
       </dl>
 
+      {book.payLater.bills > 0 && (
+        <p className="rounded-2xl bg-accent px-4 py-3 text-sm">
+          <span className="font-semibold">Pay later: {rupees(book.payLater.paise)} not paid yet</span> on{" "}
+          {book.payLater.bills} bill{book.payLater.bills === 1 ? "" : "s"}. It counts as a sale on the day the
+          guest pays.{" "}
+          <Link href="/admin/orders?status=PAY_LATER" className="font-semibold underline">
+            See them
+          </Link>
+        </p>
+      )}
+
       <section className="rounded-3xl border border-border bg-card p-4" aria-labelledby="split-h">
         <h3 id="split-h" className="font-bold">
           How guests paid

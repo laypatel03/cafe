@@ -184,6 +184,8 @@ model Bill {
   totalPaise         Int
   paymentMethod      PaymentMethod?
   paidAt             DateTime?
+  // order completed without payment ("pay later"); paidAt is set when the guest pays
+  payLaterAt         DateTime?
   createdById        String?
   createdBy          StaffUser?     @relation("BillsCreated", fields: [createdById], references: [id], onDelete: SetNull)
   orders             Order[]

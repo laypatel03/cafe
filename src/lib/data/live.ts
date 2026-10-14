@@ -40,6 +40,8 @@ export type LiveOrder = {
   note: string | null;
   totalPaise: number;
   createdAt: string;
+  /** placed before today and still not finished – left over from an earlier day */
+  earlier: boolean;
   items: LiveOrderItem[];
 };
 
@@ -51,37 +53,70 @@ export type LiveBill = {
   totalPaise: number;
   orderNumbers: number[];
   createdAt: string;
+  /** set when the order was completed without payment; the guest pays later */
+  payLaterAt: string | null;
 };
 
 export type LiveBoard = {
   selections: LiveSelection[];
   orders: LiveOrder[];
   bills: LiveBill[];
+  /** bills completed with "pay later", any day, still not paid */
+  payLater: LiveBill[];
   serverTime: string;
 };
 
-/** Everything the live dashboard shows: guests picking right now, and today's confirmed orders. */
+const OPEN: OrderStatus[] = ["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED"];
+
+/**
+ * Everything the live dashboard shows: guests picking right now, today's orders, and any order
+ * from an earlier day that was never finished (so it can still be moved on, billed or cancelled).
+ */
 export async function getLiveBoard(role: Role): Promise<LiveBoard> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-  const [selections, orders, bills] = await Promise.all([
+  const [selections, orders, bills, payLater] = await Promise.all([
     db.selection.findMany({
       where: { status: { not: "CONFIRMED" }, updatedAt: { gt: new Date(Date.now() - 12 * 60 * 60 * 1000) } },
       orderBy: { createdAt: "asc" },
     }),
     db.order.findMany({
-      where: { createdAt: { gte: startOfDay }, deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [
+          { createdAt: { gte: startOfDay } },
+          // left open on an earlier day – but not ones completed with "pay later"
+          { status: { in: OPEN }, NOT: { bill: { is: { payLaterAt: { not: null } } } } },
+        ],
+      },
       orderBy: { createdAt: "desc" },
       include: { items: true, bill: { select: { paidAt: true } } },
     }),
     db.bill.findMany({
-      where: { paidAt: null, voidedAt: null },
+      where: { paidAt: null, voidedAt: null, payLaterAt: null },
       orderBy: { createdAt: "asc" },
       include: {
         orders: { select: { number: true }, orderBy: { number: "asc" } },
       },
     }),
+    db.bill.findMany({
+      where: { paidAt: null, voidedAt: null, payLaterAt: { not: null } },
+      orderBy: { payLaterAt: "asc" },
+      include: {
+        orders: { select: { number: true }, orderBy: { number: "asc" } },
+      },
+    }),
   ]);
+  const toLiveBill = (b: (typeof bills)[number]): LiveBill => ({
+    id: b.id,
+    number: b.number,
+    type: b.type,
+    customerName: b.customerName,
+    totalPaise: b.totalPaise,
+    orderNumbers: b.orders.map((o) => o.number),
+    createdAt: b.createdAt.toISOString(),
+    payLaterAt: b.payLaterAt?.toISOString() ?? null,
+  });
   return {
     selections: selections.map((s) => ({
       id: s.id,
@@ -105,6 +140,7 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       note: o.note,
       totalPaise: o.totalPaise,
       createdAt: o.createdAt.toISOString(),
+      earlier: o.createdAt < startOfDay,
       items: o.items.map((i) => ({
         id: i.id,
         itemId: i.menuItemId,
@@ -114,15 +150,8 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
         lineTotalPaise: i.lineTotalPaise,
       })),
     })),
-    bills: bills.map((b) => ({
-      id: b.id,
-      number: b.number,
-      type: b.type,
-      customerName: b.customerName,
-      totalPaise: b.totalPaise,
-      orderNumbers: b.orders.map((o) => o.number),
-      createdAt: b.createdAt.toISOString(),
-    })),
+    bills: bills.map(toLiveBill),
+    payLater: payLater.map(toLiveBill),
     serverTime: new Date().toISOString(),
   };
 }

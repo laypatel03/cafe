@@ -40,21 +40,33 @@ const GROUPS: { title: string; statuses: OrderStatus[]; hint: string }[] = [
 export function OrdersPanel({
   orders,
   bills,
+  payLater,
   menu,
   onChanged,
 }: {
   orders: LiveOrder[];
   bills: LiveBill[];
+  payLater: LiveBill[];
   menu: PublicMenu;
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState<LiveOrder | null>(null);
   const [cancelling, setCancelling] = useState<LiveOrder | null>(null);
   const served = orders.filter((o) => o.status === "PAID");
+  const leftOver = orders.filter((o) => o.earlier && !["PAID", "CANCELLED"].includes(o.status)).length;
   const cancelled = orders.filter((o) => o.status === "CANCELLED");
 
   return (
     <>
+      {leftOver > 0 && (
+        <p role="status" className="rounded-2xl bg-accent px-4 py-3 text-sm">
+          <span className="font-semibold">
+            {leftOver} order{leftOver === 1 ? "" : "s"} from an earlier day {leftOver === 1 ? "is" : "are"}{" "}
+            still open
+          </span>{" "}
+          – marked with their date below. Move {leftOver === 1 ? "it" : "them"} on, bill, or cancel.
+        </p>
+      )}
       {GROUPS.map((g) => {
         const list = orders.filter((o) => g.statuses.includes(o.status));
         if (g.statuses.includes("READY") && list.length === 0) return null;
@@ -84,7 +96,7 @@ export function OrdersPanel({
         );
       })}
 
-      <BillingPanel orders={orders} bills={bills} onChanged={onChanged} />
+      <BillingPanel orders={orders} bills={bills} payLater={payLater} onChanged={onChanged} />
 
       {served.length + cancelled.length > 0 && (
         <section className="space-y-3" aria-label="Done today">
@@ -144,14 +156,22 @@ function OrderCard({
           <p className="text-xs text-muted-foreground">
             {o.customerName}
             {o.customerPhone && ` · ${o.customerPhone}`} ·{" "}
-            {new Date(o.createdAt).toLocaleTimeString("en-IN", {
+            {new Date(o.createdAt).toLocaleString("en-IN", {
+              ...(o.earlier && { day: "numeric", month: "short" }),
               hour: "numeric",
               minute: "2-digit",
               timeZone: CAFE_TZ,
             })}
           </p>
         </div>
-        <OrderStatusBadge status={o.status} />
+        <div className="flex flex-col items-end gap-1">
+          <OrderStatusBadge status={o.status} />
+          {o.earlier && !done && (
+            <span className="rounded-full bg-hh-orange/15 px-2 py-0.5 text-[11px] font-semibold text-brand-text">
+              Earlier day
+            </span>
+          )}
+        </div>
       </div>
       <ul className="mt-3 flex-1 space-y-1 text-sm">
         {o.items.map((i) => (

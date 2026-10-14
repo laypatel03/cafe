@@ -1,15 +1,24 @@
 "use client";
 
-import { Ban, Banknote, CreditCard, LoaderCircle, Printer, ReceiptText, Smartphone } from "lucide-react";
+import {
+  Ban,
+  Banknote,
+  Clock,
+  CreditCard,
+  LoaderCircle,
+  Printer,
+  ReceiptText,
+  Smartphone,
+} from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { generateBill, markBillPaid, voidBill } from "@/app/admin/(dashboard)/actions";
+import { generateBill, markBillPaid, markBillPayLater, voidBill } from "@/app/admin/(dashboard)/actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import type { LiveBill, LiveOrder } from "@/lib/data/live";
-import { formatINR } from "@/lib/format";
+import { CAFE_TZ, formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
 import { ReceiptSmsDialog } from "./receipt-sms";
@@ -60,10 +69,12 @@ function toBill(orders: LiveOrder[]): ToBill[] {
 export function BillingPanel({
   orders,
   bills,
+  payLater,
   onChanged,
 }: {
   orders: LiveOrder[];
   bills: LiveBill[];
+  payLater: LiveBill[];
   onChanged: () => void;
 }) {
   const pending = toBill(orders);
@@ -94,6 +105,28 @@ export function BillingPanel({
               <BillCard key={b.id} bill={b} onChanged={onChanged} onPaid={setReceipt} />
             ))}
           </ul>
+        </section>
+      )}
+      {payLater.length > 0 && (
+        <section className="space-y-3" aria-label="Pay later">
+          <details className="group" open>
+            <summary className="cursor-pointer text-lg font-bold">
+              <Clock className="mr-1 inline size-5 text-brand-text" aria-hidden /> Pay later{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                {payLater.length} not paid yet ·{" "}
+                {formatINR(toRupees(payLater.reduce((s, b) => s + b.totalPaise, 0)))}
+              </span>
+            </summary>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Orders completed without payment. When the guest pays, tap how they paid – it counts as a sale
+              on that day.
+            </p>
+            <ul className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {payLater.map((b) => (
+                <BillCard key={b.id} bill={b} onChanged={onChanged} onPaid={setReceipt} />
+              ))}
+            </ul>
+          </details>
         </section>
       )}
       {RECEIPT_SMS_ENABLED && <ReceiptSmsDialog bill={receipt} onClose={() => setReceipt(null)} />}
@@ -140,6 +173,23 @@ function ToBillCard({ entry, onChanged }: { entry: ToBill; onChanged: () => void
         )}
         Generate bill
       </Button>
+      <Button
+        variant="outline"
+        className="mt-2 rounded-full"
+        disabled={pending || entry.waitingOn.length > 0}
+        onClick={() =>
+          start(async () => {
+            const res = await generateBill(entry.orders.map((o) => o.id));
+            if (!res.ok) return void toast.error(res.error);
+            const later = await markBillPayLater(res.billId);
+            if (later.ok) toast.success(`Bill #${res.number} completed – pay later`);
+            else toast.error(later.error);
+            onChanged();
+          })
+        }
+      >
+        <Clock data-icon="inline-start" /> Complete · pay later
+      </Button>
     </li>
   );
 }
@@ -177,7 +227,12 @@ function BillCard({
     });
 
   return (
-    <li className="flex flex-col rounded-3xl border-2 border-hh-green/40 bg-card p-4">
+    <li
+      className={cn(
+        "flex flex-col rounded-3xl border-2 bg-card p-4",
+        bill.payLaterAt ? "border-hh-orange/40" : "border-hh-green/40",
+      )}
+    >
       <div className="flex items-start gap-2">
         <div className="flex-1">
           <p className="text-lg font-bold">
@@ -186,6 +241,18 @@ function BillCard({
           <p className="text-xs text-muted-foreground">
             {bill.customerName} · orders {bill.orderNumbers.map((n) => `#${n}`).join(", ")}
           </p>
+          {bill.payLaterAt && (
+            <p className="mt-1 text-xs font-semibold text-brand-text">
+              Pay later since{" "}
+              {new Date(bill.payLaterAt).toLocaleString("en-IN", {
+                day: "numeric",
+                month: "short",
+                hour: "numeric",
+                minute: "2-digit",
+                timeZone: CAFE_TZ,
+              })}
+            </p>
+          )}
         </div>
         <Button asChild size="sm" variant="outline" className="rounded-full">
           <Link href={`/admin/print/bill/${bill.id}`} target="_blank">
@@ -213,6 +280,16 @@ function BillCard({
           </Button>
         ))}
       </div>
+      {!bill.payLaterAt && (
+        <Button
+          variant="outline"
+          disabled={pending}
+          className="mt-2 rounded-full"
+          onClick={() => run(() => markBillPayLater(bill.id), `Bill #${bill.number} completed – pay later`)}
+        >
+          <Clock data-icon="inline-start" /> Complete · pay later
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="sm"

@@ -387,6 +387,53 @@ export async function markBillPaid(billId: string, method: PayChoice): Promise<{
   return { ok: true };
 }
 
+/**
+ * Complete a bill without payment – the guest pays later. Its orders are finished (a takeaway
+ * waiting at the counter counts as picked up) and it leaves "Awaiting payment" for the "Pay later"
+ * list, where the payment is recorded whenever it comes. Not counted as a sale until then.
+ */
+export async function markBillPayLater(billId: string): Promise<{ ok: true } | Fail> {
+  const me = await staff();
+  if ("ok" in me) return me;
+  const id = z.string().min(1).max(40).safeParse(billId);
+  if (!id.success) return { ok: false, error: "Bill not found." };
+  const bill = await db.bill.findUnique({ where: { id: id.data }, include: { orders: true } });
+  if (!bill) return { ok: false, error: "Bill not found." };
+  if (bill.paidAt) return { ok: false, error: `Bill #${bill.number} is already paid.` };
+  if (bill.voidedAt) return { ok: false, error: `Bill #${bill.number} is void – make a new bill.` };
+  if (bill.payLaterAt) return { ok: false, error: `Bill #${bill.number} is already on pay later.` };
+
+  const done = await db.$transaction(async (tx) => {
+    const marked = await tx.bill.updateMany({
+      where: { id: bill.id, paidAt: null, voidedAt: null, payLaterAt: null },
+      data: { payLaterAt: new Date() },
+    });
+    if (marked.count === 0) return false;
+    for (const o of bill.orders) {
+      if (o.status === "READY") await tx.order.update({ where: { id: o.id }, data: { status: "SERVED" } });
+    }
+    await tx.orderStatusLog.createMany({
+      data: bill.orders.map((o) => ({
+        orderId: o.id,
+        fromStatus: o.status,
+        toStatus: o.status === "READY" ? "SERVED" : o.status,
+        changedById: me.id,
+        note: `Bill #${bill.number} completed – pay later`,
+      })),
+    });
+    return true;
+  });
+  if (!done) return { ok: false, error: `Bill #${bill.number} was just changed by someone else.` };
+  for (const o of bill.orders)
+    await publish({
+      type: "order",
+      orderId: o.id,
+      number: o.number,
+      status: o.status === "READY" ? "SERVED" : o.status,
+    });
+  return { ok: true };
+}
+
 const VoidSchema = z.object({
   billId: z.string().min(1).max(40),
   reason: z
