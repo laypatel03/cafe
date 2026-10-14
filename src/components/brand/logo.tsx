@@ -2,8 +2,8 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 // Source artwork: doc/brand-palette.jpg (colours and lettering) and doc/brand-guide.jpg (HH mark). Cut-outs live in public/brand.
-const WORDMARK = { src: "/brand/hh-wordmark.webp", width: 1227, height: 305 };
-const NAME = { src: "/brand/hh-name.webp", width: 1223, height: 247 };
+const WORDMARK = { src: "/brand/hh-wordmark.webp", width: 1000, height: 247 };
+const NAME = { src: "/brand/hh-name.webp", width: 640, height: 128 };
 const ICON = { src: "/brand/hh-icon-512.webp", width: 512, height: 391 };
 
 type Props = { className?: string; priority?: boolean };
@@ -19,6 +19,8 @@ export function LogoWordmark({ className, priority }: Props) {
       priority={priority}
       className={cn("h-10 w-auto select-none", className)}
       draggable={false}
+      // served as-is: the image optimiser's re-compression softens the letter edges
+      unoptimized
     />
   );
 }
@@ -33,6 +35,8 @@ export function BrandName({ className }: { className?: string }) {
       alt="Healthy Hunger"
       className={cn("inline-block h-6 w-auto select-none", className)}
       draggable={false}
+      // served as-is: the image optimiser's re-compression softens the letter edges
+      unoptimized
     />
   );
 }
@@ -48,6 +52,8 @@ export function LogoIcon({ className, priority, alt = "Healthy Hunger" }: Props 
       priority={priority}
       className={cn("h-10 w-auto select-none", className)}
       draggable={false}
+      // served as-is: the image optimiser's re-compression softens the letter edges
+      unoptimized
     />
   );
 }

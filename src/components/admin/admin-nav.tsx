@@ -109,7 +109,7 @@ function UserBlock({ user }: { user: CurrentUser }) {
 export function AdminSidebar({ user }: { user: CurrentUser }) {
   return (
     <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col gap-6 bg-sidebar p-4 text-sidebar-foreground lg:flex">
-      <Link href="/admin" className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2">
+      <Link href="/admin" className="flex items-center gap-2 px-2 py-1">
         <LogoIcon className="h-8" alt="" />
         <BrandName className="h-7" />
       </Link>
@@ -138,7 +138,7 @@ export function AdminMobileBar({ user }: { user: CurrentUser }) {
       <span className="font-heading font-bold">Dashboard</span>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-72 gap-6 border-0 bg-sidebar p-4 text-sidebar-foreground">
-          <SheetTitle className="flex items-center gap-2 rounded-2xl bg-white px-3 py-2">
+          <SheetTitle className="flex items-center gap-2 px-2 py-1">
             <LogoIcon className="h-8" alt="" />
             <BrandName className="h-7" />
           </SheetTitle>

@@ -102,7 +102,8 @@
   --accent-foreground: var(--hh-ink);
   --brand: var(--hh-orange);
   --brand-text: var(--hh-orange-text);
-  --surface: var(--hh-green-deep);
+  /* footer and sidebar sit a step darker than Deep Leaf so the logo's greens stand out on them */
+  --surface: #0b3213;
   --surface-foreground: #ffffff;
   --surface-accent: var(--hh-orange-light);
   --destructive: #b42318;
@@ -124,7 +125,7 @@
   --chart-4: var(--hh-orange-light);
   --chart-5: var(--hh-green-deep);
   --radius: 0.875rem;
-  --sidebar: var(--hh-green-deep);
+  --sidebar: #0b3213;
   --sidebar-foreground: #ffffff;
   --sidebar-primary: var(--hh-orange);
   --sidebar-primary-foreground: var(--hh-ink);
