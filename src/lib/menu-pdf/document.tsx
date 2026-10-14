@@ -45,7 +45,17 @@ const s = StyleSheet.create({
     paddingBottom: 10,
   },
   header: { alignItems: "center", marginBottom: 12 },
-  logo: { width: 220, height: 49 },
+  logo: { width: 232, height: 58 },
+  phone: {
+    marginTop: 5,
+    fontSize: 9,
+    fontWeight: 800,
+    color: "#FFFFFF",
+    backgroundColor: C.green,
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 2.5,
+  },
   vegLine: { marginTop: 5, flexDirection: "row", alignItems: "center", gap: 4 },
   vegBox: {
     width: 8,
@@ -195,7 +205,8 @@ function Block({ block }: { block: PdfBlock }) {
 
 export function MenuPdf({ menu, cafe, menuUrl }: { menu: PublicMenu; cafe: CafeDetails; menuUrl: string }) {
   const pages = paginate(groupMenu(menu.categories, menu.items, menu.addOns));
-  const contact = [cafe.address, cafe.phone, cafe.instagram && `@${cafe.instagram.replace(/^@/, "")}`]
+  const phone = cafe.phone.trim();
+  const contact = [cafe.address, cafe.instagram && `@${cafe.instagram.replace(/^@/, "")}`]
     .filter(Boolean)
     .join("  ·  ");
   const updated = new Date().toLocaleDateString("en-IN", {
@@ -224,6 +235,7 @@ export function MenuPdf({ menu, cafe, menuUrl }: { menu: PublicMenu; cafe: CafeD
                 </View>
                 <Text style={s.vegText}>100% veg. Protein from real food.</Text>
               </View>
+              {phone && <Text style={s.phone}>Call or WhatsApp: {phone}</Text>}
             </View>
 
             <View style={s.columns}>

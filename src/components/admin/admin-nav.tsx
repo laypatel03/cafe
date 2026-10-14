@@ -18,7 +18,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/admin/login/actions";
-import { LogoIcon } from "@/components/brand/logo";
+import { BrandName, LogoIcon } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -113,7 +113,7 @@ export function AdminSidebar({ user }: { user: CurrentUser }) {
         <span className="rounded-xl bg-white p-1">
           <LogoIcon className="h-7" alt="" />
         </span>
-        <span className="font-heading text-lg font-bold">Healthy Hunger</span>
+        <BrandName className="text-xl" />
       </Link>
       <div className="flex-1 overflow-y-auto">
         <NavLinks user={user} />
@@ -140,8 +140,8 @@ export function AdminMobileBar({ user }: { user: CurrentUser }) {
       <span className="font-heading font-bold">Dashboard</span>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-72 gap-6 border-0 bg-sidebar p-4 text-sidebar-foreground">
-          <SheetTitle className="px-2 pt-1 font-heading text-lg text-sidebar-foreground">
-            Healthy Hunger
+          <SheetTitle className="px-2 pt-1">
+            <BrandName className="text-xl" />
           </SheetTitle>
           <div className="flex-1 overflow-y-auto">
             <NavLinks user={user} onNavigate={() => setOpen(false)} />

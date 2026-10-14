@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import Link from "next/link";
 import { CardFeesForm, DeleteExtraSaleButton, ExtraSaleForm } from "@/components/admin/money/money-forms";
+import { MonthlyChart } from "@/components/admin/money/monthly-chart";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { today } from "@/lib/data/cash";
@@ -286,7 +287,22 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
         <h3 id="months-h" className="font-bold">
           Month by month · last 12 months
         </h3>
-        <div className="mt-3 overflow-x-auto">
+        <p className="text-sm text-muted-foreground">
+          Sales, expenses and profit for each month. Tap a month to see the numbers.
+        </p>
+        <div className="mt-4">
+          <MonthlyChart
+            months={book.months.map((m) => ({
+              key: m.key,
+              short: new Date(`${m.key}-01T12:00:00`).toLocaleDateString("en-IN", { month: "short" }),
+              label: m.label,
+              sales: toRupees(m.sales),
+              expenses: toRupees(m.expenses),
+              profit: toRupees(m.profit),
+            }))}
+          />
+        </div>
+        <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[56rem] text-right tabular text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border">

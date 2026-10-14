@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LogoIcon } from "@/components/brand/logo";
+import { BrandName, LogoIcon } from "@/components/brand/logo";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Staff login", robots: { index: false } };
@@ -12,7 +12,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/admin/logi
         <div className="mb-6 flex flex-col items-center text-center">
           <LogoIcon className="h-14" alt="" priority />
           <h1 className="mt-3 text-2xl font-bold">Staff login</h1>
-          <p className="text-sm text-muted-foreground">Healthy Hunger dashboard</p>
+          <p className="text-sm text-muted-foreground">
+            <BrandName className="text-base" /> dashboard
+          </p>
         </div>
         <LoginForm next={typeof next === "string" ? next : undefined} />
       </div>

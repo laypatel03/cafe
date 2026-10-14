@@ -11,7 +11,7 @@ export type PdfBlock = PdfCategory & { continued: boolean; showAddOns: boolean }
 export type PdfPage = [PdfBlock[], PdfBlock[]];
 
 /** Usable height of one column in points (A4 minus padding, header and footer, with slack). */
-export const COLUMN_HEIGHT = 655;
+export const COLUMN_HEIGHT = 630;
 
 const NAME_CHARS_PER_LINE = 40;
 const TEXT_CHARS_PER_LINE = 68;

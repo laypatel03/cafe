@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogoIcon } from "@/components/brand/logo";
+import { BrandName, LogoIcon } from "@/components/brand/logo";
 import type { CafeDetails } from "@/lib/data/menu";
 
 export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
@@ -11,10 +11,10 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
             <LogoIcon className="h-10" alt="" />
           </span>
           <div>
-            <p className="font-heading text-2xl font-bold">
-              Healthy <span className="text-hh-orange-light">Hunger</span>
+            <p className="text-3xl leading-none">
+              <BrandName />
             </p>
-            <p className="tagline mt-0.5 text-[11px] text-white/75">Eat well, live well</p>
+            <p className="mt-0.5 tagline text-[11px] text-white/75">Eat well, live well</p>
           </div>
         </div>
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/85">
