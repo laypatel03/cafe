@@ -8,11 +8,12 @@ import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { maskPhone } from "@/lib/phone-mask";
 import { PrintButton } from "../../print-button";
+import { PAYMENT_LABEL } from "@/lib/payments";
 
 export const metadata: Metadata = { title: "Bill", robots: { index: false } };
 
 const rupees = (paise: number) => formatINR(toRupees(paise));
-const METHOD = { CASH: "Cash", UPI: "UPI", CARD: "Card" } as const;
+const METHOD = PAYMENT_LABEL;
 
 /** Receipt-style bill: 80 mm wide (thermal printers) and fine on A4. Outside the dashboard layout. */
 export default async function BillPage({ params }: PageProps<"/admin/print/bill/[id]">) {

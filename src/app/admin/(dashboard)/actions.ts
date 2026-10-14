@@ -17,6 +17,7 @@ import { billFromOrders } from "@/lib/billing";
 import { billTotals, priceLines } from "@/lib/pricing";
 import { publish } from "@/lib/realtime";
 import { maskPhone } from "@/lib/phone-mask";
+import { PAY_CHOICES, type PayChoice, PAYMENT_SHORT } from "@/lib/payments";
 import { RECEIPT_SMS_ENABLED, receiptMessage, smsLink } from "@/lib/receipt";
 import { type CounterOrderInput, CounterOrderSchema } from "@/lib/validators/place-order";
 import { SelectionLinesSchema } from "@/lib/validators/selection";
@@ -326,21 +327,18 @@ export async function generateBill(
 
 const PaymentSchema = z.object({
   billId: z.string().min(1).max(40),
-  method: z.enum(["CASH", "UPI", "CARD"]),
+  method: z.enum(PAY_CHOICES),
 });
 
 /**
  * Payment taken at the counter: orders become PAID (a takeaway not yet picked up stays READY),
  * customer stats update.
  */
-export async function markBillPaid(
-  billId: string,
-  method: "CASH" | "UPI" | "CARD",
-): Promise<{ ok: true } | Fail> {
+export async function markBillPaid(billId: string, method: PayChoice): Promise<{ ok: true } | Fail> {
   const me = await staff();
   if ("ok" in me) return me;
   const parsed = PaymentSchema.safeParse({ billId, method });
-  if (!parsed.success) return { ok: false, error: "Choose cash, UPI or card." };
+  if (!parsed.success) return { ok: false, error: "Choose cash, Google Pay, credit card or debit card." };
 
   const bill = await db.bill.findUnique({ where: { id: parsed.data.billId }, include: { orders: true } });
   if (!bill) return { ok: false, error: "Bill not found." };
@@ -348,7 +346,7 @@ export async function markBillPaid(
   if (bill.voidedAt) return { ok: false, error: `Bill #${bill.number} is void – make a new bill.` };
 
   const now = new Date();
-  const label = { CASH: "cash", UPI: "UPI", CARD: "card" }[parsed.data.method];
+  const label = PAYMENT_SHORT[parsed.data.method];
   const done = await db.$transaction(async (tx) => {
     const paid = await tx.bill.updateMany({
       where: { id: bill.id, paidAt: null, voidedAt: null },

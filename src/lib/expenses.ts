@@ -17,7 +17,7 @@ export const EXPENSE_CATEGORY: Record<ExpenseCategory, string> = {
 
 export const EXPENSE_PAYMENT: Record<ExpensePayment, string> = {
   CASH: "Cash from the drawer",
-  UPI: "UPI",
+  UPI: "Google Pay / UPI",
   CARD: "Card",
   BANK: "Bank transfer",
 };

@@ -13,6 +13,7 @@ import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { maskPhone } from "@/lib/phone-mask";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
+import { PAYMENT_SHORT } from "@/lib/payments";
 
 export const metadata = { title: "Order history" };
 
@@ -190,7 +191,9 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                   <>
                     {" "}
                     · Bill #{o.bill.number}
-                    {o.bill.paidAt ? ` · paid by ${o.bill.paymentMethod?.toLowerCase()}` : " · not paid yet"}
+                    {o.bill.paidAt
+                      ? ` · paid by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}`
+                      : " · not paid yet"}
                   </>
                 )}
               </p>

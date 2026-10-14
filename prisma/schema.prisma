@@ -38,8 +38,10 @@ enum SelectionStatus {
 
 enum PaymentMethod {
   CASH
-  UPI
-  CARD
+  UPI // Google Pay and other UPI apps
+  CARD // bills from before 13 Oct 2026, when card wasn't split; counted as credit card
+  CREDIT_CARD
+  DEBIT_CARD
 }
 
 /// What an expense was for (owner-facing names live in src/lib/expenses.ts).
@@ -242,25 +244,29 @@ model StaffUser {
   expenses       Expense[]        @relation("ExpensesAdded")
   cashDaysOpened CashDay[]        @relation("CashDaysOpened")
   cashDaysClosed CashDay[]        @relation("CashDaysClosed")
+  extraSales     ExtraSale[]      @relation("ExtraSalesAdded")
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 }
 
 /// Single row (id = 1) with the café's details and switches.
 model CafeSettings {
-  id              Int      @id @default(1)
-  name            String   @default("Healthy Hunger")
-  tagline         String   @default("Eat well, live well")
-  address         String   @default("")
-  mapUrl          String   @default("")
-  phone           String   @default("")
-  whatsapp        String   @default("")
-  instagram       String   @default("")
-  hours           Json     @default("[]") // [{ days, time }]
-  orderingEnabled Boolean  @default(true)
-  taxBasisPoints  Int      @default(0) // 500 = 5 %
-  todaysPickId    String?
-  updatedAt       DateTime @updatedAt
+  id               Int      @id @default(1)
+  name             String   @default("Healthy Hunger")
+  tagline          String   @default("Eat well, live well")
+  address          String   @default("")
+  mapUrl           String   @default("")
+  phone            String   @default("")
+  whatsapp         String   @default("")
+  instagram        String   @default("")
+  hours            Json     @default("[]") // [{ days, time }]
+  orderingEnabled  Boolean  @default(true)
+  taxBasisPoints   Int      @default(0) // 500 = 5 %
+  todaysPickId     String?
+  // what the card machine provider keeps, in basis points (180 = 1.8 %); taken off profit in the money book
+  creditCardFeeBps Int      @default(0)
+  debitCardFeeBps  Int      @default(0)
+  updatedAt        DateTime @updatedAt
 }
 
 /// Fixed-window rate limiting for login and order forms.
@@ -321,4 +327,18 @@ model CashDay {
   closedBy          StaffUser?  @relation("CashDaysClosed", fields: [closedById], references: [id], onDelete: SetNull)
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+}
+
+/// Sales that never went through a bill (e.g. a counter sale written on paper), added in the money book.
+model ExtraSale {
+  id          String        @id @default(cuid())
+  soldAt      DateTime // noon of the day it belongs to (café time), like back-dated expenses
+  method      PaymentMethod
+  amountPaise Int
+  note        String?
+  createdById String?
+  createdBy   StaffUser?    @relation("ExtraSalesAdded", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+
+  @@index([soldAt])
 }

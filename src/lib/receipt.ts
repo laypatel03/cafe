@@ -1,5 +1,6 @@
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
+import { PAYMENT_SHORT } from "@/lib/payments";
 
 // The receipt text a guest gets by SMS once their bill is paid. Staff send it from the
 // counter phone's own messages app (an sms: link), so it costs nothing. Pure, so it's unit-tested.
@@ -10,15 +11,13 @@ import { toRupees } from "@/lib/money";
  */
 export const RECEIPT_SMS_ENABLED = false;
 
-const METHOD = { CASH: "cash", UPI: "UPI", CARD: "card" } as const;
-
 export function receiptMessage(bill: {
   cafeName: string;
   number: number;
   totalPaise: number;
-  paymentMethod: keyof typeof METHOD | null;
+  paymentMethod: keyof typeof PAYMENT_SHORT | null;
 }) {
-  const paid = bill.paymentMethod ? ` paid by ${METHOD[bill.paymentMethod]}` : " paid";
+  const paid = bill.paymentMethod ? ` paid by ${PAYMENT_SHORT[bill.paymentMethod]}` : " paid";
   return `Thank you for visiting ${bill.cafeName}! Bill #${bill.number} – ${formatINR(toRupees(bill.totalPaise))}${paid}. See you again soon.`;
 }
 

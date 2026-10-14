@@ -146,8 +146,9 @@ function ToBillCard({ entry, onChanged }: { entry: ToBill; onChanged: () => void
 
 const METHODS = [
   { id: "CASH", label: "Cash", icon: Banknote },
-  { id: "UPI", label: "UPI", icon: Smartphone },
-  { id: "CARD", label: "Card", icon: CreditCard },
+  { id: "UPI", label: "Google Pay", icon: Smartphone },
+  { id: "CREDIT_CARD", label: "Credit card", icon: CreditCard },
+  { id: "DEBIT_CARD", label: "Debit card", icon: CreditCard },
 ] as const;
 
 function BillCard({
@@ -194,7 +195,7 @@ function BillCard({
       </div>
       <p className="mt-3 text-right tabular text-2xl font-bold">{formatINR(toRupees(bill.totalPaise))}</p>
       <p className="mt-3 text-xs font-semibold text-muted-foreground">Paid by</p>
-      <div className="mt-1 grid grid-cols-3 gap-2">
+      <div className="mt-1 grid grid-cols-2 gap-2">
         {METHODS.map((m) => (
           <Button
             key={m.id}

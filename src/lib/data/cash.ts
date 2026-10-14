@@ -1,4 +1,5 @@
 import "server-only";
+import type { PaymentMethod } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { carriedOpening, expectedCash } from "@/lib/cash";
 import { isoDay } from "@/lib/reports";
@@ -13,12 +14,18 @@ export const today = () => isoDay(new Date());
 
 /** Money in and out between two moments: paid, non-void bills by method, and expenses. */
 export async function moneyBetween(start: Date, end: Date) {
-  const [bills, expenses] = await Promise.all([
+  const [bills, extra, expenses] = await Promise.all([
     db.bill.groupBy({
       by: ["paymentMethod"],
       where: { paidAt: { gte: start, lt: end }, voidedAt: null },
       _sum: { totalPaise: true },
       _count: true,
+    }),
+    // sales added by hand in the money book (no bill)
+    db.extraSale.groupBy({
+      by: ["method"],
+      where: { soldAt: { gte: start, lt: end } },
+      _sum: { amountPaise: true },
     }),
     db.expense.groupBy({
       by: ["paidWith"],
@@ -27,13 +34,16 @@ export async function moneyBetween(start: Date, end: Date) {
       _count: true,
     }),
   ]);
-  const sales = (m: "CASH" | "UPI" | "CARD") =>
-    bills.find((b) => b.paymentMethod === m)?._sum.totalPaise ?? 0;
+  const sales = (...methods: PaymentMethod[]) =>
+    bills
+      .filter((b) => b.paymentMethod && methods.includes(b.paymentMethod))
+      .reduce((s, b) => s + (b._sum.totalPaise ?? 0), 0) +
+    extra.filter((x) => methods.includes(x.method)).reduce((s, x) => s + (x._sum.amountPaise ?? 0), 0);
   const spent = expenses.reduce((s, e) => s + (e._sum.amountPaise ?? 0), 0);
   return {
     cashSalesPaise: sales("CASH"),
     upiSalesPaise: sales("UPI"),
-    cardSalesPaise: sales("CARD"),
+    cardSalesPaise: sales("CARD", "CREDIT_CARD", "DEBIT_CARD"),
     bills: bills.reduce((n, b) => n + b._count, 0),
     cashExpensesPaise: expenses.find((e) => e.paidWith === "CASH")?._sum.amountPaise ?? 0,
     expensesPaise: spent,

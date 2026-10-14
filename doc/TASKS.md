@@ -167,6 +167,9 @@ Flow: guest picks items (**staff see it live**) → guest taps **Confirm – I'm
 - [x] **P4B-02 Cash counter** – open and close the drawer each day; opening carries over when nobody enters it.
   ✅ 8 Oct: `CashDay` model + `/admin/cash`. Expected = opening + cash sales − cash expenses (`src/lib/cash.ts`, tested). Not entered → carried from the last day: its closing count if closed, otherwise its opening + its net cash, plus any days in between. Closing saves the day's totals (snapshot) with the count; live "Short by / Extra" preview while typing. Owner: last 14 days and reopen today. Verified: ₹2,000 + ₹737 − ₹450 = ₹2,287, counted ₹2,250 → short ₹37; carry tested both ways (₹1,500 closed count; ₹1,000 + ₹1,694 = ₹2,694 when left open).
 
+- [x] **P4B-03 Money book** – sales by how guests paid (cash, Google Pay, credit card, debit card), card machine fees, expenses and profit, per day and per month.
+  ✅ 13 Oct: `/admin/money` (owner) + `/api/money/export?month=` (CSV). `PaymentMethod` gains `CREDIT_CARD`/`DEBIT_CARD` (old `CARD` bills count as credit); billing offers Cash · Google Pay · Credit card · Debit card. `ExtraSale` for sales that never got a bill (cash ones count toward the drawer). Card fee % in `CafeSettings` (basis points), rounded to the rupee per day; a month's fees = sum of its days. Pure maths in `src/lib/money-book.ts` (tested).
+
 ## Phase 5 – Launch
 - [ ] **P5-01 Package for the server** – Next.js + Postgres + Caddy; production env.
   Plain: Package the app so it runs the same way on the café's server as on our computers.
