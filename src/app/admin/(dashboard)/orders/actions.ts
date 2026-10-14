@@ -15,6 +15,7 @@ import { PAYMENT_SHORT } from "@/lib/payments";
 import { billTotals, type PricedLine } from "@/lib/pricing";
 import { publish } from "@/lib/realtime";
 import {
+  DeleteOrderSchema,
   type EditOrderInput,
   EditOrderSchema,
   type PastOrderInput,
@@ -66,12 +67,16 @@ async function refreshCustomers(tx: Prisma.TransactionClient, ids: (string | nul
     if (!customer) continue;
     const [bills, firstOrder] = await Promise.all([
       tx.bill.findMany({
-        where: { paidAt: { not: null }, voidedAt: null, orders: { some: { customerId: id } } },
+        where: {
+          paidAt: { not: null },
+          voidedAt: null,
+          orders: { some: { customerId: id, deletedAt: null } },
+        },
         select: {
           totalPaise: true,
           paidAt: true,
           customerPhone: true,
-          orders: { select: { customerId: true, customerPhone: true } },
+          orders: { where: { deletedAt: null }, select: { customerId: true, customerPhone: true } },
         },
       }),
       tx.order.findFirst({
@@ -194,12 +199,18 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
       items: true,
       bill: {
         include: {
-          orders: { select: { id: true, subtotalPaise: true, customerPhone: true, customerId: true } },
+          // deleted orders stay linked to their bill but no longer count on it
+          orders: {
+            where: { deletedAt: null },
+            select: { id: true, subtotalPaise: true, customerPhone: true, customerId: true },
+          },
         },
       },
     },
   });
   if (!order) return { ok: false, error: "Order not found." };
+  if (order.deletedAt)
+    return { ok: false, error: `Order #${order.number} was deleted and can't be changed.` };
   const bill = order.bill;
   const type = takeaway ? "PARCEL" : "DINE_IN";
   const shared = !!bill && bill.orders.length > 1;
@@ -301,6 +312,82 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
   });
 
   await publish({ type: "order", orderId: order.id, number: order.number, status: order.status });
+  refresh();
+  return { ok: true };
+}
+
+/* ------------------------------ delete order ------------------------------ */
+
+/**
+ * Delete an order entered by mistake. It stays in Order history (shown in red, with the reason)
+ * but leaves the money book, reports and the guest's visits: its bill is voided, or – when the
+ * bill has other orders – the bill's total drops by this order.
+ */
+export async function deleteOrder(orderId: string, reason: string): Promise<{ ok: true } | Fail> {
+  const me = await editor();
+  if ("ok" in me) return me;
+  const parsed = DeleteOrderSchema.safeParse({ orderId, reason });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+
+  const order = await db.order.findUnique({
+    where: { id: parsed.data.orderId },
+    include: {
+      bill: {
+        include: {
+          orders: {
+            select: { id: true, number: true, subtotalPaise: true, customerId: true, deletedAt: true },
+          },
+        },
+      },
+    },
+  });
+  if (!order) return { ok: false, error: "Order not found." };
+  if (order.deletedAt) return { ok: false, error: `Order #${order.number} is already deleted.` };
+  const bill = order.bill;
+  const why = parsed.data.reason;
+
+  await db.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        deletedAt: new Date(),
+        status: "CANCELLED",
+        cancelReason: `Deleted: ${why}`,
+        statusLogs: {
+          create: {
+            fromStatus: order.status,
+            toStatus: "CANCELLED",
+            changedById: me.id,
+            note: `Deleted by ${me.name}: ${why}`,
+          },
+        },
+      },
+    });
+    if (bill && !bill.voidedAt) {
+      const left = bill.orders.filter((o) => o.id !== order.id && !o.deletedAt);
+      if (left.length === 0) {
+        // the bill stays (numbers are continuous) but no longer counts anywhere
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: {
+            voidedAt: new Date(),
+            voidReason: `Order #${order.number} deleted: ${why}`,
+            voidedById: me.id,
+            voidedOrderNumbers: bill.orders.map((o) => o.number),
+          },
+        });
+      } else {
+        const sums = billFromOrders(left, bill.taxBasisPoints);
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: { subtotalPaise: sums.subtotalPaise, taxPaise: sums.taxPaise, totalPaise: sums.totalPaise },
+        });
+      }
+    }
+    await refreshCustomers(tx, [order.customerId, ...(bill?.orders.map((o) => o.customerId) ?? [])]);
+  });
+
+  await publish({ type: "order", orderId: order.id, number: order.number, status: "CANCELLED" });
   refresh();
   return { ok: true };
 }

@@ -1,17 +1,23 @@
 "use client";
 
-import { LoaderCircle, Pencil, Plus } from "lucide-react";
+import { LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { addPastOrder, editOrder } from "@/app/admin/(dashboard)/orders/actions";
-import { type EditableLine, ItemLinesEditor, toEditableLines } from "@/components/admin/item-lines-editor";
+import { addPastOrder, deleteOrder, editOrder } from "@/app/admin/(dashboard)/orders/actions";
+import {
+  type EditableLine,
+  ItemLinesEditor,
+  parsePrice,
+  toEditableLines,
+} from "@/components/admin/item-lines-editor";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { PublicMenu } from "@/lib/data/menu";
+import { formatINR } from "@/lib/format";
 import { toCafeInput } from "@/lib/order-edit";
 import { PAY_CHOICES, PAYMENT_LABEL, type PayChoice } from "@/lib/payments";
 
@@ -24,7 +30,14 @@ export type EditableOrder = {
   name: string;
   phone: string;
   note: string;
-  items: { itemId: string | null; name: string; quantity: number; addOns: { id: string; name: string }[] }[];
+  items: {
+    itemId: string | null;
+    name: string;
+    quantity: number;
+    addOns: { id: string; name: string }[];
+    /** price each in ₹ that the guest paid */
+    unitPrice: number;
+  }[];
   /** set when the order's bill is paid */
   paidBy: PayChoice | "CARD" | null;
   billNumber: number | null;
@@ -92,19 +105,28 @@ function OrderForm({
   const showPayment = !order || !!order.paidBy;
   const now = toCafeInput(new Date());
 
+  const prices = lines.map((l) => parsePrice(l.price));
+  const itemsTotal = lines.reduce((s, l, i) => s + (prices[i] ?? 0) * l.quantity, 0);
+
   const save = () =>
     start(async () => {
       setError(null);
+      const missing = lines.filter((_, i) => prices[i] === undefined || prices[i]! < 0);
+      if (missing.length > 0) {
+        setError({ message: `Enter a price for ${missing.map((l) => l.name).join(", ")}.` });
+        return;
+      }
       const common = {
         when,
         takeaway,
         name,
         phone,
         note,
-        items: lines.map((l) => ({
+        items: lines.map((l, i) => ({
           itemId: l.itemId,
           addOnIds: l.addOns.map((a) => a.id),
           quantity: l.quantity,
+          unitPrice: prices[i],
         })),
       };
       const res = order
@@ -129,7 +151,7 @@ function OrderForm({
         </DialogTitle>
         <DialogDescription>
           {order
-            ? "Fix anything that was entered wrong. Items already on the order keep the price the guest paid."
+            ? "Fix anything that was entered wrong, prices too. The bill, money book and reports follow."
             : "For an order that already happened and was paid. It goes in as served and paid, with its bill."}
         </DialogDescription>
       </div>
@@ -219,7 +241,13 @@ function OrderForm({
             save.
           </p>
         )}
-        <ItemLinesEditor lines={lines} onChange={setLines} menu={menu} allowSoldOut />
+        <ItemLinesEditor lines={lines} onChange={setLines} menu={menu} allowSoldOut editPrices />
+        {lines.length > 0 && (
+          <p className="text-right text-sm">
+            Items total <span className="tabular font-semibold">{formatINR(itemsTotal)}</span>
+            <span className="text-xs text-muted-foreground"> (before tax, if any)</span>
+          </p>
+        )}
       </div>
 
       <div className="space-y-1.5">
@@ -256,5 +284,87 @@ function OrderForm({
         </Button>
       </DialogFooter>
     </div>
+  );
+}
+
+const DELETE_REASONS = ["Entered by mistake", "Duplicate order", "Test order", "Guest didn't pay"];
+
+/** "Delete" on an order in Order history: it stays listed in red but leaves the money book. */
+export function DeleteOrderButton({
+  order,
+}: {
+  order: { id: string; number: number; billNumber: number | null };
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pending, start] = useTransition();
+  const confirm = () =>
+    start(async () => {
+      const res = await deleteOrder(order.id, reason);
+      if (res.ok) {
+        toast.success(`Order #${order.number} deleted`);
+        setOpen(false);
+        router.refresh();
+      } else toast.error(res.error);
+    });
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="rounded-full text-destructive hover:text-destructive"
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 data-icon="inline-start" /> Delete
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <div className="space-y-4">
+            <div>
+              <DialogTitle className="text-xl">Delete order #{order.number}?</DialogTitle>
+              <DialogDescription>
+                It comes off the money book, reports and the guest&apos;s visits
+                {order.billNumber ? ` (bill #${order.billNumber} is voided or reduced)` : ""}. It stays in
+                Order history, marked in red with your reason.
+              </DialogDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {DELETE_REASONS.map((r) => (
+                <Button
+                  key={r}
+                  type="button"
+                  size="sm"
+                  variant={reason === r ? "default" : "outline"}
+                  className="rounded-full"
+                  onClick={() => setReason(r)}
+                >
+                  {r}
+                </Button>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`del-${order.id}`}>Reason</Label>
+              <Input
+                id={`del-${order.id}`}
+                value={reason}
+                maxLength={200}
+                onChange={(e) => setReason(e.target.value)}
+                className="h-10"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Keep it
+              </Button>
+              <Button variant="destructive" onClick={confirm} disabled={pending || reason.trim().length < 3}>
+                {pending && <LoaderCircle className="animate-spin" aria-hidden />}
+                Delete order
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

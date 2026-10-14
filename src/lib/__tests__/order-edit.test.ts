@@ -9,7 +9,7 @@ import {
   toCafeInput,
 } from "@/lib/order-edit";
 import type { MenuItemPrice } from "@/lib/pricing";
-import { EditOrderSchema, PastOrderSchema } from "@/lib/validators/order-edit";
+import { DeleteOrderSchema, EditOrderSchema, PastOrderSchema } from "@/lib/validators/order-edit";
 
 const menu = new Map<string, MenuItemPrice>([
   [
@@ -63,6 +63,49 @@ describe("priceEditedLines", () => {
       ok: false,
     });
     expect(priceEditedLines([], menu)).toMatchObject({ ok: false });
+  });
+});
+
+describe("typed prices", () => {
+  it("a typed price wins over the kept and the menu price", () => {
+    const kept = new Map<string, KeptLine>([
+      [lineKey("tea", []), { itemName: "Lemon Iced Tea", unitPricePaise: 9900, addOns: [] }],
+    ]);
+    const res = priceEditedLines(
+      [
+        { itemId: "tea", addOnIds: [], quantity: 2, unitPricePaise: 5000 },
+        { itemId: "salad", addOnIds: [], quantity: 1, unitPricePaise: 0 },
+      ],
+      menu,
+      kept,
+    );
+    expect(res).toMatchObject({ ok: true, subtotalPaise: 10000 });
+  });
+
+  it("rejects negative or huge prices", () => {
+    expect(
+      priceEditedLines([{ itemId: "tea", addOnIds: [], quantity: 1, unitPricePaise: -1 }], menu),
+    ).toMatchObject({ ok: false });
+    expect(
+      priceEditedLines([{ itemId: "tea", addOnIds: [], quantity: 1, unitPricePaise: 10_000_001 }], menu),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("turns typed rupees into paise in the form", () => {
+    const res = EditOrderSchema.safeParse({
+      when: "2026-01-05T13:15",
+      takeaway: false,
+      name: "Riya",
+      phone: "",
+      orderId: "o1",
+      items: [{ itemId: "tea", addOnIds: [], quantity: 1, unitPrice: 49.5 }],
+    });
+    expect(res.success && res.data.items[0]).toMatchObject({ unitPricePaise: 4950 });
+  });
+
+  it("needs a reason to delete", () => {
+    expect(DeleteOrderSchema.safeParse({ orderId: "o1", reason: " " }).success).toBe(false);
+    expect(DeleteOrderSchema.safeParse({ orderId: "o1", reason: "Test order" }).success).toBe(true);
   });
 });
 

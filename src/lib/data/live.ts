@@ -70,7 +70,7 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       orderBy: { createdAt: "asc" },
     }),
     db.order.findMany({
-      where: { createdAt: { gte: startOfDay } },
+      where: { createdAt: { gte: startOfDay }, deletedAt: null },
       orderBy: { createdAt: "desc" },
       include: { items: true, bill: { select: { paidAt: true } } },
     }),

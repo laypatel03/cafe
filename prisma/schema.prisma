@@ -153,6 +153,8 @@ model Order {
   taxPaise      Int              @default(0)
   totalPaise    Int
   cancelReason  String?
+  // deleted by the owner from Order history: kept and shown in red, but left out of the money book and reports
+  deletedAt     DateTime?
   // set when the cashier generates the bill for this visit
   billId        String?
   bill          Bill?            @relation(fields: [billId], references: [id], onDelete: SetNull)

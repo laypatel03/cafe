@@ -15,17 +15,27 @@ export type EditableLine = {
   name: string;
   quantity: number;
   addOns: { id: string; name: string }[];
+  /** price each in ₹ as typed, when prices can be edited */
+  price?: string;
 };
 
 const keyOf = (itemId: string, addOnIds: string[]) => [itemId, ...[...addOnIds].sort()].join("|");
 
 export function toEditableLines(
-  items: { itemId: string | null; name: string; quantity: number; addOns: { id: string; name: string }[] }[],
-) {
+  items: {
+    itemId: string | null;
+    name: string;
+    quantity: number;
+    addOns: { id: string; name: string }[];
+    /** price each in ₹, to start the price box from */
+    unitPrice?: number;
+  }[],
+): EditableLine[] {
   return items
     .filter((i): i is typeof i & { itemId: string } => !!i.itemId)
-    .map((i) => ({
+    .map(({ unitPrice, ...i }) => ({
       ...i,
+      ...(unitPrice !== undefined && { price: String(unitPrice) }),
       key: keyOf(
         i.itemId,
         i.addOns.map((a) => a.id),
@@ -33,20 +43,31 @@ export function toEditableLines(
     }));
 }
 
+/** A typed price as a number of rupees, or undefined if it isn't one. */
+export const parsePrice = (v: string | undefined) => {
+  if (v === undefined || v.trim() === "") return undefined;
+  const n = Number(v.replace(/[₹,\s]/g, ""));
+  return Number.isFinite(n) ? n : undefined;
+};
+
 /** Staff edit a guest's items: change quantity, remove, or add from the menu. */
 export function ItemLinesEditor({
   lines,
   onChange,
   menu,
   allowSoldOut = false,
+  editPrices = false,
 }: {
   lines: EditableLine[];
   onChange: (lines: EditableLine[]) => void;
   menu: PublicMenu;
   /** for past orders: the guest already had it, so sold-out items can be picked */
   allowSoldOut?: boolean;
+  /** Order history: show a price box on each line (₹ each, add-ons included) */
+  editPrices?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
+  const addOnPrice = useMemo(() => new Map(menu.addOns.map((a) => [a.id, a.price])), [menu.addOns]);
 
   const add = (item: MenuItem, addOns: { id: string; name: string }[]) => {
     const key = keyOf(
@@ -57,7 +78,19 @@ export function ItemLinesEditor({
     onChange(
       existing
         ? lines.map((l) => (l.key === key ? { ...l, quantity: Math.min(20, l.quantity + 1) } : l))
-        : [...lines, { key, itemId: item.id, name: item.name, quantity: 1, addOns }],
+        : [
+            ...lines,
+            {
+              key,
+              itemId: item.id,
+              name: item.name,
+              quantity: 1,
+              addOns,
+              ...(editPrices && {
+                price: String(item.price + addOns.reduce((s, a) => s + (addOnPrice.get(a.id) ?? 0), 0)),
+              }),
+            },
+          ],
     );
     setAdding(false);
   };
@@ -73,6 +106,25 @@ export function ItemLinesEditor({
                 <p className="truncate text-xs text-muted-foreground">
                   + {it.addOns.map((a) => a.name).join(", ")}
                 </p>
+              )}
+              {editPrices && (
+                <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="sr-only">Price of {it.name}, each</span>
+                  <span aria-hidden>₹</span>
+                  <input
+                    inputMode="decimal"
+                    value={it.price ?? ""}
+                    onChange={(e) =>
+                      onChange(lines.map((x) => (x.key === it.key ? { ...x, price: e.target.value } : x)))
+                    }
+                    aria-invalid={parsePrice(it.price) === undefined}
+                    className="h-8 w-20 rounded-lg border border-input bg-background px-2 tabular text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/40 aria-invalid:border-destructive"
+                  />
+                  <span aria-hidden>each</span>
+                  {parsePrice(it.price) !== undefined && it.quantity > 1 && (
+                    <span className="tabular">· {formatINR(parsePrice(it.price)! * it.quantity)}</span>
+                  )}
+                </label>
               )}
             </div>
             <QuantityStepper

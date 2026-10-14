@@ -2,7 +2,11 @@ import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { ORDER_STATUS, OrderStatusBadge } from "@/components/admin/order-status-badge";
-import { AddOrderButton, EditOrderButton } from "@/components/admin/orders/order-record-dialog";
+import {
+  AddOrderButton,
+  DeleteOrderButton,
+  EditOrderButton,
+} from "@/components/admin/orders/order-record-dialog";
 import { TextReceiptButton } from "@/components/admin/receipt-sms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +21,7 @@ import { toRupees } from "@/lib/money";
 import { toCafeInput } from "@/lib/order-edit";
 import { maskPhone } from "@/lib/phone-mask";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
+import { cn } from "@/lib/utils";
 import { PAYMENT_SHORT } from "@/lib/payments";
 
 export const metadata = { title: "Order history" };
@@ -92,7 +97,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             totalPaise: true,
             customerPhone: true,
             voidedAt: true,
-            _count: { select: { orders: true } },
+            _count: { select: { orders: { where: { deletedAt: null } } } },
           },
         },
         statusLogs: { orderBy: { createdAt: "asc" }, include: { changedBy: { select: { name: true } } } },
@@ -190,13 +195,33 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
 
       <ul className="space-y-3">
         {orders.map((o) => (
-          <li key={o.id} className="rounded-3xl border border-border bg-card p-4">
+          <li
+            key={o.id}
+            className={cn(
+              "rounded-3xl border p-4",
+              // deleted: kept for the record, tinted light red, left out of the money book
+              o.deletedAt ? "border-destructive/30 bg-destructive/5" : "border-border bg-card",
+            )}
+          >
             <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
               <p className="text-lg font-bold">
                 #{o.number} · {o.type === "PARCEL" ? "Takeaway" : "Dine-in"}
               </p>
-              <OrderStatusBadge status={o.status} className="mt-1" />
-              <p className="ml-auto tabular text-lg font-semibold">{formatINR(toRupees(o.totalPaise))}</p>
+              {o.deletedAt ? (
+                <span className="mt-1 inline-flex items-center rounded-full bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
+                  Deleted
+                </span>
+              ) : (
+                <OrderStatusBadge status={o.status} className="mt-1" />
+              )}
+              <p
+                className={cn(
+                  "ml-auto tabular text-lg font-semibold",
+                  o.deletedAt && "text-muted-foreground line-through",
+                )}
+              >
+                {formatINR(toRupees(o.totalPaise))}
+              </p>
               <p className="w-full text-xs text-muted-foreground">
                 {o.customerName}
                 {o.customerPhone && ` · ${showPhone(o.customerPhone)}`} · {time(o.createdAt)}
@@ -204,9 +229,11 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                   <>
                     {" "}
                     · Bill #{o.bill.number}
-                    {o.bill.paidAt
-                      ? ` · paid by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}`
-                      : " · not paid yet"}
+                    {o.bill.voidedAt
+                      ? " · bill voided"
+                      : o.bill.paidAt
+                        ? ` · paid by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}`
+                        : " · not paid yet"}
                   </>
                 )}
               </p>
@@ -232,7 +259,14 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
               })}
             </ul>
             {o.note && <p className="mt-2 text-sm">Note: {o.note}</p>}
-            {o.cancelReason && <p className="mt-2 text-sm text-destructive">Cancelled: {o.cancelReason}</p>}
+            {o.deletedAt ? (
+              <p className="mt-2 text-sm text-destructive">
+                Deleted {time(o.deletedAt)} – {o.cancelReason?.replace(/^Deleted: /, "")}. Not counted in the
+                money book or reports.
+              </p>
+            ) : (
+              o.cancelReason && <p className="mt-2 text-sm text-destructive">Cancelled: {o.cancelReason}</p>
+            )}
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <details className="flex-1 text-sm">
@@ -261,7 +295,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
               {RECEIPT_SMS_ENABLED && o.bill?.paidAt && o.bill.customerPhone && (
                 <TextReceiptButton bill={{ id: o.bill.id, number: o.bill.number }} />
               )}
-              {menu && (
+              {menu && !o.deletedAt && (
                 <EditOrderButton
                   menu={menu}
                   order={{
@@ -280,11 +314,17 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                         id: a.id,
                         name: a.name,
                       })),
+                      unitPrice: toRupees(i.unitPricePaise),
                     })),
                     paidBy: o.bill?.paidAt && !o.bill.voidedAt ? (o.bill.paymentMethod ?? null) : null,
                     billNumber: o.bill?.number ?? null,
                     sharedBill: (o.bill?._count.orders ?? 0) > 1,
                   }}
+                />
+              )}
+              {menu && !o.deletedAt && (
+                <DeleteOrderButton
+                  order={{ id: o.id, number: o.number, billNumber: o.bill?.number ?? null }}
                 />
               )}
             </div>

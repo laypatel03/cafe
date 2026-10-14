@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { fromCafeInput } from "@/lib/order-edit";
 import { PAY_CHOICES } from "@/lib/payments";
+import { MAX_LINE_QUANTITY } from "@/lib/pricing";
 import { INDIAN_MOBILE } from "./phone";
-import { SelectionLinesSchema } from "./selection";
 
 const optionalPhone = z
   .string()
@@ -29,19 +29,52 @@ const when = z
   })
   .refine((d) => d.getTime() <= Date.now() + 60_000, "The date and time can't be in the future");
 
+/** Item lines, each with an optional price the owner typed (₹ each, add-ons included) → paise. */
+const EditLinesSchema = z
+  .array(
+    z.object({
+      itemId: z.string().min(1).max(40),
+      addOnIds: z.array(z.string().min(1).max(40)).max(10).default([]),
+      quantity: z.number().int().min(1).max(MAX_LINE_QUANTITY),
+      unitPrice: z
+        .number({ error: "Prices must be numbers" })
+        .min(0, "Prices can't be negative")
+        .max(100_000, "That price looks too high")
+        .optional(),
+    }),
+  )
+  .max(40)
+  .min(1, "Add at least one item")
+  .transform((lines) =>
+    lines.map(({ unitPrice, ...l }) => ({
+      ...l,
+      ...(unitPrice !== undefined && { unitPricePaise: Math.round(unitPrice * 100) }),
+    })),
+  );
+
 const fields = {
   when,
   takeaway: z.boolean(),
   name: z.string().trim().min(2, "Enter the guest's name").max(60, "Keep the name under 60 characters"),
   phone: optionalPhone,
   note: z.string().trim().max(200, "Keep the note under 200 characters").default(""),
-  items: SelectionLinesSchema.min(1, "Add at least one item"),
+  items: EditLinesSchema,
 };
 
 /** An order that already happened and was paid, added from Order history. */
 export const PastOrderSchema = z.object({
   ...fields,
   method: z.enum(PAY_CHOICES, { error: "Pick how the guest paid" }),
+});
+
+/** Deleting an order from Order history: it stays visible, but leaves the money book. */
+export const DeleteOrderSchema = z.object({
+  orderId: z.string().min(1).max(40),
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Say why the order is deleted")
+    .max(200, "Keep the reason under 200 characters"),
 });
 
 /** Fixing an order in Order history. `method` only applies when its bill is paid. */

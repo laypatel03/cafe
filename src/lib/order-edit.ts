@@ -10,12 +10,19 @@ export const lineKey = (itemId: string, addOnIds: string[]) => [itemId, ...[...a
 /** What a line was sold at, so an untouched line keeps its old price after the menu changes. */
 export type KeptLine = { itemName: string; unitPricePaise: number; addOns: PricedLine["addOns"] };
 
+/** A line asked for from Order history; `unitPricePaise` is a price the owner typed (each, add-ons included). */
+export type EditedLine = RequestedLine & { unitPricePaise?: number };
+
+/** Highest price the owner can type for one item, in paise (₹1,00,000). */
+export const MAX_UNIT_PRICE_PAISE = 10_000_000;
+
 /**
- * Prices lines for a past order. Lines already on the order keep the price the guest paid;
- * new lines take today's menu price. Sold-out doesn't matter here – the guest already had it.
+ * Prices lines for a past order. A price the owner typed wins; otherwise lines already on the
+ * order keep the price the guest paid and new lines take today's menu price. Sold-out doesn't
+ * matter here – the guest already had it.
  */
 export function priceEditedLines(
-  requested: RequestedLine[],
+  requested: EditedLine[],
   menu: Map<string, MenuItemPrice>,
   kept: Map<string, KeptLine> = new Map(),
 ): PricingResult {
@@ -29,15 +36,21 @@ export function priceEditedLines(
       problems.push(`Quantities go from 1 to ${MAX_LINE_QUANTITY}.`);
       continue;
     }
+    const typed = r.unitPricePaise;
+    if (typed !== undefined && (!Number.isInteger(typed) || typed < 0 || typed > MAX_UNIT_PRICE_PAISE)) {
+      problems.push("Check the prices – they go from ₹0 to ₹1,00,000.");
+      continue;
+    }
     const old = kept.get(lineKey(r.itemId, addOnIds));
     if (old) {
+      const unit = typed ?? old.unitPricePaise;
       lines.push({
         menuItemId: r.itemId,
         itemName: old.itemName,
         addOns: old.addOns,
-        unitPricePaise: old.unitPricePaise,
+        unitPricePaise: unit,
         quantity: r.quantity,
-        lineTotalPaise: old.unitPricePaise * r.quantity,
+        lineTotalPaise: unit * r.quantity,
       });
       continue;
     }
@@ -52,7 +65,7 @@ export function priceEditedLines(
       if (!addOn) problems.push(`An add-on for ${item.name} is no longer offered.`);
       else addOns.push({ id, name: addOn.name, pricePaise: addOn.pricePaise });
     }
-    const unitPricePaise = item.pricePaise + addOns.reduce((s, a) => s + a.pricePaise, 0);
+    const unitPricePaise = typed ?? item.pricePaise + addOns.reduce((s, a) => s + a.pricePaise, 0);
     lines.push({
       menuItemId: r.itemId,
       itemName: item.name,

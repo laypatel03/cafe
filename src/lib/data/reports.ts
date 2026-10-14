@@ -42,12 +42,12 @@ export async function getReport(range: ReportRange): Promise<Report> {
     db.$queryRaw<{ total: bigint; returning: bigint }[]>`
       WITH g AS (
         SELECT DISTINCT o."customerId" AS id FROM "Bill" b JOIN "Order" o ON o."billId" = b."id"
-        WHERE ${inRange} AND o."customerId" IS NOT NULL
+        WHERE ${inRange} AND o."customerId" IS NOT NULL AND o."deletedAt" IS NULL
       )
       SELECT COUNT(*) AS total,
         COUNT(*) FILTER (WHERE (
           SELECT COUNT(DISTINCT b."id") FROM "Order" o2 JOIN "Bill" b ON o2."billId" = b."id"
-          WHERE o2."customerId" = g.id AND ${PAID} AND b."paidAt" < ${end}
+          WHERE o2."customerId" = g.id AND o2."deletedAt" IS NULL AND ${PAID} AND b."paidAt" < ${end}
         ) >= 2) AS returning
       FROM g`,
     db.$queryRaw<BucketRow[]>`
@@ -62,7 +62,7 @@ export async function getReport(range: ReportRange): Promise<Report> {
     db.$queryRaw<{ name: string; quantity: bigint; paise: bigint }[]>`
       SELECT i."itemName" AS name, SUM(i."quantity") AS quantity, SUM(i."lineTotalPaise") AS paise
       FROM "OrderItem" i JOIN "Order" o ON o."id" = i."orderId" JOIN "Bill" b ON b."id" = o."billId"
-      WHERE ${inRange}
+      WHERE ${inRange} AND o."deletedAt" IS NULL
       GROUP BY i."itemName" ORDER BY quantity DESC, paise DESC LIMIT 10`,
     db.expense.groupBy({
       by: ["category"],
