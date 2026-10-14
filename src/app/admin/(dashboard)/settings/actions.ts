@@ -56,6 +56,28 @@ export async function saveCafeDetails(_prev: FormState, formData: FormData): Pro
   return { ok: true };
 }
 
+/* ------------------------------ editing ------------------------------ */
+
+/** Settings → Editing: allow adding and changing orders in Order history. */
+export async function setOrderEdits(enabled: boolean): Promise<Result> {
+  const me = await owner();
+  if ("error" in me) return me;
+  await db.cafeSettings.update({ where: { id: 1 }, data: { orderEditsEnabled: enabled === true } });
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/orders");
+  return { ok: true };
+}
+
+/** Settings → Editing: allow adding customers and changing their name, phone and email. */
+export async function setCustomerEdits(enabled: boolean): Promise<Result> {
+  const me = await owner();
+  if ("error" in me) return me;
+  await db.cafeSettings.update({ where: { id: 1 }, data: { customerEditsEnabled: enabled === true } });
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/customers", "layout");
+  return { ok: true };
+}
+
 /* ------------------------------- staff ------------------------------- */
 
 export type StaffFormState = (FormState & { password?: string; username?: string }) | undefined;

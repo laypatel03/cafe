@@ -8,6 +8,8 @@ import {
   createStaff,
   resetStaffPassword,
   saveCafeDetails,
+  setCustomerEdits,
+  setOrderEdits,
   setStaffActive,
 } from "@/app/admin/(dashboard)/settings/actions";
 import { ActionSwitch } from "@/components/admin/action-switch";
@@ -45,11 +47,13 @@ type Staff = {
 export function SettingsScreen({
   meId,
   cafe,
+  edits,
   staff,
   items,
 }: {
   meId: string;
   cafe: Cafe;
+  edits: { orders: boolean; customers: boolean };
   staff: Staff[];
   items: { id: string; name: string }[];
 }) {
@@ -59,11 +63,15 @@ export function SettingsScreen({
       <Tabs defaultValue="cafe" className="mt-6">
         <TabsList>
           <TabsTrigger value="cafe">Café</TabsTrigger>
+          <TabsTrigger value="editing">Editing</TabsTrigger>
           <TabsTrigger value="staff">Staff logins</TabsTrigger>
           <TabsTrigger value="password">My password</TabsTrigger>
         </TabsList>
         <TabsContent value="cafe" className="mt-4">
           <CafeForm cafe={cafe} items={items} />
+        </TabsContent>
+        <TabsContent value="editing" className="mt-4">
+          <EditingPanel edits={edits} />
         </TabsContent>
         <TabsContent value="staff" className="mt-4">
           <StaffPanel staff={staff} meId={meId} />
@@ -99,6 +107,47 @@ function Field({
         hint && <p className="text-xs text-muted-foreground">{hint}</p>
       )}
     </div>
+  );
+}
+
+/* ------------------------------ editing ------------------------------ */
+
+function EditingPanel({ edits }: { edits: { orders: boolean; customers: boolean } }) {
+  const rows = [
+    {
+      id: "orders",
+      title: "Add and edit orders",
+      hint: "Shows “Add order” and “Edit” in Order history: fix items, date and time, guest, or how they paid. The money book and reports update too.",
+      checked: edits.orders,
+      action: setOrderEdits,
+      done: (on: boolean) => (on ? "Order editing is on" : "Order editing is off"),
+    },
+    {
+      id: "customers",
+      title: "Add and edit customers",
+      hint: "Shows “Add customer” and “Edit details” in Customers: name, phone number and email.",
+      checked: edits.customers,
+      action: setCustomerEdits,
+      done: (on: boolean) => (on ? "Customer editing is on" : "Customer editing is off"),
+    },
+  ];
+  return (
+    <section className="space-y-3 rounded-3xl border border-border bg-card p-5">
+      <p className="text-sm text-muted-foreground">
+        Keep these off day to day so past records can&apos;t be changed by mistake. Turn one on when you need
+        to fix something, then turn it off again. Only owners can edit, and every change is noted in the
+        order&apos;s history.
+      </p>
+      {rows.map((r) => (
+        <div key={r.id} className="flex items-center gap-3 rounded-2xl bg-secondary/60 p-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold">{r.title}</p>
+            <p className="text-xs text-muted-foreground">{r.hint}</p>
+          </div>
+          <ActionSwitch checked={r.checked} action={r.action} label={r.title} successMessage={r.done} />
+        </div>
+      ))}
+    </section>
   );
 }
 

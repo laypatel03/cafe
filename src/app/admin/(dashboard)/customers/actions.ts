@@ -2,9 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
+import { getEditSwitches } from "@/lib/data/edit-switches";
 import { db } from "@/lib/db";
-import type { FormState } from "@/lib/validators/menu";
+import { fieldErrors, type FormState } from "@/lib/validators/menu";
+import { CustomerDetailsSchema } from "@/lib/validators/order-edit";
 
 async function owner(): Promise<CurrentUser | { error: string }> {
   try {
@@ -86,4 +89,85 @@ export async function deleteCustomer(id: string): Promise<{ ok: true } | { error
   ]);
   revalidatePath("/admin/customers");
   return { ok: true };
+}
+
+/* ----------------------- add and edit (owner switch) ----------------------- */
+
+async function customerEditor(): Promise<CurrentUser | { error: string }> {
+  const me = await owner();
+  if ("error" in me) return me;
+  if (!(await getEditSwitches()).customers)
+    return { error: "Customer editing is off. Turn it on in Settings → Editing." };
+  return me;
+}
+
+const phoneTaken = (e: unknown) => e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+
+export type CustomerFormState = (FormState & { id?: string }) | undefined;
+
+/** A guest who hasn't ordered online yet – a regular, say, so their visits can be tracked. */
+export async function addCustomer(_prev: CustomerFormState, formData: FormData): Promise<CustomerFormState> {
+  const me = await customerEditor();
+  if ("error" in me) return me;
+  const parsed = CustomerDetailsSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fieldErrors(parsed.error);
+  const { name, phone, email, notes } = parsed.data;
+  try {
+    const made = await db.customer.create({
+      data: { name, phone, email: email || null, notes: notes || null, orderCount: 0 },
+      select: { id: true },
+    });
+    revalidatePath("/admin/customers");
+    return { ok: true, id: made.id };
+  } catch (e) {
+    if (phoneTaken(e))
+      return {
+        error: "There's already a customer with this number.",
+        fieldErrors: { phone: "Already a customer" },
+      };
+    throw e;
+  }
+}
+
+/**
+ * Fix a guest's name, phone or email. Their past orders and bills show the new name and number,
+ * so searching Order history by the new number finds them.
+ */
+export async function updateCustomer(
+  _prev: CustomerFormState,
+  formData: FormData,
+): Promise<CustomerFormState> {
+  const me = await customerEditor();
+  if ("error" in me) return me;
+  const id = CustomerId.safeParse(formData.get("id"));
+  const parsed = CustomerDetailsSchema.omit({ notes: true }).safeParse(Object.fromEntries(formData));
+  if (!id.success) return { error: "Customer not found." };
+  if (!parsed.success) return fieldErrors(parsed.error);
+  const { name, phone, email } = parsed.data;
+  const before = await db.customer.findUnique({ where: { id: id.data }, select: { phone: true } });
+  if (!before) return { error: "Customer not found." };
+  try {
+    await db.$transaction([
+      db.customer.update({ where: { id: id.data }, data: { name, phone, email: email || null } }),
+      // bills first: they're matched on the old number
+      db.bill.updateMany({
+        where: { customerPhone: before.phone, orders: { some: { customerId: id.data } } },
+        data: { customerName: name, customerPhone: phone },
+      }),
+      db.order.updateMany({
+        where: { customerId: id.data },
+        data: { customerName: name, customerPhone: phone },
+      }),
+    ]);
+  } catch (e) {
+    if (phoneTaken(e))
+      return {
+        error: "Another customer already has this number.",
+        fieldErrors: { phone: "Another customer has it" },
+      };
+    throw e;
+  }
+  revalidatePath(`/admin/customers/${id.data}`);
+  revalidatePath("/admin/customers");
+  return { ok: true, id: id.data };
 }

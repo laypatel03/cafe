@@ -1,11 +1,13 @@
 import { ChevronLeft, ChevronRight, Download, ReceiptText, Search } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
+import { AddCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
+import { getEditSwitches } from "@/lib/data/edit-switches";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
@@ -59,6 +61,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const consenting = await db.customer.count({ where: { marketingConsent: true } });
+  const canEdit = (await getEditSwitches()).customers;
 
   const pageHref = (page: number) => {
     const p = new URLSearchParams();
@@ -80,12 +83,15 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
             numbers.
           </p>
         </div>
-        <Button asChild variant="outline" className="rounded-full">
-          {/* a plain link: the browser downloads the file */}
-          <a href={f.offers ? "/api/customers/export?offers=1" : "/api/customers/export"} download>
-            <Download data-icon="inline-start" /> Export CSV
-          </a>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canEdit && <AddCustomerButton />}
+          <Button asChild variant="outline" className="rounded-full">
+            {/* a plain link: the browser downloads the file */}
+            <a href={f.offers ? "/api/customers/export?offers=1" : "/api/customers/export"} download>
+              <Download data-icon="inline-start" /> Export CSV
+            </a>
+          </Button>
+        </div>
       </div>
 
       <dl className="grid grid-cols-3 gap-3">

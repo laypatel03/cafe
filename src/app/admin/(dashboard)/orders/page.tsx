@@ -2,15 +2,19 @@ import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { ORDER_STATUS, OrderStatusBadge } from "@/components/admin/order-status-badge";
+import { AddOrderButton, EditOrderButton } from "@/components/admin/orders/order-record-dialog";
 import { TextReceiptButton } from "@/components/admin/receipt-sms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
+import { getEditSwitches } from "@/lib/data/edit-switches";
+import { getPublicMenu } from "@/lib/data/menu";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
+import { toCafeInput } from "@/lib/order-edit";
 import { maskPhone } from "@/lib/phone-mask";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
 import { PAYMENT_SHORT } from "@/lib/payments";
@@ -66,6 +70,10 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
     ...search,
   };
 
+  // owner only, while Settings → Editing → "Add and edit orders" is on
+  const canEdit = user.role === "OWNER" && (await getEditSwitches()).orders;
+  const menu = canEdit ? await getPublicMenu() : null;
+
   const [total, orders] = await Promise.all([
     db.order.count({ where }),
     db.order.findMany({
@@ -83,6 +91,8 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             paidAt: true,
             totalPaise: true,
             customerPhone: true,
+            voidedAt: true,
+            _count: { select: { orders: true } },
           },
         },
         statusLogs: { orderBy: { createdAt: "asc" }, include: { changedBy: { select: { name: true } } } },
@@ -107,11 +117,14 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <div>
-        <h1 className="text-3xl font-bold">Order history</h1>
-        <p className="text-sm text-muted-foreground">
-          Find any order or bill. Searching an order number or phone looks across all dates.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Order history</h1>
+          <p className="text-sm text-muted-foreground">
+            Find any order or bill. Searching an order number or phone looks across all dates.
+          </p>
+        </div>
+        {menu && <AddOrderButton menu={menu} />}
       </div>
 
       <form
@@ -247,6 +260,32 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
               )}
               {RECEIPT_SMS_ENABLED && o.bill?.paidAt && o.bill.customerPhone && (
                 <TextReceiptButton bill={{ id: o.bill.id, number: o.bill.number }} />
+              )}
+              {menu && (
+                <EditOrderButton
+                  menu={menu}
+                  order={{
+                    id: o.id,
+                    number: o.number,
+                    when: toCafeInput(o.createdAt),
+                    takeaway: o.type === "PARCEL",
+                    name: o.customerName,
+                    phone: o.customerPhone ?? "",
+                    note: o.note ?? "",
+                    items: o.items.map((i) => ({
+                      itemId: i.menuItemId,
+                      name: i.itemName,
+                      quantity: i.quantity,
+                      addOns: (i.addOns as { id: string; name: string }[]).map((a) => ({
+                        id: a.id,
+                        name: a.name,
+                      })),
+                    })),
+                    paidBy: o.bill?.paidAt && !o.bill.voidedAt ? (o.bill.paymentMethod ?? null) : null,
+                    billNumber: o.bill?.number ?? null,
+                    sharedBill: (o.bill?._count.orders ?? 0) > 1,
+                  }}
+                />
               )}
             </div>
           </li>

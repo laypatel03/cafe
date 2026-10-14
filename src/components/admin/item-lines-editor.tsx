@@ -38,10 +38,13 @@ export function ItemLinesEditor({
   lines,
   onChange,
   menu,
+  allowSoldOut = false,
 }: {
   lines: EditableLine[];
   onChange: (lines: EditableLine[]) => void;
   menu: PublicMenu;
+  /** for past orders: the guest already had it, so sold-out items can be picked */
+  allowSoldOut?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
 
@@ -95,7 +98,7 @@ export function ItemLinesEditor({
         )}
       </ul>
       {adding ? (
-        <MenuPicker menu={menu} onPick={add} onCancel={() => setAdding(false)} />
+        <MenuPicker menu={menu} onPick={add} onCancel={() => setAdding(false)} allowSoldOut={allowSoldOut} />
       ) : (
         <Button
           type="button"
@@ -115,10 +118,12 @@ function MenuPicker({
   menu,
   onPick,
   onCancel,
+  allowSoldOut,
 }: {
   menu: PublicMenu;
   onPick: (item: MenuItem, addOns: { id: string; name: string }[]) => void;
   onCancel: () => void;
+  allowSoldOut: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [choosing, setChoosing] = useState<MenuItem | null>(null);
@@ -143,16 +148,16 @@ function MenuPicker({
           {options.map((a) => (
             <li key={a.id}>
               <label
-                className={`flex min-h-9 items-center gap-2 text-sm ${a.available ? "cursor-pointer" : "opacity-50"}`}
+                className={`flex min-h-9 items-center gap-2 text-sm ${a.available || allowSoldOut ? "cursor-pointer" : "opacity-50"}`}
               >
                 <Checkbox
-                  disabled={!a.available}
+                  disabled={!a.available && !allowSoldOut}
                   checked={picked.includes(a.id)}
                   onCheckedChange={(c) => setPicked((p) => (c ? [...p, a.id] : p.filter((x) => x !== a.id)))}
                 />
                 <span className="flex-1">{a.name}</span>
                 <span className="tabular text-xs text-muted-foreground">
-                  {a.available ? `+${formatINR(a.price)}` : "Sold out"}
+                  {a.available || allowSoldOut ? `+${formatINR(a.price)}` : "Sold out"}
                 </span>
               </label>
             </li>
@@ -202,7 +207,7 @@ function MenuPicker({
           <li key={item.id}>
             <button
               type="button"
-              disabled={!item.available}
+              disabled={!item.available && !allowSoldOut}
               onClick={() => {
                 if (item.addOnIds.length > 0) {
                   setPicked([]);
@@ -213,7 +218,7 @@ function MenuPicker({
             >
               <span className="flex-1 font-medium">{item.name}</span>
               <span className="tabular text-xs text-muted-foreground">
-                {item.available ? formatINR(item.price) : "Sold out"}
+                {item.available || allowSoldOut ? formatINR(item.price) : "Sold out"}
               </span>
             </button>
           </li>

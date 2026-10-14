@@ -186,10 +186,7 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
             <Leaf className="size-3.5" aria-hidden /> 100% vegetarian café
           </p>
           <h1>
-            <LogoWordmark
-              priority
-              className="h-auto w-[min(88vw,24rem)] drop-shadow-[0_10px_18px_rgba(21,128,61,0.18)] lg:w-[30rem]"
-            />
+            <LogoWordmark priority className="h-auto w-[min(88vw,24rem)] lg:w-[30rem]" />
           </h1>
           <p className="mt-5 max-w-md text-lg text-pretty text-muted-foreground md:text-xl">
             Protein from real food. Salads, chaats, sandwiches and oats bowls made fresh every day.

@@ -266,6 +266,9 @@ model CafeSettings {
   // what the card machine provider keeps, in basis points (180 = 1.8 %); taken off profit in the money book
   creditCardFeeBps Int      @default(0)
   debitCardFeeBps  Int      @default(0)
+  // owner switches: allow adding/editing orders in Order history, and adding/editing customers
+  orderEditsEnabled    Boolean  @default(false)
+  customerEditsEnabled Boolean  @default(false)
   updatedAt        DateTime @updatedAt
 }
 

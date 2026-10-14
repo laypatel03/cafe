@@ -12,8 +12,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/admin/logi
         <div className="mb-6 flex flex-col items-center text-center">
           <LogoIcon className="h-14" alt="" priority />
           <h1 className="mt-3 text-2xl font-bold">Staff login</h1>
-          <p className="text-sm text-muted-foreground">
-            <BrandName className="text-base" /> dashboard
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <BrandName className="h-5" /> dashboard
           </p>
         </div>
         <LoginForm next={typeof next === "string" ? next : undefined} />

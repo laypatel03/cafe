@@ -2,7 +2,8 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 // Source artwork: doc/brand-guide.jpg. Cut-outs live in public/brand.
-const WORDMARK = { src: "/brand/hh-wordmark.webp", width: 1228, height: 309 };
+const WORDMARK = { src: "/brand/hh-wordmark.webp", width: 1238, height: 311 };
+const NAME = { src: "/brand/hh-name.webp", width: 1227, height: 248 };
 const ICON = { src: "/brand/hh-icon-512.webp", width: 512, height: 391 };
 
 type Props = { className?: string; priority?: boolean };
@@ -16,27 +17,23 @@ export function LogoWordmark({ className, priority }: Props) {
       height={WORDMARK.height}
       alt="Healthy Hunger – Eat well, live well"
       priority={priority}
-      // the artwork has no outline, so a faint light halo keeps it readable on dark backgrounds
-      className={cn("h-10 w-auto select-none dark:drop-shadow-[0_0_10px_rgba(255,255,255,0.22)]", className)}
+      className={cn("h-10 w-auto select-none", className)}
       draggable={false}
     />
   );
 }
 
-/**
- * "Healthy Hunger" set in the logo's style: rounded bold type, "Healthy" in the greens and "Hunger"
- * in the oranges, each with the logo's light-to-deep gradient. For places where the name is text.
- */
+/** Just "Healthy Hunger" from the logo artwork (no tagline), for headers. Size it with a height class. */
 export function BrandName({ className }: { className?: string }) {
   return (
-    <span className={cn("font-heading font-extrabold tracking-tight whitespace-nowrap", className)}>
-      <span className="bg-linear-to-b from-hh-green-light to-hh-green bg-clip-text text-transparent">
-        Healthy
-      </span>
-      <span className="bg-linear-to-b from-hh-orange-light to-hh-orange bg-clip-text text-transparent">
-        Hunger
-      </span>
-    </span>
+    <Image
+      src={NAME.src}
+      width={NAME.width}
+      height={NAME.height}
+      alt="Healthy Hunger"
+      className={cn("inline-block h-6 w-auto select-none", className)}
+      draggable={false}
+    />
   );
 }
 

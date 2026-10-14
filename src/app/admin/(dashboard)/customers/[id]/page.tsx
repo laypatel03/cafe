@@ -6,10 +6,12 @@ import {
   DeleteCustomerButton,
   StopOffersButton,
 } from "@/components/admin/customer-profile-actions";
+import { EditCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { favouriteItems } from "@/lib/customer-stats";
+import { getEditSwitches } from "@/lib/data/edit-switches";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
@@ -27,7 +29,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const customer = await db.customer.findUnique({ where: { id } });
   if (!customer) notFound();
 
-  const [orders, lines, orderTotal] = await Promise.all([
+  const [orders, lines, orderTotal, switches] = await Promise.all([
     db.order.findMany({
       where: { customerId: id },
       orderBy: { createdAt: "desc" },
@@ -39,6 +41,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
       select: { itemName: true, quantity: true, order: { select: { status: true } } },
     }),
     db.order.count({ where: { customerId: id } }),
+    getEditSwitches(),
   ]);
   const favourites = favouriteItems(lines.map((l) => ({ ...l, status: l.order.status })));
   const average = customer.orderCount > 0 ? Math.round(customer.totalSpendPaise / customer.orderCount) : 0;
@@ -61,7 +64,17 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
             {customer.email && ` · ${customer.email}`}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {switches.customers && (
+            <EditCustomerButton
+              customer={{
+                id: customer.id,
+                name: customer.name,
+                phone: customer.phone,
+                email: customer.email,
+              }}
+            />
+          )}
           {customer.marketingConsent ? (
             <>
               <span className="rounded-full bg-secondary px-3 py-1 font-semibold text-secondary-foreground">

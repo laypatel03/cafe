@@ -41,6 +41,7 @@ export default async function SettingsPage() {
         orderingEnabled: settings.orderingEnabled,
         todaysPickId: settings.todaysPickId ?? "",
       }}
+      edits={{ orders: settings.orderEditsEnabled, customers: settings.customerEditsEnabled }}
       staff={staff.map((s) => ({ ...s, lastLoginAt: s.lastLoginAt?.toISOString() ?? null }))}
       items={items}
     />
