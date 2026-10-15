@@ -1,0 +1,13 @@
+# Copy to /etc/systemd/system/ with the timer – see the header of backup.sh / doc/PLAN.md.
+[Unit]
+Description=Healthy Hunger nightly backup
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# the app's user and folder on the server
+User=cafe
+WorkingDirectory=/srv/healthy-hunger
+ExecStart=/usr/bin/env bash scripts/backup/backup.sh
+Nice=10

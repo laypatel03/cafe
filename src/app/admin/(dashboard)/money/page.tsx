@@ -124,7 +124,7 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
           <span className="font-semibold">Pay later: {rupees(book.payLater.paise)} not paid yet</span> on{" "}
           {book.payLater.bills} bill{book.payLater.bills === 1 ? "" : "s"}. It counts as a sale on the day the
           guest pays.{" "}
-          <Link href="/admin/orders?status=PAY_LATER" className="font-semibold underline">
+          <Link href="/admin/orders?pay=PAY_LATER" className="font-semibold underline">
             See them
           </Link>
         </p>

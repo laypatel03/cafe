@@ -177,6 +177,7 @@ Flow: guest picks items (**staff see it live**) → guest taps **Confirm – I'm
   Plain: Put the site live on a server in Mumbai at the café's own web address, with the padlock (HTTPS).
 - [ ] **P5-03 Daily backups** – daily `pg_dump`, 30-day retention, tested restore.
   Plain: Save a copy of all orders, bills and customers every day, keep 30 days, and prove we can restore one.
+  15 Oct: built – `scripts/backup/backup.sh` (database `pg_dump -Fc` + dish photos tar, saved in `BACKUP_DIR`, each night restored into a throwaway `<db>_restore_check` database and counted, 30-day cleanup, email OK/FAILED over SMTP with curl), `restore.sh`, systemd `healthy-hunger-backup.timer` at 03:00 Asia/Kolkata. Verified locally: backup + restore check (20 orders, 18 bills, 40 dishes), failure path, cleanup. Left: install on the server (P5-01), set SMTP in `.env`, confirm the email arrives.
 - [ ] **P5-04 Security check** – security headers, rate limits verified, final privacy page.
   Plain: A security check before going live, plus the final privacy note.
 - [ ] **P5-05 Automatic order tests** – Playwright order flow on phone viewport; Lighthouse pass.

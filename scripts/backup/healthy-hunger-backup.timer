@@ -1,0 +1,11 @@
+[Unit]
+Description=Healthy Hunger backup at 03:00 India time
+
+[Timer]
+# the time zone is part of the schedule, so it stays 03:00 IST whatever the server's clock is set to
+OnCalendar=*-*-* 03:00:00 Asia/Kolkata
+# a night missed while the server was off runs as soon as it's back
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -7,12 +7,13 @@ import {
   DeleteOrderButton,
   EditOrderButton,
 } from "@/components/admin/orders/order-record-dialog";
-import { RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
+import { ChangePaymentButton, RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
 import { TextReceiptButton } from "@/components/admin/receipt-sms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { Prisma } from "@/generated/prisma/client";
+import type { PaymentMethod } from "@/generated/prisma/enums";
 import { requireUser } from "@/lib/auth/dal";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { getPublicMenu } from "@/lib/data/menu";
@@ -28,6 +29,38 @@ import { PAYMENT_SHORT } from "@/lib/payments";
 export const metadata = { title: "Order history" };
 
 const PAGE_SIZE = 50;
+const PAY_FILTERS = ["PENDING", "PAY_LATER", "PAID", "CASH", "UPI", "CREDIT_CARD", "DEBIT_CARD"] as const;
+type PayFilter = (typeof PAY_FILTERS)[number];
+
+const paidBy = (...methods: PaymentMethod[]): Prisma.OrderWhereInput => ({
+  bill: {
+    is: { paidAt: { not: null }, voidedAt: null, ...(methods.length && { paymentMethod: { in: methods } }) },
+  },
+});
+const PAY_WHERE: Record<PayFilter, Prisma.OrderWhereInput> = {
+  // not paid yet and still owed: no bill made, or a bill waiting for payment
+  PENDING: {
+    deletedAt: null,
+    status: { not: "CANCELLED" },
+    OR: [{ billId: null }, { bill: { is: { paidAt: null, voidedAt: null } } }],
+  },
+  PAY_LATER: { bill: { is: { payLaterAt: { not: null }, paidAt: null, voidedAt: null } } },
+  PAID: paidBy(),
+  CASH: paidBy("CASH"),
+  UPI: paidBy("UPI"),
+  // old bills say CARD and count as credit card
+  CREDIT_CARD: paidBy("CREDIT_CARD", "CARD"),
+  DEBIT_CARD: paidBy("DEBIT_CARD"),
+};
+const PAY_FILTER_LABEL: Record<PayFilter, string> = {
+  PENDING: "Payment pending",
+  PAY_LATER: "Pay later",
+  PAID: "Paid – any way",
+  CASH: "Paid by cash",
+  UPI: "Paid by Google Pay",
+  CREDIT_CARD: "Paid by credit card",
+  DEBIT_CARD: "Paid by debit card",
+};
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const Filters = z.object({
   from: day.optional().catch(undefined),
@@ -35,9 +68,10 @@ const Filters = z.object({
   q: z.string().trim().max(60).optional().catch(undefined),
   type: z.enum(["DINE_IN", "PARCEL"]).optional().catch(undefined),
   status: z
-    .enum(["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED", "PAID", "CANCELLED", "PAY_LATER"])
+    .enum(["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED", "PAID", "CANCELLED"])
     .optional()
     .catch(undefined),
+  pay: z.enum(PAY_FILTERS).optional().catch(undefined),
   page: z.coerce.number().int().min(1).max(1000).catch(1),
 });
 
@@ -48,9 +82,15 @@ const isoDay = (d: Date) =>
 export default async function OrderHistoryPage({ searchParams }: PageProps<"/admin/orders">) {
   const user = await requireUser();
   const raw = await searchParams;
-  const f = Filters.parse({
-    ...Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v || undefined])),
-  });
+  const params = Object.fromEntries(
+    Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v || undefined]),
+  );
+  // old links said ?status=PAY_LATER
+  if (params.status === "PAY_LATER") {
+    params.pay ??= "PAY_LATER";
+    delete params.status;
+  }
+  const f = Filters.parse(params);
   const today = isoDay(new Date());
   const from = f.from ?? today;
   const to = f.to ?? from;
@@ -68,14 +108,13 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         ? { OR: [{ number: Number(q) }, { bill: { number: Number(q) } }] }
         : { customerName: { contains: q, mode: "insensitive" } };
 
+  const owedOnly = f.pay === "PENDING" || f.pay === "PAY_LATER";
   const where: Prisma.OrderWhereInput = {
-    // a number or phone search, or "Pay later – not paid", looks across all dates
-    ...((q && /^\d+$/.test(q)) || f.status === "PAY_LATER" ? {} : { createdAt: { gte: start, lt: end } }),
+    // a number or phone search, or a "still owed" filter, looks across all dates
+    ...((q && /^\d+$/.test(q)) || owedOnly ? {} : { createdAt: { gte: start, lt: end } }),
     ...(f.type && { type: f.type }),
-    ...(f.status === "PAY_LATER"
-      ? { bill: { is: { payLaterAt: { not: null }, paidAt: null, voidedAt: null } } }
-      : f.status && { status: f.status }),
-    ...search,
+    ...(f.status && { status: f.status }),
+    AND: [search ?? {}, f.pay ? PAY_WHERE[f.pay] : {}],
   };
 
   // owner only, while Settings → Editing → "Add and edit orders" is on
@@ -116,6 +155,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
       ...(f.q && { q: f.q }),
       ...(f.type && { type: f.type }),
       ...(f.status && { status: f.status }),
+      ...(f.pay && { pay: f.pay }),
       page: String(page),
     });
     return `/admin/orders?${params}`;
@@ -130,7 +170,8 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         <div>
           <h1 className="text-3xl font-bold">Order history</h1>
           <p className="text-sm text-muted-foreground">
-            Find any order or bill. Searching an order number or phone looks across all dates.
+            Find any order or bill. Searching an order number or phone, or payment pending, looks across all
+            dates.
           </p>
         </div>
         {menu && <AddOrderButton menu={menu} />}
@@ -138,7 +179,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
 
       <form
         method="get"
-        className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_11rem_auto]"
+        className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_9rem_11rem_auto]"
       >
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           Search
@@ -180,7 +221,17 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                 {v.label}
               </option>
             ))}
-            <option value="PAY_LATER">Pay later – not paid</option>
+          </NativeSelect>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Payment
+          <NativeSelect name="pay" defaultValue={f.pay ?? ""} className="h-10 text-foreground">
+            <option value="">All</option>
+            {PAY_FILTERS.map((k) => (
+              <option key={k} value={k}>
+                {PAY_FILTER_LABEL[k]}
+              </option>
+            ))}
           </NativeSelect>
         </label>
         <div className="flex gap-2">
@@ -243,6 +294,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                           : " · not paid yet"}
                   </>
                 )}
+                {!o.bill && !o.deletedAt && o.status !== "CANCELLED" && " · not billed yet"}
               </p>
             </div>
 
@@ -265,7 +317,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                 );
               })}
             </ul>
-            {o.note && <p className="mt-2 text-sm">Note: {o.note}</p>}
+            {o.note && <p className="mt-2 text-sm font-medium text-destructive">Note: {o.note}</p>}
             {o.deletedAt ? (
               <p className="mt-2 text-sm text-destructive">
                 Deleted {time(o.deletedAt)} – {o.cancelReason?.replace(/^Deleted: /, "")}. Not counted in the
@@ -302,6 +354,16 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
               {o.bill && !o.bill.paidAt && !o.bill.voidedAt && !o.deletedAt && (
                 <RecordPaymentButton
                   bill={{ id: o.bill.id, number: o.bill.number, totalPaise: o.bill.totalPaise }}
+                />
+              )}
+              {menu && o.bill?.paidAt && !o.bill.voidedAt && !o.deletedAt && (
+                <ChangePaymentButton
+                  bill={{
+                    id: o.bill.id,
+                    number: o.bill.number,
+                    totalPaise: o.bill.totalPaise,
+                    method: o.bill.paymentMethod,
+                  }}
                 />
               )}
               {RECEIPT_SMS_ENABLED && o.bill?.paidAt && o.bill.customerPhone && (

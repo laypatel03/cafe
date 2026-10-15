@@ -30,6 +30,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Make the bill – one bill for a guest's whole visit, even across several orders. Mark it paid by cash, UPI or card, and print a receipt.
 - Void a bill made by mistake, with a reason. Bill numbers never skip.
 - Find any order or bill by number, phone, name or date, and reprint it.
+- In Order history, filter by payment: payment pending (across all days), pay later, paid, or paid by cash, Google Pay, credit or debit card. The owner can change how a paid bill was paid, or set it back to payment pending if the guest didn't actually pay.
 - Mark a dish sold out in one tap.
 - Cash counter: enter the cash in the drawer each morning (or it carries over from last night), and count it at closing. The app shows what should be there and whether it's short or extra.
 - Record expenses – vegetables, groceries, gas, salaries and so on – and how they were paid. Cash paid from the drawer is taken off the cash counter automatically.

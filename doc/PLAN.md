@@ -157,6 +157,9 @@ Phase 0 is added in front of the doc's five phases so the look and the 3D are ag
 ### Phase 5 – Launch
 - VPS (Mumbai) with Docker Compose: Next.js + Postgres + Caddy (auto HTTPS); domain DNS.
 - Daily `pg_dump` backup with 30-day retention + a tested restore.
+  Decided 15 Oct: a systemd timer (`OnCalendar=… 03:00:00 Asia/Kolkata`, `Persistent=true`) rather than cron, so it's 03:00 IST whatever the server's clock zone and a missed night still runs. Mail is sent with `curl` over SMTP – no mail package in the app. The email carries a summary only, never the backup itself (it holds guests' phone numbers). Copies stay on the server only for now; an off-server copy is still worth adding (a full disk or a lost VPS loses them too).
+  Install: copy `scripts/backup/healthy-hunger-backup.{service,timer}` to `/etc/systemd/system/` (set `User` and `WorkingDirectory`), `systemctl daemon-reload && systemctl enable --now healthy-hunger-backup.timer`; test with `systemctl start healthy-hunger-backup.service`; `systemctl list-timers` shows the next run.
+  Before the server exists it runs on the Mac: `scripts/backup/install-mac.sh` (launchd every 30 min → `run-if-due.sh` backs up once a day after 03:00 IST, since launchd only knows the Mac's clock). `BACKUP_KEEP_DAYS="0"` keeps every copy (owner asked not to delete anything yet).
 - Rate limits verified, security headers, privacy page final, Lighthouse + Playwright pass.
 - Print per-table QR cards.
 - **Done when:** live at the café domain on opening day.

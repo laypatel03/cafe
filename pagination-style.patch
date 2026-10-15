@@ -1,0 +1,369 @@
+From 565c7cb814bcf36487ede1bf266e279f565cc8ca Mon Sep 17 00:00:00 2001
+From: Lay Patel <laypatel.lp103@gmail.com>
+Date: Wed, 14 Oct 2026 21:19:45 -0400
+Subject: [PATCH] Pagination in the boxed style; also on Expenses
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Square page buttons ‹ 1 2 3 … 10 ›, current page filled in brand green
+- "Results: 1 - 10 of 96" with a rows-per-page dropdown (10 / 25 / 50) underneath
+- One pager under each list: Order history, Customers, Expenses (new) and the Money book lists
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CESPNZ2mDnZSVm9srcJgyq
+---
+ src/app/admin/(dashboard)/customers/page.tsx | 14 +---
+ src/app/admin/(dashboard)/expenses/page.tsx  | 29 ++++++-
+ src/app/admin/(dashboard)/orders/page.tsx    | 14 +---
+ src/components/admin/page-size-select.tsx    | 26 +++++++
+ src/components/admin/pager.tsx               | 80 +++++++++-----------
+ src/lib/__tests__/paging.test.ts             |  4 +-
+ src/lib/paging.ts                            |  4 +-
+ 7 files changed, 101 insertions(+), 70 deletions(-)
+ create mode 100644 src/components/admin/page-size-select.tsx
+
+diff --git a/src/app/admin/(dashboard)/customers/page.tsx b/src/app/admin/(dashboard)/customers/page.tsx
+index a5b8b49..19c4121 100644
+--- a/src/app/admin/(dashboard)/customers/page.tsx
++++ b/src/app/admin/(dashboard)/customers/page.tsx
+@@ -160,15 +160,9 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
+           No customers match.
+         </p>
+       ) : (
+-        <Pager
+-          page={page}
+-          pages={pages}
+-          total={total}
+-          perPage={perPage}
+-          noun="customers"
+-          href={pageHref}
+-          sizes
+-        />
++        <p className="text-sm text-muted-foreground">
++          {total} customer{total === 1 ? "" : "s"}
++        </p>
+       )}
+ 
+       <ul className="divide-y divide-border rounded-3xl border border-border bg-card">
+@@ -206,7 +200,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
+         ))}
+       </ul>
+ 
+-      {pages > 1 && (
++      {total > 0 && (
+         <Pager
+           page={page}
+           pages={pages}
+diff --git a/src/app/admin/(dashboard)/expenses/page.tsx b/src/app/admin/(dashboard)/expenses/page.tsx
+index 91c006a..6ada1e8 100644
+--- a/src/app/admin/(dashboard)/expenses/page.tsx
++++ b/src/app/admin/(dashboard)/expenses/page.tsx
+@@ -1,6 +1,7 @@
+ import { Pencil } from "lucide-react";
+ import Link from "next/link";
+ import { DeleteExpenseButton, ExpenseForm } from "@/components/admin/cash/cash-forms";
++import { Pager } from "@/components/admin/pager";
+ import { Button } from "@/components/ui/button";
+ import { requireUser } from "@/lib/auth/dal";
+ import { today } from "@/lib/data/cash";
+@@ -8,6 +9,7 @@ import { db } from "@/lib/db";
+ import { EXPENSE_CATEGORY, EXPENSE_PAYMENT } from "@/lib/expenses";
+ import { formatINR } from "@/lib/format";
+ import { toRupees } from "@/lib/money";
++import { clampPage, resolvePerPage } from "@/lib/paging";
+ import { isoDay, RANGE_PRESETS, resolveRange } from "@/lib/reports";
+ 
+ export const metadata = { title: "Expenses" };
+@@ -41,6 +43,22 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/admin/e
+   const cashOut = expenses.filter((e) => e.paidWith === "CASH").reduce((s, e) => s + e.amountPaise, 0);
+   const todayKey = today();
+ 
++  // the totals above cover the whole period; the list shows one page of it
++  const perPage = resolvePerPage(first(p.per), 10);
++  const { page, pages } = clampPage(Number(first(p.page)) || 1, expenses.length, perPage);
++  const shown = expenses.slice((page - 1) * perPage, page * perPage);
++  const pageHref = (to: { page: number; perPage: number }) => {
++    const q = new URLSearchParams();
++    for (const key of ["range", "from", "to"] as const) {
++      const v = first(p[key]);
++      if (owner && v) q.set(key, v);
++    }
++    if (to.perPage !== 10) q.set("per", String(to.perPage));
++    if (to.page > 1) q.set("page", String(to.page));
++    const qs = q.toString();
++    return `/admin/expenses${qs ? `?${qs}` : ""}#list-h`;
++  };
++
+   return (
+     <div className="mx-auto max-w-4xl space-y-6">
+       <div>
+@@ -144,7 +162,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/admin/e
+           </p>
+         ) : (
+           <ul className="divide-y divide-border rounded-3xl border border-border bg-card">
+-            {expenses.map((e) => (
++            {shown.map((e) => (
+               <li key={e.id} className="px-4 py-3 text-sm">
+                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                   <span className="font-semibold">{EXPENSE_CATEGORY[e.category]}</span>
+@@ -189,6 +207,15 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/admin/e
+             ))}
+           </ul>
+         )}
++        <Pager
++          page={page}
++          pages={pages}
++          total={expenses.length}
++          perPage={perPage}
++          noun="expenses"
++          href={pageHref}
++          sizes
++        />
+       </section>
+     </div>
+   );
+diff --git a/src/app/admin/(dashboard)/orders/page.tsx b/src/app/admin/(dashboard)/orders/page.tsx
+index d7e10f6..633c110 100644
+--- a/src/app/admin/(dashboard)/orders/page.tsx
++++ b/src/app/admin/(dashboard)/orders/page.tsx
+@@ -204,15 +204,9 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
+           No orders match.
+         </p>
+       ) : (
+-        <Pager
+-          page={page}
+-          pages={pages}
+-          total={total}
+-          perPage={perPage}
+-          noun="orders"
+-          href={pageHref}
+-          sizes
+-        />
++        <p className="text-sm text-muted-foreground">
++          {total} order{total === 1 ? "" : "s"}
++        </p>
+       )}
+ 
+       <ul className="space-y-3">
+@@ -361,7 +355,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
+         ))}
+       </ul>
+ 
+-      {pages > 1 && (
++      {total > 0 && (
+         <Pager
+           page={page}
+           pages={pages}
+diff --git a/src/components/admin/page-size-select.tsx b/src/components/admin/page-size-select.tsx
+new file mode 100644
+index 0000000..171de7e
+--- /dev/null
++++ b/src/components/admin/page-size-select.tsx
+@@ -0,0 +1,26 @@
++"use client";
++
++import { ChevronDown } from "lucide-react";
++import { useRouter } from "next/navigation";
++
++/** "10 ▾" – rows per page. Each size has its own link, worked out on the server. */
++export function PageSizeSelect({ value, hrefs }: { value: number; hrefs: Record<number, string> }) {
++  const router = useRouter();
++  return (
++    <label className="relative inline-flex items-center">
++      <span className="sr-only">Rows per page</span>
++      <select
++        value={value}
++        onChange={(e) => router.push(hrefs[Number(e.target.value)])}
++        className="h-11 cursor-pointer appearance-none rounded-[10px] bg-muted pr-10 pl-4 tabular text-base font-semibold text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
++      >
++        {Object.keys(hrefs).map((n) => (
++          <option key={n} value={n}>
++            {n}
++          </option>
++        ))}
++      </select>
++      <ChevronDown className="pointer-events-none absolute right-3 size-4" aria-hidden />
++    </label>
++  );
++}
+diff --git a/src/components/admin/pager.tsx b/src/components/admin/pager.tsx
+index 779239f..384da92 100644
+--- a/src/components/admin/pager.tsx
++++ b/src/components/admin/pager.tsx
+@@ -1,11 +1,15 @@
+ import { ChevronLeft, ChevronRight } from "lucide-react";
+ import Link from "next/link";
+-import { PAGE_SIZES, pageNumbers, rangeLabel } from "@/lib/paging";
++import { PAGE_SIZES, pageNumbers } from "@/lib/paging";
+ import { cn } from "@/lib/utils";
++import { PageSizeSelect } from "./page-size-select";
++
++const box =
++  "inline-flex size-11 items-center justify-center rounded-[10px] border-2 border-border bg-card text-base font-semibold tabular transition-colors";
+ 
+ /**
+- * Page links under an admin list: "11–20 of 134", ‹ 1 … 4 5 6 … 14 ›, and (optionally) how many
+- * to show per page. Plain links, so the browser's back button and shared URLs keep the page.
++ * Page buttons under an admin list – ‹ 1 2 3 … 10 › – then "Results: 1 - 10 of 96" and, where
++ * offered, rows per page. Plain links, so the back button and shared URLs keep the page.
+  */
+ export function Pager({
+   page,
+@@ -20,55 +24,53 @@ export function Pager({
+   pages: number;
+   total: number;
+   perPage: number;
+-  /** what's being counted, plural: "orders" */
++  /** what's being counted, plural, for screen readers: "orders" */
+   noun: string;
+   /** link for a page (and page size, when sizes are offered) */
+   href: (to: { page: number; perPage: number }) => string;
+-  /** show the 10 / 25 / 50 per page choice */
++  /** offer 10 / 25 / 50 rows per page */
+   sizes?: boolean;
+ }) {
+   if (total === 0) return null;
+-  const link = "inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm";
+-  return (
+-    <nav
+-      aria-label={`${noun} pages`}
+-      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-2"
+-    >
+-      <p className="tabular text-sm text-muted-foreground">
+-        {rangeLabel(page, perPage, total)} {noun}
+-      </p>
++  const from = (page - 1) * perPage + 1;
++  const to = Math.min(total, page * perPage);
++  const sizeHrefs = Object.fromEntries(PAGE_SIZES.map((n) => [n, href({ page: 1, perPage: n })]));
+ 
++  return (
++    <nav aria-label={`${noun} pages`} className="space-y-4">
+       {pages > 1 && (
+-        <ul className="flex flex-wrap items-center gap-1">
++        <ul className="flex flex-wrap items-center gap-2">
+           <li>
+             {page > 1 ? (
+               <Link
+                 href={href({ page: page - 1, perPage })}
+-                className={cn(link, "hover:bg-muted")}
++                className={cn(box, "hover:border-primary/40 hover:bg-muted")}
+                 aria-label="Previous page"
+               >
+-                <ChevronLeft className="size-4" aria-hidden />
++                <ChevronLeft className="size-5" aria-hidden />
+               </Link>
+             ) : (
+-              <span className={cn(link, "text-muted-foreground/40")} aria-hidden>
+-                <ChevronLeft className="size-4" />
++              <span className={cn(box, "text-muted-foreground/40")} aria-hidden>
++                <ChevronLeft className="size-5" />
+               </span>
+             )}
+           </li>
+           {pageNumbers(page, pages).map((n, i) =>
+             n === "…" ? (
+-              <li key={`gap-${i}`} className="px-1 text-muted-foreground" aria-hidden>
+-                …
++              <li key={`gap-${i}`} aria-hidden>
++                <span className={cn(box, "text-muted-foreground")}>…</span>
+               </li>
+             ) : (
+               <li key={n}>
+                 <Link
+                   href={href({ page: n, perPage })}
++                  aria-label={`Page ${n}`}
+                   aria-current={n === page ? "page" : undefined}
+                   className={cn(
+-                    link,
+-                    "tabular",
+-                    n === page ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-muted",
++                    box,
++                    n === page
++                      ? "border-primary bg-primary text-primary-foreground"
++                      : "hover:border-primary/40 hover:bg-muted",
+                   )}
+                 >
+                   {n}
+@@ -80,38 +82,26 @@ export function Pager({
+             {page < pages ? (
+               <Link
+                 href={href({ page: page + 1, perPage })}
+-                className={cn(link, "hover:bg-muted")}
++                className={cn(box, "hover:border-primary/40 hover:bg-muted")}
+                 aria-label="Next page"
+               >
+-                <ChevronRight className="size-4" aria-hidden />
++                <ChevronRight className="size-5" aria-hidden />
+               </Link>
+             ) : (
+-              <span className={cn(link, "text-muted-foreground/40")} aria-hidden>
+-                <ChevronRight className="size-4" />
++              <span className={cn(box, "text-muted-foreground/40")} aria-hidden>
++                <ChevronRight className="size-5" />
+               </span>
+             )}
+           </li>
+         </ul>
+       )}
+ 
+-      {sizes && (
+-        <p className="flex items-center gap-1 text-sm text-muted-foreground">
+-          Show
+-          {PAGE_SIZES.map((n) => (
+-            <Link
+-              key={n}
+-              href={href({ page: 1, perPage: n })}
+-              aria-current={n === perPage ? "true" : undefined}
+-              className={cn(
+-                "rounded-full px-2 py-0.5 tabular",
+-                n === perPage ? "bg-secondary font-semibold text-secondary-foreground" : "hover:bg-muted",
+-              )}
+-            >
+-              {n}
+-            </Link>
+-          ))}
++      <div className="flex flex-wrap items-center justify-between gap-3">
++        <p className="tabular text-base font-semibold" role="status">
++          Results: {from} - {to} of {total}
+         </p>
+-      )}
++        {sizes && <PageSizeSelect value={perPage} hrefs={sizeHrefs} />}
++      </div>
+     </nav>
+   );
+ }
+diff --git a/src/lib/__tests__/paging.test.ts b/src/lib/__tests__/paging.test.ts
+index 584a6a1..7609ad2 100644
+--- a/src/lib/__tests__/paging.test.ts
++++ b/src/lib/__tests__/paging.test.ts
+@@ -8,9 +8,9 @@ describe("paging", () => {
+   });
+ 
+   it("collapses long runs around the current page", () => {
+-    expect(pageNumbers(1, 20)).toEqual([1, 2, 3, 4, "…", 20]);
++    expect(pageNumbers(1, 10)).toEqual([1, 2, 3, "…", 10]);
+     expect(pageNumbers(10, 20)).toEqual([1, "…", 9, 10, 11, "…", 20]);
+-    expect(pageNumbers(20, 20)).toEqual([1, "…", 17, 18, 19, 20]);
++    expect(pageNumbers(20, 20)).toEqual([1, "…", 18, 19, 20]);
+   });
+ 
+   it("keeps the page inside the range", () => {
+diff --git a/src/lib/paging.ts b/src/lib/paging.ts
+index f376bbc..7f8b701 100644
+--- a/src/lib/paging.ts
++++ b/src/lib/paging.ts
+@@ -18,8 +18,8 @@ export function clampPage(page: number, total: number, perPage: number) {
+ export function pageNumbers(page: number, pages: number): (number | "…")[] {
+   if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+   const keep = new Set([1, pages, page - 1, page, page + 1]);
+-  if (page <= 3) [2, 3, 4].forEach((n) => keep.add(n));
+-  if (page >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach((n) => keep.add(n));
++  if (page <= 2) [2, 3].forEach((n) => keep.add(n));
++  if (page >= pages - 1) [pages - 1, pages - 2].forEach((n) => keep.add(n));
+   const sorted = [...keep].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+   const out: (number | "…")[] = [];
+   sorted.forEach((n, i) => {
+-- 
+2.43.0
+

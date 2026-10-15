@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
+import type { OrderStatus } from "@/generated/prisma/enums";
 import { AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
 import { billFromOrders } from "@/lib/billing";
 import { getEditSwitches } from "@/lib/data/edit-switches";
@@ -11,7 +13,7 @@ import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { customerTotals, type KeptLine, lineKey, priceEditedLines } from "@/lib/order-edit";
-import { PAYMENT_SHORT } from "@/lib/payments";
+import { PAY_CHOICES, type PayChoice, PAYMENT_SHORT } from "@/lib/payments";
 import { billTotals, type PricedLine } from "@/lib/pricing";
 import { publish } from "@/lib/realtime";
 import {
@@ -388,6 +390,74 @@ export async function deleteOrder(orderId: string, reason: string): Promise<{ ok
   });
 
   await publish({ type: "order", orderId: order.id, number: order.number, status: "CANCELLED" });
+  refresh();
+  return { ok: true };
+}
+
+/* ----------------------------- change payment ----------------------------- */
+
+const ChangePaymentSchema = z.object({
+  billId: z.string().min(1).max(40),
+  to: z.enum([...PAY_CHOICES, "PENDING"]),
+});
+
+/**
+ * Fix how a paid bill was paid, or set it back to "payment pending" (the guest didn't actually pay):
+ * it goes to the Pay later list and leaves the money book until the payment is recorded again.
+ */
+export async function changeBillPayment(
+  billId: string,
+  to: PayChoice | "PENDING",
+): Promise<{ ok: true } | Fail> {
+  const me = await editor();
+  if ("ok" in me) return me;
+  const parsed = ChangePaymentSchema.safeParse({ billId, to });
+  if (!parsed.success) return { ok: false, error: "Choose how the bill was paid, or payment pending." };
+
+  const bill = await db.bill.findUnique({
+    where: { id: parsed.data.billId },
+    include: { orders: { where: { deletedAt: null } } },
+  });
+  if (!bill) return { ok: false, error: "Bill not found." };
+  if (bill.voidedAt) return { ok: false, error: `Bill #${bill.number} is void.` };
+  if (!bill.paidAt) return { ok: false, error: `Bill #${bill.number} isn't paid yet – record the payment.` };
+  const target = parsed.data.to;
+  if (target === bill.paymentMethod) return { ok: true };
+
+  const unpay = target === "PENDING";
+  // a paid order goes back to served; a takeaway still waiting at the counter counts as picked up
+  const statusFor = (s: OrderStatus): OrderStatus =>
+    unpay && (s === "PAID" || s === "READY") ? "SERVED" : s;
+  const note = unpay
+    ? `Bill #${bill.number} set back to payment pending by ${me.name}`
+    : `Bill #${bill.number} payment changed to ${PAYMENT_SHORT[target]} by ${me.name}`;
+
+  await db.$transaction(async (tx) => {
+    await tx.bill.update({
+      where: { id: bill.id },
+      data: unpay
+        ? { paidAt: null, paymentMethod: null, payLaterAt: bill.payLaterAt ?? new Date() }
+        : { paymentMethod: target },
+    });
+    for (const o of bill.orders) {
+      const status = statusFor(o.status);
+      await tx.order.update({
+        where: { id: o.id },
+        data: {
+          status,
+          statusLogs: { create: { fromStatus: o.status, toStatus: status, changedById: me.id, note } },
+        },
+      });
+    }
+    if (unpay)
+      await refreshCustomers(
+        tx,
+        bill.orders.map((o) => o.customerId),
+      );
+  });
+
+  for (const o of bill.orders)
+    await publish({ type: "order", orderId: o.id, number: o.number, status: statusFor(o.status) });
   refresh();
   return { ok: true };
 }
