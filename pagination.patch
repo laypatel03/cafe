@@ -1,0 +1,657 @@
+From e8e878d316c1aa0a6f5ad86384c26a4754446bb3 Mon Sep 17 00:00:00 2001
+From: Lay Patel <laypatel.lp103@gmail.com>
+Date: Wed, 14 Oct 2026 20:08:57 -0400
+Subject: [PATCH] Pagination for Order history, Customers and the Money book
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- One pager for admin lists: "11–20 of 134", numbered pages with … for gaps, previous/next
+- Order history: 10 per page by default; Customers: 25; both can show 10 / 25 / 50, and the
+  choice is kept when filtering
+- Money book: day-by-day table and "sales not billed" list page 10 at a time, separately
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CESPNZ2mDnZSVm9srcJgyq
+---
+ src/app/admin/(dashboard)/customers/page.tsx |  74 ++++++------
+ src/app/admin/(dashboard)/money/page.tsx     |  58 ++++++++-
+ src/app/admin/(dashboard)/orders/page.tsx    |  79 +++++++------
+ src/components/admin/pager.tsx               | 117 +++++++++++++++++++
+ src/lib/__tests__/paging.test.ts             |  32 +++++
+ src/lib/paging.ts                            |  37 ++++++
+ 6 files changed, 320 insertions(+), 77 deletions(-)
+ create mode 100644 src/components/admin/pager.tsx
+ create mode 100644 src/lib/__tests__/paging.test.ts
+ create mode 100644 src/lib/paging.ts
+
+diff --git a/src/app/admin/(dashboard)/customers/page.tsx b/src/app/admin/(dashboard)/customers/page.tsx
+index 1bcbc91..a5b8b49 100644
+--- a/src/app/admin/(dashboard)/customers/page.tsx
++++ b/src/app/admin/(dashboard)/customers/page.tsx
+@@ -1,7 +1,8 @@
+-import { ChevronLeft, ChevronRight, Download, ReceiptText, Search } from "lucide-react";
++import { Download, ReceiptText, Search } from "lucide-react";
+ import Link from "next/link";
+ import { z } from "zod";
+ import { AddCustomerButton } from "@/components/admin/customer-edit-dialog";
++import { Pager } from "@/components/admin/pager";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { NativeSelect } from "@/components/ui/native-select";
+@@ -11,10 +12,10 @@ import { getEditSwitches } from "@/lib/data/edit-switches";
+ import { db } from "@/lib/db";
+ import { formatINR } from "@/lib/format";
+ import { toRupees } from "@/lib/money";
++import { clampPage, resolvePerPage } from "@/lib/paging";
+ 
+ export const metadata = { title: "Customers" };
+ 
+-const PAGE_SIZE = 50;
+ const SORTS = {
+   recent: { label: "Last visit", orderBy: { lastVisitAt: "desc" } },
+   visits: { label: "Most visits", orderBy: { orderCount: "desc" } },
+@@ -26,7 +27,8 @@ const Filters = z.object({
+   q: z.string().trim().max(60).optional().catch(undefined),
+   sort: z.enum(["recent", "visits", "spend", "new"]).catch("recent"),
+   offers: z.literal("1").optional().catch(undefined),
+-  page: z.coerce.number().int().min(1).max(1000).catch(1),
++  page: z.coerce.number().int().min(1).max(10000).catch(1),
++  per: z.string().optional().catch(undefined),
+ });
+ 
+ const date = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+@@ -49,26 +51,28 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
+     ...(f.offers && { marketingConsent: true }),
+   };
+ 
+-  const [total, customers, all] = await Promise.all([
+-    db.customer.count({ where }),
++  const perPage = resolvePerPage(f.per, 25);
++  const total = await db.customer.count({ where });
++  const { page, pages } = clampPage(f.page, total, perPage);
++  const [customers, all] = await Promise.all([
+     db.customer.findMany({
+       where,
+       orderBy: [SORTS[f.sort].orderBy, { name: "asc" }],
+-      skip: (f.page - 1) * PAGE_SIZE,
+-      take: PAGE_SIZE,
++      skip: (page - 1) * perPage,
++      take: perPage,
+     }),
+     db.customer.aggregate({ _count: true, _sum: { totalSpendPaise: true } }),
+   ]);
+-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+   const consenting = await db.customer.count({ where: { marketingConsent: true } });
+   const canEdit = (await getEditSwitches()).customers;
+ 
+-  const pageHref = (page: number) => {
++  const pageHref = (to: { page: number; perPage: number }) => {
+     const p = new URLSearchParams();
+     if (f.q) p.set("q", f.q);
+     if (f.sort !== "recent") p.set("sort", f.sort);
+     if (f.offers) p.set("offers", "1");
+-    if (page > 1) p.set("page", String(page));
++    if (to.perPage !== 25) p.set("per", String(to.perPage));
++    if (to.page > 1) p.set("page", String(to.page));
+     const s = p.toString();
+     return s ? `/admin/customers?${s}` : "/admin/customers";
+   };
+@@ -111,6 +115,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
+         method="get"
+         className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-[1.6fr_1fr_auto_auto] sm:items-end"
+       >
++        {perPage !== 25 && <input type="hidden" name="per" value={perPage} />}
+         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+           Search
+           <span className="relative">
+@@ -150,10 +155,21 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
+         </div>
+       </form>
+ 
+-      <p className="text-sm text-muted-foreground" role="status">
+-        {total === 0 ? "No customers match." : `${total} customer${total === 1 ? "" : "s"}`}
+-        {total > PAGE_SIZE && ` · page ${f.page} of ${pages}`}
+-      </p>
++      {total === 0 ? (
++        <p className="text-sm text-muted-foreground" role="status">
++          No customers match.
++        </p>
++      ) : (
++        <Pager
++          page={page}
++          pages={pages}
++          total={total}
++          perPage={perPage}
++          noun="customers"
++          href={pageHref}
++          sizes
++        />
++      )}
+ 
+       <ul className="divide-y divide-border rounded-3xl border border-border bg-card">
+         {customers.map((c) => (
+@@ -191,27 +207,15 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
+       </ul>
+ 
+       {pages > 1 && (
+-        <nav className="flex items-center justify-center gap-2" aria-label="Pages">
+-          <Button asChild variant="outline" size="sm" className="rounded-full" aria-disabled={f.page <= 1}>
+-            <Link href={pageHref(Math.max(1, f.page - 1))}>
+-              <ChevronLeft data-icon="inline-start" /> Previous
+-            </Link>
+-          </Button>
+-          <span className="text-sm text-muted-foreground">
+-            {f.page} / {pages}
+-          </span>
+-          <Button
+-            asChild
+-            variant="outline"
+-            size="sm"
+-            className="rounded-full"
+-            aria-disabled={f.page >= pages}
+-          >
+-            <Link href={pageHref(Math.min(pages, f.page + 1))}>
+-              Next <ChevronRight data-icon="inline-end" />
+-            </Link>
+-          </Button>
+-        </nav>
++        <Pager
++          page={page}
++          pages={pages}
++          total={total}
++          perPage={perPage}
++          noun="customers"
++          href={pageHref}
++          sizes
++        />
+       )}
+     </div>
+   );
+diff --git a/src/app/admin/(dashboard)/money/page.tsx b/src/app/admin/(dashboard)/money/page.tsx
+index 69d760b..8a45642 100644
+--- a/src/app/admin/(dashboard)/money/page.tsx
++++ b/src/app/admin/(dashboard)/money/page.tsx
+@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+ import Link from "next/link";
+ import { CardFeesForm, DeleteExtraSaleButton, ExtraSaleForm } from "@/components/admin/money/money-forms";
+ import { MonthlyChart } from "@/components/admin/money/monthly-chart";
++import { Pager } from "@/components/admin/pager";
+ import { Button } from "@/components/ui/button";
+ import { requireUser } from "@/lib/auth/dal";
+ import { today } from "@/lib/data/cash";
+@@ -10,6 +11,7 @@ import { EXPENSE_CATEGORY } from "@/lib/expenses";
+ import { formatINR } from "@/lib/format";
+ import { toRupees } from "@/lib/money";
+ import { margin, monthKey, monthLabel, type MoneyRow, resolveMonth, shiftMonth } from "@/lib/money-book";
++import { clampPage } from "@/lib/paging";
+ import { PAYMENT_LABEL } from "@/lib/payments";
+ import { cn } from "@/lib/utils";
+ 
+@@ -36,6 +38,9 @@ const SPLIT = [
+   { key: "debit", label: "Debit card", className: "bg-violet-500" },
+ ] as const;
+ 
++const DAYS_PER_PAGE = 10;
++const SALES_PER_PAGE = 10;
++
+ const DAY_COLUMNS: { key: keyof MoneyRow; label: string; strong?: boolean }[] = [
+   { key: "cash", label: "Cash" },
+   { key: "upi", label: "Google Pay" },
+@@ -51,11 +56,30 @@ const DAY_COLUMNS: { key: keyof MoneyRow; label: string; strong?: boolean }[] =
+ /** Owner only: every day's sales by how guests paid, card fees, expenses and profit. */
+ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/money">) {
+   await requireUser("OWNER");
+-  const month = resolveMonth(first((await searchParams).month));
++  const params = await searchParams;
++  const month = resolveMonth(first(params.month));
+   const book = await getMoneyBook(month);
+   const t = book.monthTotal;
+   const isCurrent = month === monthKey(new Date());
+-  const days = [...book.days].reverse(); // newest first
++  const allDays = [...book.days].reverse(); // newest first
++  // 10 days and 10 extra sales per page; ?dpage= and ?spage= so the two lists page on their own
++  const dayPaging = clampPage(Number(first(params.dpage)) || 1, allDays.length, DAYS_PER_PAGE);
++  const days = allDays.slice((dayPaging.page - 1) * DAYS_PER_PAGE, dayPaging.page * DAYS_PER_PAGE);
++  const salePaging = clampPage(Number(first(params.spage)) || 1, book.extraSales.length, SALES_PER_PAGE);
++  const extraSales = book.extraSales.slice(
++    (salePaging.page - 1) * SALES_PER_PAGE,
++    salePaging.page * SALES_PER_PAGE,
++  );
++  const pageLink = (key: "dpage" | "spage", anchor: string) => (to: { page: number }) => {
++    const q = new URLSearchParams();
++    if (!isCurrent) q.set("month", month);
++    const other = key === "dpage" ? "spage" : "dpage";
++    const keep = first(params[other]);
++    if (keep && keep !== "1") q.set(other, keep);
++    if (to.page > 1) q.set(key, String(to.page));
++    const qs = q.toString();
++    return `/admin/money${qs ? `?${qs}` : ""}#${anchor}`;
++  };
+   const salesDays = book.days.filter((d) => d.sales > 0).length;
+ 
+   const tiles: [string, number, string?][] = [
+@@ -202,7 +226,7 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
+             </tbody>
+             <tfoot>
+               <tr className="font-bold">
+-                <td className="py-2 pr-3 text-left">Total</td>
++                <td className="py-2 pr-3 text-left">Month total</td>
+                 {DAY_COLUMNS.map((c) => (
+                   <td key={c.key} className="px-2 py-2 whitespace-nowrap">
+                     <Amount paise={t[c.key] as number} strong />
+@@ -212,6 +236,18 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
+             </tfoot>
+           </table>
+         </div>
++        {dayPaging.pages > 1 && (
++          <div className="mt-3">
++            <Pager
++              page={dayPaging.page}
++              pages={dayPaging.pages}
++              total={allDays.length}
++              perPage={DAYS_PER_PAGE}
++              noun="days"
++              href={pageLink("dpage", "days-h")}
++            />
++          </div>
++        )}
+       </section>
+ 
+       <div className="grid gap-4 lg:grid-cols-2">
+@@ -227,9 +263,9 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
+             today={today()}
+             defaultDay={isCurrent ? today() : (book.days.at(-1)?.key ?? today())}
+           />
+-          {book.extraSales.length > 0 && (
++          {extraSales.length > 0 && (
+             <ul className="mt-4 divide-y divide-border text-sm">
+-              {book.extraSales.map((s) => (
++              {extraSales.map((s) => (
+                 <li key={s.id} className="flex items-center gap-3 py-2">
+                   <div className="flex-1">
+                     <p className="font-medium">
+@@ -249,6 +285,18 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
+               ))}
+             </ul>
+           )}
++          {salePaging.pages > 1 && (
++            <div className="mt-3">
++              <Pager
++                page={salePaging.page}
++                pages={salePaging.pages}
++                total={book.extraSales.length}
++                perPage={SALES_PER_PAGE}
++                noun="sales"
++                href={pageLink("spage", "extra-h")}
++              />
++            </div>
++          )}
+         </section>
+ 
+         <div className="space-y-4">
+diff --git a/src/app/admin/(dashboard)/orders/page.tsx b/src/app/admin/(dashboard)/orders/page.tsx
+index 3ad9d7a..d7e10f6 100644
+--- a/src/app/admin/(dashboard)/orders/page.tsx
++++ b/src/app/admin/(dashboard)/orders/page.tsx
+@@ -1,4 +1,4 @@
+-import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
++import { Printer, Search } from "lucide-react";
+ import Link from "next/link";
+ import { z } from "zod";
+ import { ORDER_STATUS, OrderStatusBadge } from "@/components/admin/order-status-badge";
+@@ -8,6 +8,7 @@ import {
+   EditOrderButton,
+ } from "@/components/admin/orders/order-record-dialog";
+ import { RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
++import { Pager } from "@/components/admin/pager";
+ import { TextReceiptButton } from "@/components/admin/receipt-sms";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+@@ -21,13 +22,13 @@ import { formatINR } from "@/lib/format";
+ import { toRupees } from "@/lib/money";
+ import { toCafeInput } from "@/lib/order-edit";
+ import { maskPhone } from "@/lib/phone-mask";
++import { clampPage, resolvePerPage } from "@/lib/paging";
+ import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
+ import { cn } from "@/lib/utils";
+ import { PAYMENT_SHORT } from "@/lib/payments";
+ 
+ export const metadata = { title: "Order history" };
+ 
+-const PAGE_SIZE = 50;
+ const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+ const Filters = z.object({
+   from: day.optional().catch(undefined),
+@@ -38,7 +39,8 @@ const Filters = z.object({
+     .enum(["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED", "PAID", "CANCELLED", "PAY_LATER"])
+     .optional()
+     .catch(undefined),
+-  page: z.coerce.number().int().min(1).max(1000).catch(1),
++  page: z.coerce.number().int().min(1).max(10000).catch(1),
++  per: z.string().optional().catch(undefined),
+ });
+ 
+ /** yyyy-mm-dd in the server's local time (the café runs in IST). */
+@@ -82,13 +84,15 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
+   const canEdit = user.role === "OWNER" && (await getEditSwitches()).orders;
+   const menu = canEdit ? await getPublicMenu() : null;
+ 
+-  const [total, orders] = await Promise.all([
+-    db.order.count({ where }),
++  const perPage = resolvePerPage(f.per, 10);
++  const total = await db.order.count({ where });
++  const { page, pages } = clampPage(f.page, total, perPage);
++  const [orders] = await Promise.all([
+     db.order.findMany({
+       where,
+       orderBy: { createdAt: "desc" },
+-      skip: (f.page - 1) * PAGE_SIZE,
+-      take: PAGE_SIZE,
++      skip: (page - 1) * perPage,
++      take: perPage,
+       include: {
+         items: true,
+         bill: {
+@@ -108,17 +112,18 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
+       },
+     }),
+   ]);
+-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+-  const pageHref = (page: number) => {
++  const pageHref = (to: { page: number; perPage: number }) => {
+     const params = new URLSearchParams({
+       ...(f.from && { from }),
+-      ...(f.to && { to }),
++      ...(f.to && { to: f.to }),
+       ...(f.q && { q: f.q }),
+       ...(f.type && { type: f.type }),
+       ...(f.status && { status: f.status }),
+-      page: String(page),
++      ...(to.perPage !== 10 && { per: String(to.perPage) }),
++      ...(to.page > 1 && { page: String(to.page) }),
+     });
+-    return `/admin/orders?${params}`;
++    const qs = params.toString();
++    return qs ? `/admin/orders?${qs}` : "/admin/orders";
+   };
+   const showPhone = (p: string | null) => (p ? (user.role === "OWNER" ? p : maskPhone(p)) : null);
+   const time = (d: Date) =>
+@@ -140,6 +145,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
+         method="get"
+         className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_11rem_auto]"
+       >
++        {perPage !== 10 && <input type="hidden" name="per" value={perPage} />}
+         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+           Search
+           <span className="relative">
+@@ -193,10 +199,21 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
+         </div>
+       </form>
+ 
+-      <p className="text-sm text-muted-foreground" role="status">
+-        {total === 0 ? "No orders match." : `${total} order${total === 1 ? "" : "s"}`}
+-        {total > PAGE_SIZE && ` · page ${f.page} of ${pages}`}
+-      </p>
++      {total === 0 ? (
++        <p className="text-sm text-muted-foreground" role="status">
++          No orders match.
++        </p>
++      ) : (
++        <Pager
++          page={page}
++          pages={pages}
++          total={total}
++          perPage={perPage}
++          noun="orders"
++          href={pageHref}
++          sizes
++        />
++      )}
+ 
+       <ul className="space-y-3">
+         {orders.map((o) => (
+@@ -345,27 +362,15 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
+       </ul>
+ 
+       {pages > 1 && (
+-        <nav className="flex items-center justify-center gap-2" aria-label="Pages">
+-          <Button asChild variant="outline" size="sm" className="rounded-full" aria-disabled={f.page <= 1}>
+-            <Link href={pageHref(Math.max(1, f.page - 1))}>
+-              <ChevronLeft data-icon="inline-start" /> Newer
+-            </Link>
+-          </Button>
+-          <span className="text-sm text-muted-foreground">
+-            {f.page} / {pages}
+-          </span>
+-          <Button
+-            asChild
+-            variant="outline"
+-            size="sm"
+-            className="rounded-full"
+-            aria-disabled={f.page >= pages}
+-          >
+-            <Link href={pageHref(Math.min(pages, f.page + 1))}>
+-              Older <ChevronRight data-icon="inline-end" />
+-            </Link>
+-          </Button>
+-        </nav>
++        <Pager
++          page={page}
++          pages={pages}
++          total={total}
++          perPage={perPage}
++          noun="orders"
++          href={pageHref}
++          sizes
++        />
+       )}
+     </div>
+   );
+diff --git a/src/components/admin/pager.tsx b/src/components/admin/pager.tsx
+new file mode 100644
+index 0000000..779239f
+--- /dev/null
++++ b/src/components/admin/pager.tsx
+@@ -0,0 +1,117 @@
++import { ChevronLeft, ChevronRight } from "lucide-react";
++import Link from "next/link";
++import { PAGE_SIZES, pageNumbers, rangeLabel } from "@/lib/paging";
++import { cn } from "@/lib/utils";
++
++/**
++ * Page links under an admin list: "11–20 of 134", ‹ 1 … 4 5 6 … 14 ›, and (optionally) how many
++ * to show per page. Plain links, so the browser's back button and shared URLs keep the page.
++ */
++export function Pager({
++  page,
++  pages,
++  total,
++  perPage,
++  noun,
++  href,
++  sizes = false,
++}: {
++  page: number;
++  pages: number;
++  total: number;
++  perPage: number;
++  /** what's being counted, plural: "orders" */
++  noun: string;
++  /** link for a page (and page size, when sizes are offered) */
++  href: (to: { page: number; perPage: number }) => string;
++  /** show the 10 / 25 / 50 per page choice */
++  sizes?: boolean;
++}) {
++  if (total === 0) return null;
++  const link = "inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm";
++  return (
++    <nav
++      aria-label={`${noun} pages`}
++      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-3 py-2"
++    >
++      <p className="tabular text-sm text-muted-foreground">
++        {rangeLabel(page, perPage, total)} {noun}
++      </p>
++
++      {pages > 1 && (
++        <ul className="flex flex-wrap items-center gap-1">
++          <li>
++            {page > 1 ? (
++              <Link
++                href={href({ page: page - 1, perPage })}
++                className={cn(link, "hover:bg-muted")}
++                aria-label="Previous page"
++              >
++                <ChevronLeft className="size-4" aria-hidden />
++              </Link>
++            ) : (
++              <span className={cn(link, "text-muted-foreground/40")} aria-hidden>
++                <ChevronLeft className="size-4" />
++              </span>
++            )}
++          </li>
++          {pageNumbers(page, pages).map((n, i) =>
++            n === "…" ? (
++              <li key={`gap-${i}`} className="px-1 text-muted-foreground" aria-hidden>
++                …
++              </li>
++            ) : (
++              <li key={n}>
++                <Link
++                  href={href({ page: n, perPage })}
++                  aria-current={n === page ? "page" : undefined}
++                  className={cn(
++                    link,
++                    "tabular",
++                    n === page ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-muted",
++                  )}
++                >
++                  {n}
++                </Link>
++              </li>
++            ),
++          )}
++          <li>
++            {page < pages ? (
++              <Link
++                href={href({ page: page + 1, perPage })}
++                className={cn(link, "hover:bg-muted")}
++                aria-label="Next page"
++              >
++                <ChevronRight className="size-4" aria-hidden />
++              </Link>
++            ) : (
++              <span className={cn(link, "text-muted-foreground/40")} aria-hidden>
++                <ChevronRight className="size-4" />
++              </span>
++            )}
++          </li>
++        </ul>
++      )}
++
++      {sizes && (
++        <p className="flex items-center gap-1 text-sm text-muted-foreground">
++          Show
++          {PAGE_SIZES.map((n) => (
++            <Link
++              key={n}
++              href={href({ page: 1, perPage: n })}
++              aria-current={n === perPage ? "true" : undefined}
++              className={cn(
++                "rounded-full px-2 py-0.5 tabular",
++                n === perPage ? "bg-secondary font-semibold text-secondary-foreground" : "hover:bg-muted",
++              )}
++            >
++              {n}
++            </Link>
++          ))}
++        </p>
++      )}
++    </nav>
++  );
++}
+diff --git a/src/lib/__tests__/paging.test.ts b/src/lib/__tests__/paging.test.ts
+new file mode 100644
+index 0000000..584a6a1
+--- /dev/null
++++ b/src/lib/__tests__/paging.test.ts
+@@ -0,0 +1,32 @@
++import { describe, expect, it } from "vitest";
++
++import { clampPage, pageNumbers, rangeLabel, resolvePerPage } from "@/lib/paging";
++
++describe("paging", () => {
++  it("shows every page when there are few", () => {
++    expect(pageNumbers(2, 5)).toEqual([1, 2, 3, 4, 5]);
++  });
++
++  it("collapses long runs around the current page", () => {
++    expect(pageNumbers(1, 20)).toEqual([1, 2, 3, 4, "…", 20]);
++    expect(pageNumbers(10, 20)).toEqual([1, "…", 9, 10, 11, "…", 20]);
++    expect(pageNumbers(20, 20)).toEqual([1, "…", 17, 18, 19, 20]);
++  });
++
++  it("keeps the page inside the range", () => {
++    expect(clampPage(9, 25, 10)).toEqual({ pages: 3, page: 3 });
++    expect(clampPage(0, 0, 10)).toEqual({ pages: 1, page: 1 });
++  });
++
++  it("accepts only offered page sizes", () => {
++    expect(resolvePerPage("25", 10)).toBe(25);
++    expect(resolvePerPage("7", 10)).toBe(10);
++    expect(resolvePerPage(undefined, 20)).toBe(20);
++  });
++
++  it("labels the range shown", () => {
++    expect(rangeLabel(2, 10, 134)).toBe("11–20 of 134");
++    expect(rangeLabel(14, 10, 134)).toBe("131–134 of 134");
++    expect(rangeLabel(1, 10, 0)).toBe("0 of 0");
++  });
++});
+diff --git a/src/lib/paging.ts b/src/lib/paging.ts
+new file mode 100644
+index 0000000..f376bbc
+--- /dev/null
++++ b/src/lib/paging.ts
+@@ -0,0 +1,37 @@
++// Page maths for the admin lists. Pure, so it's unit-tested.
++
++export const PAGE_SIZES = [10, 25, 50] as const;
++
++/** A page size from the URL if it's one we offer, otherwise the default. */
++export function resolvePerPage(input: string | undefined, fallback: number) {
++  const n = Number(input);
++  return (PAGE_SIZES as readonly number[]).includes(n) ? n : fallback;
++}
++
++/** Number of pages (at least 1) and the requested page kept inside them. */
++export function clampPage(page: number, total: number, perPage: number) {
++  const pages = Math.max(1, Math.ceil(total / perPage));
++  return { pages, page: Math.min(Math.max(1, Math.floor(page) || 1), pages) };
++}
++
++/** Page buttons to show: always the first and last, the current one and its neighbours, "…" for gaps. */
++export function pageNumbers(page: number, pages: number): (number | "…")[] {
++  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
++  const keep = new Set([1, pages, page - 1, page, page + 1]);
++  if (page <= 3) [2, 3, 4].forEach((n) => keep.add(n));
++  if (page >= pages - 2) [pages - 1, pages - 2, pages - 3].forEach((n) => keep.add(n));
++  const sorted = [...keep].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
++  const out: (number | "…")[] = [];
++  sorted.forEach((n, i) => {
++    if (i > 0 && n - sorted[i - 1] > 1) out.push("…");
++    out.push(n);
++  });
++  return out;
++}
++
++/** "11–20 of 134" */
++export function rangeLabel(page: number, perPage: number, total: number) {
++  if (total === 0) return "0 of 0";
++  const from = (page - 1) * perPage + 1;
++  return `${from}–${Math.min(total, page * perPage)} of ${total}`;
++}
+-- 
+2.43.0
+
