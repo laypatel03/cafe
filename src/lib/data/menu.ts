@@ -73,6 +73,8 @@ export type CafeDetails = {
   instagram: string;
   hours: { days: string; time: string }[];
   orderingEnabled: boolean;
+  /** the public Blog; off = guests get "not found" and no blog links */
+  blogEnabled: boolean;
   taxBasisPoints: number;
   todaysPickId: string | null;
 };
@@ -91,6 +93,7 @@ export const getCafeDetails = unstable_cache(
       instagram: s.instagram,
       hours: (s.hours as CafeDetails["hours"]) ?? [],
       orderingEnabled: s.orderingEnabled,
+      blogEnabled: s.blogEnabled,
       taxBasisPoints: s.taxBasisPoints,
       todaysPickId: s.todaysPickId,
     };

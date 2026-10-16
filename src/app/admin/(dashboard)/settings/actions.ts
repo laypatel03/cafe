@@ -58,6 +58,26 @@ export async function saveCafeDetails(_prev: FormState, formData: FormData): Pro
 
 /* ------------------------------ editing ------------------------------ */
 
+/** Settings → Editing: guests can pick and order on the QR menu (off = view-only menu). */
+export async function setOrderingEnabled(enabled: boolean): Promise<Result> {
+  const me = await owner();
+  if ("error" in me) return me;
+  await db.cafeSettings.update({ where: { id: 1 }, data: { orderingEnabled: enabled === true } });
+  updateTag(SETTINGS_TAG);
+  revalidatePath("/admin/settings");
+  return { ok: true };
+}
+
+/** Settings → Editing: show the Blog pages and links to guests. */
+export async function setBlogEnabled(enabled: boolean): Promise<Result> {
+  const me = await owner();
+  if ("error" in me) return me;
+  await db.cafeSettings.update({ where: { id: 1 }, data: { blogEnabled: enabled === true } });
+  updateTag(SETTINGS_TAG);
+  revalidatePath("/admin/settings");
+  return { ok: true };
+}
+
 /** Settings → Editing: allow adding and changing orders in Order history. */
 export async function setOrderEdits(enabled: boolean): Promise<Result> {
   const me = await owner();

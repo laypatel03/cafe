@@ -1,9 +1,10 @@
 import { connection } from "next/server";
 import { CafeJsonLd } from "@/components/landing/cafe-json-ld";
 import { Hero, type HeroDish } from "@/components/landing/hero";
-import { Bestsellers, OurPromise, TodaysPick, VisitUs } from "@/components/landing/sections";
+import { Bestsellers, FromOurKitchen, OurPromise, TodaysPick, VisitUs } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
+import { ARTICLES } from "@/lib/articles";
 import { getCafeDetails, getPublicMenu } from "@/lib/data/menu";
 
 export default async function HomePage() {
@@ -37,12 +38,17 @@ export default async function HomePage() {
   return (
     <>
       <CafeJsonLd cafe={cafe} />
-      <SiteHeader />
+      <SiteHeader showBlog={cafe.blogEnabled} />
       <main>
         <Hero dishes={heroDishes} />
         {pick && <TodaysPick item={pick} />}
         <OurPromise />
         {bestsellers.length > 0 && <Bestsellers items={bestsellers} />}
+        {cafe.blogEnabled && (
+          <FromOurKitchen
+            articles={[...ARTICLES].sort((a, b) => b.published.localeCompare(a.published)).slice(0, 3)}
+          />
+        )}
         <VisitUs cafe={cafe} />
       </main>
       <SiteFooter cafe={cafe} />

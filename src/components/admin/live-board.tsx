@@ -36,7 +36,16 @@ function chime(ctx: AudioContext) {
   });
 }
 
-export function LiveBoard({ initial, menu }: { initial: LiveBoardData; menu: PublicMenu }) {
+export function LiveBoard({
+  initial,
+  menu,
+  isOwner,
+}: {
+  initial: LiveBoardData;
+  menu: PublicMenu;
+  /** the owner can add "Other item" lines (any name, plus or minus price) */
+  isOwner: boolean;
+}) {
   const [data, setData] = useState(initial);
   const [connection, setConnection] = useState<Connection>("live");
   const [skew, setSkew] = useState(() => Date.now() - new Date(initial.serverTime).getTime());
@@ -155,6 +164,7 @@ export function LiveBoard({ initial, menu }: { initial: LiveBoardData; menu: Pub
         bills={data.bills}
         payLater={data.payLater}
         menu={menu}
+        isOwner={isOwner}
         onChanged={refresh}
       />
       <section aria-labelledby="picking-h" className="space-y-3">

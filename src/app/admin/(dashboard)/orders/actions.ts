@@ -12,9 +12,10 @@ import { loadMenuPrices } from "@/lib/data/menu-prices";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
-import { customerTotals, type KeptLine, lineKey, priceEditedLines } from "@/lib/order-edit";
+import { type CustomLinesSchema, customRows, type OrderItemRow, orderRows } from "@/lib/custom-lines";
+import { customerTotals, type EditedLine, type KeptLine, lineKey, priceEditedLines } from "@/lib/order-edit";
 import { PAY_CHOICES, type PayChoice, PAYMENT_SHORT } from "@/lib/payments";
-import { billTotals, type PricedLine } from "@/lib/pricing";
+import { billTotals } from "@/lib/pricing";
 import { publish } from "@/lib/realtime";
 import {
   DeleteOrderSchema,
@@ -40,15 +41,18 @@ async function editor(): Promise<CurrentUser | Fail> {
   return me;
 }
 
-const itemRows = (lines: PricedLine[]) =>
-  lines.map((l) => ({
-    menuItemId: l.menuItemId,
-    itemName: l.itemName,
-    unitPricePaise: l.unitPricePaise,
-    quantity: l.quantity,
-    addOns: l.addOns,
-    lineTotalPaise: l.lineTotalPaise,
-  }));
+/** Dishes priced as the owner typed (or kept/menu prices), then the other items. */
+async function priceItems(
+  items: EditedLine[],
+  others: z.output<typeof CustomLinesSchema>,
+  kept?: Map<string, KeptLine>,
+): Promise<{ ok: true; rows: OrderItemRow[]; subtotalPaise: number } | Fail> {
+  const priced = items.length
+    ? priceEditedLines(items, await loadMenuPrices(items.map((i) => i.itemId)), kept)
+    : { ok: true as const, lines: [], subtotalPaise: 0 };
+  if (!priced.ok) return { ok: false, error: "Fix these first:", problems: priced.problems };
+  return orderRows(priced.lines, customRows(others));
+}
 
 /** The guest's record by phone (made if new), or none without a phone. */
 async function customerFor(tx: Prisma.TransactionClient, name: string, phone: string, at: Date) {
@@ -122,10 +126,10 @@ export async function addPastOrder(input: PastOrderInput): Promise<{ ok: true; n
   if ("ok" in me) return me;
   const parsed = PastOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { when, takeaway, name, phone, note, items, method } = parsed.data;
+  const { when, takeaway, name, phone, note, items, others, method } = parsed.data;
 
-  const priced = priceEditedLines(items, await loadMenuPrices(items.map((i) => i.itemId)));
-  if (!priced.ok) return { ok: false, error: "Fix these first:", problems: priced.problems };
+  const priced = await priceItems(items, others);
+  if (!priced.ok) return priced;
   const totals = billTotals(priced.subtotalPaise, (await getCafeDetails()).taxBasisPoints);
   const type = takeaway ? "PARCEL" : "DINE_IN";
 
@@ -161,7 +165,7 @@ export async function addPastOrder(input: PastOrderInput): Promise<{ ok: true; n
         billId: bill.id,
         createdById: me.id,
         createdAt: when,
-        items: { create: itemRows(priced.lines) },
+        items: { create: priced.rows },
         statusLogs: {
           create: {
             toStatus: "PAID",
@@ -193,7 +197,7 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
   if ("ok" in me) return me;
   const parsed = EditOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { orderId, when, takeaway, name, phone, note, items, method } = parsed.data;
+  const { orderId, when, takeaway, name, phone, note, items, others, method } = parsed.data;
 
   const order = await db.order.findUnique({
     where: { id: orderId },
@@ -234,8 +238,8 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
       { itemName: i.itemName, unitPricePaise: i.unitPricePaise, addOns },
     );
   }
-  const priced = priceEditedLines(items, await loadMenuPrices(items.map((i) => i.itemId)), kept);
-  if (!priced.ok) return { ok: false, error: "Fix these first:", problems: priced.problems };
+  const priced = await priceItems(items, others, kept);
+  if (!priced.ok) return priced;
   const taxBps = bill ? bill.taxBasisPoints : (await getCafeDetails()).taxBasisPoints;
   const totals = billTotals(priced.subtotalPaise, taxBps);
 
@@ -246,8 +250,8 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
       `total ${formatINR(toRupees(order.totalPaise))} → ${formatINR(toRupees(totals.totalPaise))}`,
     );
   else if (
-    JSON.stringify(itemRows(priced.lines).map((l) => [l.menuItemId, l.quantity])) !==
-    JSON.stringify(order.items.map((l) => [l.menuItemId, l.quantity]))
+    JSON.stringify(priced.rows.map((l) => [l.menuItemId, l.itemName, l.unitPricePaise, l.quantity])) !==
+    JSON.stringify(order.items.map((l) => [l.menuItemId, l.itemName, l.unitPricePaise, l.quantity]))
   )
     changes.push("items");
   if (when.getTime() !== order.createdAt.getTime()) changes.push("date/time");
@@ -273,7 +277,7 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
         subtotalPaise: totals.subtotalPaise,
         taxPaise: totals.taxPaise,
         totalPaise: totals.totalPaise,
-        items: { create: itemRows(priced.lines) },
+        items: { create: priced.rows },
         statusLogs: {
           create: {
             fromStatus: order.status,

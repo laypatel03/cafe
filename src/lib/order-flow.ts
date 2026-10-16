@@ -43,3 +43,43 @@ export const ACTION_LABEL: Record<OrderAction, string> = {
   readyToCollect: "Ready to collect",
   pickedUp: "Picked up",
 };
+
+export type StatusLogEntry = { fromStatus: OrderStatus | null; toStatus: OrderStatus; note: string | null };
+
+/** Note on the log entry an undo writes; later undos skip back past it. */
+export const UNDO_NOTE = "Undo";
+
+const STEP_LABEL: Partial<Record<OrderStatus, string>> = {
+  ACCEPTED: ACTION_LABEL.accept,
+  PREPARING: ACTION_LABEL.toKitchen,
+  READY: ACTION_LABEL.readyToCollect,
+  CANCELLED: "Cancel",
+};
+
+/**
+ * The last staff step on an order that can be taken back (accept, kitchen, served, ready, picked up,
+ * cancel), from its status log oldest first – or null. Each undo cancels out the step before it, so
+ * pressing undo again goes one more step back. Payments, bills and creating the order can't be undone here.
+ */
+export function stepToUndo(
+  logs: StatusLogEntry[],
+  status: OrderStatus,
+): { from: OrderStatus; to: OrderStatus; label: string } | null {
+  const steps: { from: OrderStatus; to: OrderStatus }[] = [];
+  for (const l of logs) {
+    if (l.fromStatus === l.toStatus) continue; // item edits, a takeaway paid before pickup, a voided bill
+    if (l.note === UNDO_NOTE) steps.pop();
+    else if (!l.fromStatus || /^(Bill #|Added in Order history|Deleted by)/.test(l.note ?? ""))
+      steps.length = 0;
+    else steps.push({ from: l.fromStatus, to: l.toStatus });
+  }
+  const last = steps.at(-1);
+  if (!last || last.to !== status) return null;
+  const label =
+    last.from === "READY"
+      ? ACTION_LABEL.pickedUp
+      : last.to === "SERVED"
+        ? ACTION_LABEL.served
+        : STEP_LABEL[last.to];
+  return label ? { ...last, label } : null;
+}

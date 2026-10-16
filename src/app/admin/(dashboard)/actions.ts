@@ -12,8 +12,17 @@ import {
   nextStatus,
   type OrderAction,
   statusOnPayment,
+  stepToUndo,
+  UNDO_NOTE,
 } from "@/lib/order-flow";
 import { billFromOrders } from "@/lib/billing";
+import {
+  type CustomLineInput,
+  CustomLinesSchema,
+  customRows,
+  type OrderItemRow,
+  orderRows,
+} from "@/lib/custom-lines";
 import { billTotals, priceLines } from "@/lib/pricing";
 import { publish } from "@/lib/realtime";
 import { maskPhone } from "@/lib/phone-mask";
@@ -112,31 +121,67 @@ export async function removeSelection(selectionId: string): Promise<{ ok: true }
 
 const OrderId = z.string().min(1).max(40);
 
-/** Change an order's items before it goes to the kitchen. Re-priced from the menu. */
+/**
+ * Change an order's items before it goes to the kitchen. Dishes are re-priced from the menu.
+ * Other items (`others`) are the owner's: staff edits keep the ones already on the order.
+ */
 export async function updateOrderItems(
   orderId: string,
   items: z.input<typeof SelectionLinesSchema>,
+  others?: CustomLineInput[],
 ): Promise<{ ok: true } | Fail> {
   const me = await staff();
   if ("ok" in me) return me;
   const id = OrderId.safeParse(orderId);
-  const lines = SelectionLinesSchema.min(1, "An order needs at least one item – cancel it instead").safeParse(
-    items,
-  );
+  const lines = SelectionLinesSchema.safeParse(items);
+  const custom = CustomLinesSchema.safeParse(others ?? []);
   if (!id.success) return { ok: false, error: "Order not found." };
   if (!lines.success) return { ok: false, error: lines.error.issues[0].message };
+  if (!custom.success) return { ok: false, error: custom.error.issues[0].message };
 
   const order = await db.order.findUnique({
     where: { id: id.data },
-    select: { id: true, number: true, status: true },
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      items: {
+        where: { custom: true },
+        select: {
+          menuItemId: true,
+          itemName: true,
+          unitPricePaise: true,
+          quantity: true,
+          addOns: true,
+          lineTotalPaise: true,
+          custom: true,
+        },
+      },
+    },
   });
   if (!order) return { ok: false, error: "Order not found." };
   if (!canEditItems(order.status))
     return { ok: false, error: "This order is already in the kitchen – items can't be changed." };
 
-  const priced = priceLines(lines.data, await loadMenuPrices(lines.data.map((i) => i.itemId)));
+  const priced = lines.data.length
+    ? priceLines(lines.data, await loadMenuPrices(lines.data.map((i) => i.itemId)))
+    : { ok: true as const, lines: [], subtotalPaise: 0 };
   if (!priced.ok) return { ok: false, error: "Fix these first:", problems: priced.problems };
-  const totals = billTotals(priced.subtotalPaise, (await getCafeDetails()).taxBasisPoints);
+  const combined = orderRows(
+    priced.lines,
+    me.role === "OWNER" && others !== undefined
+      ? customRows(custom.data)
+      : order.items.map((row) => ({ ...row, addOns: row.addOns as OrderItemRow["addOns"] })),
+  );
+  if (!combined.ok)
+    return {
+      ok: false,
+      error:
+        combined.error === "Add at least one item."
+          ? "An order needs at least one item – cancel it instead"
+          : combined.error,
+    };
+  const totals = billTotals(combined.subtotalPaise, (await getCafeDetails()).taxBasisPoints);
 
   await db.$transaction([
     db.orderItem.deleteMany({ where: { orderId: order.id } }),
@@ -146,16 +191,7 @@ export async function updateOrderItems(
         subtotalPaise: totals.subtotalPaise,
         taxPaise: totals.taxPaise,
         totalPaise: totals.totalPaise,
-        items: {
-          create: priced.lines.map((l) => ({
-            menuItemId: l.menuItemId,
-            itemName: l.itemName,
-            unitPricePaise: l.unitPricePaise,
-            quantity: l.quantity,
-            addOns: l.addOns,
-            lineTotalPaise: l.lineTotalPaise,
-          })),
-        },
+        items: { create: combined.rows },
         statusLogs: {
           create: {
             fromStatus: order.status,
@@ -209,6 +245,52 @@ export async function advanceOrder(orderId: string, action: OrderAction): Promis
   });
   await publish({ type: "order", orderId: order.id, number: order.number, status: to });
   return { ok: true };
+}
+
+/** Take back the last step staff took on an order (a mis-tap on the live board). */
+export async function undoOrderStep(orderId: string): Promise<{ ok: true; label: string } | Fail> {
+  const me = await staff();
+  if ("ok" in me) return me;
+  const id = OrderId.safeParse(orderId);
+  if (!id.success) return { ok: false, error: "Order not found." };
+  const order = await db.order.findUnique({
+    where: { id: id.data },
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      deletedAt: true,
+      bill: { select: { number: true } },
+      statusLogs: { orderBy: { createdAt: "asc" }, select: { fromStatus: true, toStatus: true, note: true } },
+    },
+  });
+  if (!order || order.deletedAt) return { ok: false, error: "Order not found." };
+  const step = stepToUndo(order.statusLogs, order.status);
+  if (!step) return { ok: false, error: `Nothing to undo on order #${order.number}.` };
+  // a bill is made from served orders, so only a pickup can be taken back while it's on one
+  if (order.bill && step.from !== "READY")
+    return {
+      ok: false,
+      error: `Order #${order.number} is on bill #${order.bill.number}. Void the bill first, then undo.`,
+    };
+
+  const moved = await db.order.updateMany({
+    where: { id: order.id, status: order.status },
+    data: { status: step.from, ...(step.to === "CANCELLED" && { cancelReason: null }) },
+  });
+  if (moved.count === 0)
+    return { ok: false, error: `Order #${order.number} was just changed by someone else.` };
+  await db.orderStatusLog.create({
+    data: {
+      orderId: order.id,
+      fromStatus: order.status,
+      toStatus: step.from,
+      changedById: me.id,
+      note: UNDO_NOTE,
+    },
+  });
+  await publish({ type: "order", orderId: order.id, number: order.number, status: step.from });
+  return { ok: true, label: step.label };
 }
 
 const CancelSchema = z.object({

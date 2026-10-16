@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
+import { Printer, Search } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { ORDER_STATUS, OrderStatusBadge } from "@/components/admin/order-status-badge";
@@ -8,6 +8,7 @@ import {
   EditOrderButton,
 } from "@/components/admin/orders/order-record-dialog";
 import { ChangePaymentButton, RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
+import { Pager } from "@/components/admin/pager";
 import { TextReceiptButton } from "@/components/admin/receipt-sms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,13 +23,13 @@ import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { toCafeInput } from "@/lib/order-edit";
 import { maskPhone } from "@/lib/phone-mask";
+import { clampPage, resolvePerPage } from "@/lib/paging";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
 import { cn } from "@/lib/utils";
 import { PAYMENT_SHORT } from "@/lib/payments";
 
 export const metadata = { title: "Order history" };
 
-const PAGE_SIZE = 50;
 const PAY_FILTERS = ["PENDING", "PAY_LATER", "PAID", "CASH", "UPI", "CREDIT_CARD", "DEBIT_CARD"] as const;
 type PayFilter = (typeof PAY_FILTERS)[number];
 
@@ -72,7 +73,8 @@ const Filters = z.object({
     .optional()
     .catch(undefined),
   pay: z.enum(PAY_FILTERS).optional().catch(undefined),
-  page: z.coerce.number().int().min(1).max(1000).catch(1),
+  page: z.coerce.number().int().min(1).max(10000).catch(1),
+  per: z.string().optional().catch(undefined),
 });
 
 /** yyyy-mm-dd in the server's local time (the café runs in IST). */
@@ -121,13 +123,15 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
   const canEdit = user.role === "OWNER" && (await getEditSwitches()).orders;
   const menu = canEdit ? await getPublicMenu() : null;
 
-  const [total, orders] = await Promise.all([
-    db.order.count({ where }),
+  const perPage = resolvePerPage(f.per, 10);
+  const total = await db.order.count({ where });
+  const { page, pages } = clampPage(f.page, total, perPage);
+  const [orders] = await Promise.all([
     db.order.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      skip: (f.page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * perPage,
+      take: perPage,
       include: {
         items: true,
         bill: {
@@ -147,18 +151,19 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
       },
     }),
   ]);
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const pageHref = (page: number) => {
+  const pageHref = (to: { page: number; perPage: number }) => {
     const params = new URLSearchParams({
       ...(f.from && { from }),
-      ...(f.to && { to }),
+      ...(f.to && { to: f.to }),
       ...(f.q && { q: f.q }),
       ...(f.type && { type: f.type }),
       ...(f.status && { status: f.status }),
       ...(f.pay && { pay: f.pay }),
-      page: String(page),
+      ...(to.perPage !== 10 && { per: String(to.perPage) }),
+      ...(to.page > 1 && { page: String(to.page) }),
     });
-    return `/admin/orders?${params}`;
+    const qs = params.toString();
+    return qs ? `/admin/orders?${qs}` : "/admin/orders";
   };
   const showPhone = (p: string | null) => (p ? (user.role === "OWNER" ? p : maskPhone(p)) : null);
   const time = (d: Date) =>
@@ -181,6 +186,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         method="get"
         className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_9rem_11rem_auto]"
       >
+        {perPage !== 10 && <input type="hidden" name="per" value={perPage} />}
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           Search
           <span className="relative">
@@ -244,10 +250,21 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         </div>
       </form>
 
-      <p className="text-sm text-muted-foreground" role="status">
-        {total === 0 ? "No orders match." : `${total} order${total === 1 ? "" : "s"}`}
-        {total > PAGE_SIZE && ` · page ${f.page} of ${pages}`}
-      </p>
+      {total === 0 ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          No orders match.
+        </p>
+      ) : (
+        <Pager
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          noun="orders"
+          href={pageHref}
+          sizes
+        />
+      )}
 
       <ul className="space-y-3">
         {orders.map((o) => (
@@ -389,6 +406,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                         name: a.name,
                       })),
                       unitPrice: toRupees(i.unitPricePaise),
+                      custom: i.custom,
                     })),
                     paidBy: o.bill?.paidAt && !o.bill.voidedAt ? (o.bill.paymentMethod ?? null) : null,
                     billNumber: o.bill?.number ?? null,
@@ -407,27 +425,15 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
       </ul>
 
       {pages > 1 && (
-        <nav className="flex items-center justify-center gap-2" aria-label="Pages">
-          <Button asChild variant="outline" size="sm" className="rounded-full" aria-disabled={f.page <= 1}>
-            <Link href={pageHref(Math.max(1, f.page - 1))}>
-              <ChevronLeft data-icon="inline-start" /> Newer
-            </Link>
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {f.page} / {pages}
-          </span>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            aria-disabled={f.page >= pages}
-          >
-            <Link href={pageHref(Math.min(pages, f.page + 1))}>
-              Older <ChevronRight data-icon="inline-end" />
-            </Link>
-          </Button>
-        </nav>
+        <Pager
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          noun="orders"
+          href={pageHref}
+          sizes
+        />
       )}
     </div>
   );

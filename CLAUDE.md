@@ -27,7 +27,7 @@ Next.js 16 (App Router, RSC, `src/proxy.ts` not middleware) · React 19 · TypeS
 
 ## Commands
 `pnpm dev` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm format`
-DB: `pnpm db:setup` (local Postgres) · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:studio`
+DB: `pnpm db:setup` (local Postgres) · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:demo` (fake customers/orders, local only; `--clear` removes) · `pnpm db:studio`
 After a schema change: `npx prisma generate`, then **restart `pnpm dev`** – the running server keeps the old Prisma client in memory (`db.<newModel>` is undefined until restart).
 Before calling a task done: `pnpm typecheck && pnpm lint`.
 

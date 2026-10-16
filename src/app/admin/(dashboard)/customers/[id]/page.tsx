@@ -37,7 +37,8 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
       include: { items: { select: { itemName: true, quantity: true } }, bill: { select: { number: true } } },
     }),
     db.orderItem.findMany({
-      where: { order: { customerId: id } },
+      // other items (discounts and such) aren't dishes, so they're never a favourite
+      where: { order: { customerId: id }, custom: false },
       select: { itemName: true, quantity: true, order: { select: { status: true } } },
     }),
     db.order.count({ where: { customerId: id } }),

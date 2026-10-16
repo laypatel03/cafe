@@ -97,7 +97,10 @@ export async function saveMenuItem(_prev: FormState, formData: FormData): Promis
     });
     if (photo !== undefined) await deleteUpload(existing?.photo);
   } else {
-    const last = await db.menuItem.aggregate({ where: { categoryId: data.categoryId }, _max: { sortOrder: true } });
+    const last = await db.menuItem.aggregate({
+      where: { categoryId: data.categoryId },
+      _max: { sortOrder: true },
+    });
     await db.menuItem.create({
       data: {
         ...fields,
@@ -124,7 +127,12 @@ export async function deleteMenuItem(id: string) {
 type Direction = "up" | "down";
 
 /** Swap with the neighbour, after normalising sort orders to 0..n-1. */
-async function reorder(ids: string[], id: string, dir: Direction, write: (id: string, order: number) => Promise<unknown>) {
+async function reorder(
+  ids: string[],
+  id: string,
+  dir: Direction,
+  write: (id: string, order: number) => Promise<unknown>,
+) {
   const i = ids.indexOf(id);
   const j = dir === "up" ? i - 1 : i + 1;
   if (i < 0 || j < 0 || j >= ids.length) return;
@@ -142,8 +150,11 @@ export async function moveMenuItem(id: string, dir: Direction) {
       select: { id: true },
     });
     await db.$transaction(async (tx) => {
-      await reorder(siblings.map((s) => s.id), id, dir, (x, n) =>
-        tx.menuItem.update({ where: { id: x }, data: { sortOrder: n } }),
+      await reorder(
+        siblings.map((s) => s.id),
+        id,
+        dir,
+        (x, n) => tx.menuItem.update({ where: { id: x }, data: { sortOrder: n } }),
       );
     });
     menuChanged();
@@ -187,9 +198,17 @@ export async function setCategoryVisible(id: string, visible: boolean) {
 export async function moveCategory(id: string, dir: Direction) {
   return guard(async () => {
     await assertUser("OWNER");
-    const all = await db.category.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true } });
+    const all = await db.category.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true },
+    });
     await db.$transaction(async (tx) => {
-      await reorder(all.map((c) => c.id), id, dir, (x, n) => tx.category.update({ where: { id: x }, data: { sortOrder: n } }));
+      await reorder(
+        all.map((c) => c.id),
+        id,
+        dir,
+        (x, n) => tx.category.update({ where: { id: x }, data: { sortOrder: n } }),
+      );
     });
     menuChanged();
     return { ok: true as const };

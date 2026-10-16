@@ -8,6 +8,7 @@ import { addPastOrder, deleteOrder, editOrder } from "@/app/admin/(dashboard)/or
 import {
   type EditableLine,
   ItemLinesEditor,
+  otherItems,
   parsePrice,
   toEditableLines,
 } from "@/components/admin/item-lines-editor";
@@ -37,6 +38,8 @@ export type EditableOrder = {
     addOns: { id: string; name: string }[];
     /** price each in ₹ that the guest paid */
     unitPrice: number;
+    /** "Other item" the owner typed in; a minus price is a discount */
+    custom: boolean;
   }[];
   /** set when the order's bill is paid */
   paidBy: PayChoice | "CARD" | null;
@@ -111,7 +114,10 @@ function OrderForm({
   const save = () =>
     start(async () => {
       setError(null);
-      const missing = lines.filter((_, i) => prices[i] === undefined || prices[i]! < 0);
+      // dishes can't cost less than ₹0; an other item can (a discount) but not exactly ₹0
+      const missing = lines.filter((l, i) =>
+        l.custom ? !prices[i] : prices[i] === undefined || prices[i]! < 0,
+      );
       if (missing.length > 0) {
         setError({ message: `Enter a price for ${missing.map((l) => l.name).join(", ")}.` });
         return;
@@ -122,12 +128,19 @@ function OrderForm({
         name,
         phone,
         note,
-        items: lines.map((l, i) => ({
-          itemId: l.itemId,
-          addOnIds: l.addOns.map((a) => a.id),
-          quantity: l.quantity,
-          unitPrice: prices[i],
-        })),
+        items: lines.flatMap((l, i) =>
+          l.custom
+            ? []
+            : [
+                {
+                  itemId: l.itemId,
+                  addOnIds: l.addOns.map((a) => a.id),
+                  quantity: l.quantity,
+                  unitPrice: prices[i],
+                },
+              ],
+        ),
+        others: otherItems(lines),
       };
       const res = order
         ? await editOrder({ ...common, orderId: order.id, method: method || undefined })
@@ -241,7 +254,7 @@ function OrderForm({
             save.
           </p>
         )}
-        <ItemLinesEditor lines={lines} onChange={setLines} menu={menu} allowSoldOut editPrices />
+        <ItemLinesEditor lines={lines} onChange={setLines} menu={menu} allowSoldOut editPrices allowOther />
         {lines.length > 0 && (
           <p className="text-right text-sm">
             Items total <span className="tabular font-semibold">{formatINR(itemsTotal)}</span>

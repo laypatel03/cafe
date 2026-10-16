@@ -1,7 +1,8 @@
-import { ChevronLeft, ChevronRight, Download, ReceiptText, Search } from "lucide-react";
+import { Download, ReceiptText, Search } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { AddCustomerButton } from "@/components/admin/customer-edit-dialog";
+import { Pager } from "@/components/admin/pager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -11,10 +12,10 @@ import { getEditSwitches } from "@/lib/data/edit-switches";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
+import { clampPage, resolvePerPage } from "@/lib/paging";
 
 export const metadata = { title: "Customers" };
 
-const PAGE_SIZE = 50;
 const SORTS = {
   recent: { label: "Last visit", orderBy: { lastVisitAt: "desc" } },
   visits: { label: "Most visits", orderBy: { orderCount: "desc" } },
@@ -26,7 +27,8 @@ const Filters = z.object({
   q: z.string().trim().max(60).optional().catch(undefined),
   sort: z.enum(["recent", "visits", "spend", "new"]).catch("recent"),
   offers: z.literal("1").optional().catch(undefined),
-  page: z.coerce.number().int().min(1).max(1000).catch(1),
+  page: z.coerce.number().int().min(1).max(10000).catch(1),
+  per: z.string().optional().catch(undefined),
 });
 
 const date = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -49,26 +51,28 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
     ...(f.offers && { marketingConsent: true }),
   };
 
-  const [total, customers, all] = await Promise.all([
-    db.customer.count({ where }),
+  const perPage = resolvePerPage(f.per, 25);
+  const total = await db.customer.count({ where });
+  const { page, pages } = clampPage(f.page, total, perPage);
+  const [customers, all] = await Promise.all([
     db.customer.findMany({
       where,
       orderBy: [SORTS[f.sort].orderBy, { name: "asc" }],
-      skip: (f.page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * perPage,
+      take: perPage,
     }),
     db.customer.aggregate({ _count: true, _sum: { totalSpendPaise: true } }),
   ]);
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const consenting = await db.customer.count({ where: { marketingConsent: true } });
   const canEdit = (await getEditSwitches()).customers;
 
-  const pageHref = (page: number) => {
+  const pageHref = (to: { page: number; perPage: number }) => {
     const p = new URLSearchParams();
     if (f.q) p.set("q", f.q);
     if (f.sort !== "recent") p.set("sort", f.sort);
     if (f.offers) p.set("offers", "1");
-    if (page > 1) p.set("page", String(page));
+    if (to.perPage !== 25) p.set("per", String(to.perPage));
+    if (to.page > 1) p.set("page", String(to.page));
     const s = p.toString();
     return s ? `/admin/customers?${s}` : "/admin/customers";
   };
@@ -111,6 +115,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         method="get"
         className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-[1.6fr_1fr_auto_auto] sm:items-end"
       >
+        {perPage !== 25 && <input type="hidden" name="per" value={perPage} />}
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           Search
           <span className="relative">
@@ -150,10 +155,21 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         </div>
       </form>
 
-      <p className="text-sm text-muted-foreground" role="status">
-        {total === 0 ? "No customers match." : `${total} customer${total === 1 ? "" : "s"}`}
-        {total > PAGE_SIZE && ` · page ${f.page} of ${pages}`}
-      </p>
+      {total === 0 ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          No customers match.
+        </p>
+      ) : (
+        <Pager
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          noun="customers"
+          href={pageHref}
+          sizes
+        />
+      )}
 
       <ul className="divide-y divide-border rounded-3xl border border-border bg-card">
         {customers.map((c) => (
@@ -191,27 +207,15 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
       </ul>
 
       {pages > 1 && (
-        <nav className="flex items-center justify-center gap-2" aria-label="Pages">
-          <Button asChild variant="outline" size="sm" className="rounded-full" aria-disabled={f.page <= 1}>
-            <Link href={pageHref(Math.max(1, f.page - 1))}>
-              <ChevronLeft data-icon="inline-start" /> Previous
-            </Link>
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {f.page} / {pages}
-          </span>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            aria-disabled={f.page >= pages}
-          >
-            <Link href={pageHref(Math.min(pages, f.page + 1))}>
-              Next <ChevronRight data-icon="inline-end" />
-            </Link>
-          </Button>
-        </nav>
+        <Pager
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          noun="customers"
+          href={pageHref}
+          sizes
+        />
       )}
     </div>
   );

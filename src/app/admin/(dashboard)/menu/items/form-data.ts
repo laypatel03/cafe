@@ -7,5 +7,8 @@ export async function getItemFormOptions() {
     db.category.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     db.addOn.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true, pricePaise: true } }),
   ]);
-  return { categories, addOns: addOns.map((a) => ({ id: a.id, name: a.name, price: toRupees(a.pricePaise) })) };
+  return {
+    categories,
+    addOns: addOns.map((a) => ({ id: a.id, name: a.name, price: toRupees(a.pricePaise) })),
+  };
 }

@@ -8,7 +8,8 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function SiteHeader() {
+/** `showBlog`: the Blog link, only while the blog is switched on (or on the blog pages themselves). */
+export function SiteHeader({ showBlog = false }: { showBlog?: boolean }) {
   const { scrollY } = useScroll();
   const [solid, setSolid] = useState(false);
   useMotionValueEvent(scrollY, "change", (y) => setSolid(y > 40));
@@ -33,12 +34,24 @@ export function SiteHeader() {
           <LogoWordmark className={cn("hidden h-7 transition-opacity sm:block", !solid && "sm:opacity-0")} />
         </Link>
         <nav className="flex items-center gap-1">
-          <a href="#promise" className="hidden rounded-full px-3 py-2 text-sm font-medium hover:bg-muted sm:block">
+          {/* "/#…" so the links also work from the blog pages */}
+          <Link
+            href="/#promise"
+            className="hidden rounded-full px-3 py-2 text-sm font-medium hover:bg-muted sm:block"
+          >
             Our promise
-          </a>
-          <a href="#visit" className="hidden rounded-full px-3 py-2 text-sm font-medium hover:bg-muted sm:block">
+          </Link>
+          {showBlog && (
+            <Link href="/blog" className="rounded-full px-3 py-2 text-sm font-medium hover:bg-muted">
+              Blog
+            </Link>
+          )}
+          <Link
+            href="/#visit"
+            className="hidden rounded-full px-3 py-2 text-sm font-medium hover:bg-muted sm:block"
+          >
             Visit
-          </a>
+          </Link>
           <ThemeToggle />
           <Button asChild className="h-9 rounded-full px-4 font-semibold">
             <Link href="/menu">Menu</Link>

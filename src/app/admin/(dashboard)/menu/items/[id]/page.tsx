@@ -15,7 +15,10 @@ export default async function EditItemPage({ params }: PageProps<"/admin/menu/it
   if (!item) notFound();
   return (
     <div className="mx-auto max-w-5xl">
-      <Link href="/admin/menu" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        href="/admin/menu"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ChevronLeft className="size-4" aria-hidden /> Menu
       </Link>
       <h1 className="mt-2 mb-6 text-3xl font-bold">{item.name}</h1>

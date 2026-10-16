@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { availableActions, canCancel, canEditItems, nextStatus, statusOnPayment } from "@/lib/order-flow";
+import type { OrderStatus } from "@/generated/prisma/enums";
+import {
+  availableActions,
+  canCancel,
+  canEditItems,
+  nextStatus,
+  statusOnPayment,
+  stepToUndo,
+  UNDO_NOTE,
+} from "@/lib/order-flow";
 
 describe("order flow", () => {
   it("takes a dine-in order from placed to served", () => {
@@ -43,5 +52,54 @@ describe("order flow", () => {
     expect(statusOnPayment("SERVED")).toBe("PAID");
     expect(canCancel("READY", true)).toBe(false);
     expect(canCancel("READY")).toBe(true);
+  });
+});
+
+describe("undo", () => {
+  const log = (fromStatus: OrderStatus | null, toStatus: OrderStatus, note: string | null = null) => ({
+    fromStatus,
+    toStatus,
+    note,
+  });
+  const placed = log(null, "NEW", "Placed by the guest on the QR menu");
+
+  it("takes back the last step, then the one before", () => {
+    const logs = [placed, log("NEW", "ACCEPTED"), log("ACCEPTED", "PREPARING")];
+    expect(stepToUndo(logs, "PREPARING")).toEqual({
+      from: "ACCEPTED",
+      to: "PREPARING",
+      label: "Send to kitchen",
+    });
+    const once = [...logs, log("PREPARING", "ACCEPTED", UNDO_NOTE)];
+    expect(stepToUndo(once, "ACCEPTED")).toEqual({ from: "NEW", to: "ACCEPTED", label: "Accept" });
+    expect(stepToUndo([...once, log("ACCEPTED", "NEW", UNDO_NOTE)], "NEW")).toBeNull();
+  });
+
+  it("undoes a cancel and a pickup, skipping item edits", () => {
+    const cancelled = [
+      placed,
+      log("NEW", "NEW", "Items changed by Asha"),
+      log("NEW", "CANCELLED", "Guest left"),
+    ];
+    expect(stepToUndo(cancelled, "CANCELLED")?.label).toBe("Cancel");
+    const pickedUp = [
+      placed,
+      log("NEW", "ACCEPTED"),
+      log("ACCEPTED", "PREPARING"),
+      log("PREPARING", "READY"),
+    ];
+    expect(stepToUndo([...pickedUp, log("READY", "SERVED")], "SERVED")?.label).toBe("Picked up");
+    expect(stepToUndo([...pickedUp, log("READY", "PAID", "Picked up")], "PAID")?.label).toBe("Picked up");
+  });
+
+  it("never undoes payments, pay later or a status changed elsewhere", () => {
+    const served = [placed, log("NEW", "ACCEPTED"), log("ACCEPTED", "PREPARING"), log("PREPARING", "SERVED")];
+    expect(stepToUndo(served, "SERVED")?.label).toBe("Served");
+    expect(stepToUndo([...served, log("SERVED", "PAID", "Bill #4 paid by Cash")], "PAID")).toBeNull();
+    const ready = [placed, log("NEW", "ACCEPTED"), log("ACCEPTED", "PREPARING"), log("PREPARING", "READY")];
+    expect(
+      stepToUndo([...ready, log("READY", "SERVED", "Bill #5 completed – pay later")], "SERVED"),
+    ).toBeNull();
+    expect(stepToUndo(served, "PAID")).toBeNull();
   });
 });

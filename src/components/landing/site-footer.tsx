@@ -23,6 +23,11 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
           <a href={`https://wa.me/${cafe.whatsapp}`} className="hover:text-white">
             WhatsApp
           </a>
+          {cafe.blogEnabled && (
+            <Link href="/blog" className="hover:text-white">
+              Blog
+            </Link>
+          )}
           <Link href="/privacy" className="hover:text-white">
             Privacy
           </Link>

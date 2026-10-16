@@ -2,7 +2,6 @@ import { z } from "zod";
 import { INDIAN_MOBILE } from "./phone";
 
 const optional = <T extends z.ZodType<string, string>>(schema: T) => z.union([z.literal(""), schema]);
-const checkbox = z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean());
 
 export const CafeDetailsSchema = z.object({
   name: z.string().trim().min(2, "Name is too short").max(60),
@@ -33,7 +32,6 @@ export const CafeDetailsSchema = z.object({
     .array(z.object({ days: z.string().trim().max(30), time: z.string().trim().max(40) }))
     .max(7)
     .transform((rows) => rows.filter((r) => r.days || r.time)),
-  orderingEnabled: checkbox,
   todaysPickId: z.string().max(40).default(""),
 });
 

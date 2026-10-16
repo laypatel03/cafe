@@ -4,7 +4,9 @@ import { NutritionLabel } from "@/components/brand/nutrition-label";
 import { Reveal } from "@/components/brand/reveal";
 import { TiltCard } from "@/components/brand/tilt-card";
 import { VegMark } from "@/components/brand/veg-mark";
+import { ArticleCard } from "@/components/blog/article-card";
 import { Button } from "@/components/ui/button";
+import type { Article } from "@/lib/articles";
 import type { CafeDetails } from "@/lib/data/menu";
 import { formatINR } from "@/lib/format";
 import type { MenuItem } from "@/lib/menu-types";
@@ -34,7 +36,10 @@ export function TodaysPick({ item }: { item: MenuItem }) {
             <p className="mt-4 max-w-lg text-lg text-muted-foreground">{item.description}</p>
             <ul className="mt-5 flex flex-wrap gap-2">
               {[...new Set(item.ingredients)].map((ing) => (
-                <li key={ing} className="rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground">
+                <li
+                  key={ing}
+                  className="rounded-full bg-secondary px-3 py-1 text-sm text-secondary-foreground"
+                >
                   {ing}
                 </li>
               ))}
@@ -53,7 +58,11 @@ export function TodaysPick({ item }: { item: MenuItem }) {
             </div>
           </div>
           <div className="flex items-center md:justify-end">
-            <NutritionLabel protein={item.protein} kcal={item.kcal} className="w-full max-w-60 translate-z-20 bg-card" />
+            <NutritionLabel
+              protein={item.protein}
+              kcal={item.kcal}
+              className="w-full max-w-60 translate-z-20 bg-card"
+            />
           </div>
         </TiltCard>
       </Reveal>
@@ -85,7 +94,9 @@ export function OurPromise() {
       <div className="mx-auto max-w-6xl px-5 py-24">
         <div className="mb-10">
           <p className="tagline text-xs text-surface-accent">Our promise</p>
-          <h2 className="mt-2 text-4xl font-bold text-balance md:text-5xl">Eat well, without the guesswork.</h2>
+          <h2 className="mt-2 text-4xl font-bold text-balance md:text-5xl">
+            Eat well, without the guesswork.
+          </h2>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
           {promises.map((p, i) => (
@@ -111,9 +122,13 @@ export function Bestsellers({ items }: { items: MenuItem[] }) {
       <div className="mx-auto max-w-6xl px-5">
         <SectionHeading eyebrow="Bestsellers" title="What everyone orders." />
       </div>
-      <div className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-5 overflow-x-auto px-5 pb-6 [scrollbar-width:none]">
+      <div className="mx-auto flex max-w-6xl snap-x snap-mandatory [scrollbar-width:none] gap-5 overflow-x-auto px-5 pb-6">
         {items.map((item, i) => (
-          <Reveal key={item.id} delay={i * 0.06} className="w-[78%] shrink-0 snap-start sm:w-[46%] lg:w-[31%]">
+          <Reveal
+            key={item.id}
+            delay={i * 0.06}
+            className="w-[78%] shrink-0 snap-start sm:w-[46%] lg:w-[31%]"
+          >
             <TiltCard className="flex h-full flex-col rounded-3xl border border-border bg-card p-6 shadow-[0_20px_40px_-28px_rgba(14,85,24,0.4)]">
               <div className="flex items-center gap-2">
                 <VegMark />
@@ -123,7 +138,7 @@ export function Bestsellers({ items }: { items: MenuItem[] }) {
               </div>
               <h3 className="mt-4 text-2xl font-semibold">{item.name}</h3>
               <p className="mt-2 flex-1 text-sm text-muted-foreground">{item.description}</p>
-              <div className="tabular mt-5 flex items-end justify-between">
+              <div className="mt-5 flex items-end justify-between tabular">
                 <span className="text-sm text-muted-foreground">
                   {item.protein} g protein · {item.kcal} kcal
                 </span>
@@ -144,11 +159,35 @@ export function Bestsellers({ items }: { items: MenuItem[] }) {
   );
 }
 
+export function FromOurKitchen({ articles }: { articles: Article[] }) {
+  return (
+    <section className="mx-auto max-w-6xl px-5 pb-24">
+      <SectionHeading eyebrow="From our kitchen" title="Eat well, knowing why." />
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {articles.map((a, i) => (
+          <Reveal key={a.slug} delay={i * 0.06}>
+            <ArticleCard article={a} />
+          </Reveal>
+        ))}
+      </div>
+      <Button asChild variant="outline" className="mt-8 h-11 rounded-full px-5">
+        <Link href="/blog">
+          All articles <ArrowRight data-icon="inline-end" />
+        </Link>
+      </Button>
+    </section>
+  );
+}
+
 export function VisitUs({ cafe }: { cafe: CafeDetails }) {
   const links = [
     cafe.phone && { icon: Phone, label: cafe.phone, href: `tel:${cafe.phone.replace(/\s/g, "")}` },
     cafe.whatsapp && { icon: MessageCircle, label: "WhatsApp us", href: `https://wa.me/${cafe.whatsapp}` },
-    cafe.instagram && { icon: AtSign, label: `@${cafe.instagram}`, href: `https://instagram.com/${cafe.instagram}` },
+    cafe.instagram && {
+      icon: AtSign,
+      label: `@${cafe.instagram}`,
+      href: `https://instagram.com/${cafe.instagram}`,
+    },
   ].filter((l) => !!l);
   return (
     <section id="visit" className="mx-auto max-w-6xl px-5 pb-24">
@@ -177,7 +216,10 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
             </h3>
             <dl className="mt-3 space-y-1">
               {cafe.hours.map((h) => (
-                <div key={h.days} className="flex justify-between gap-4 border-b border-border py-2 last:border-0">
+                <div
+                  key={h.days}
+                  className="flex justify-between gap-4 border-b border-border py-2 last:border-0"
+                >
                   <dt>{h.days}</dt>
                   <dd className="tabular text-muted-foreground">{h.time}</dd>
                 </div>

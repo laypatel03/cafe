@@ -9,6 +9,7 @@ import {
   Printer,
   ReceiptText,
   Smartphone,
+  Undo2,
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -23,6 +24,7 @@ import { toRupees } from "@/lib/money";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
 import { ReceiptSmsDialog } from "./receipt-sms";
 import { cn } from "@/lib/utils";
+import { undoStep } from "./undo-step";
 
 type ToBill = {
   key: string;
@@ -152,6 +154,20 @@ function ToBillCard({ entry, onChanged }: { entry: ToBill; onChanged: () => void
           billing.
         </p>
       )}
+      {entry.orders
+        .filter((o) => o.undo)
+        .map((o) => (
+          <Button
+            key={o.id}
+            size="sm"
+            variant="ghost"
+            className="mt-2 self-start rounded-full text-muted-foreground"
+            disabled={pending}
+            onClick={() => start(() => undoStep(o, onChanged))}
+          >
+            <Undo2 data-icon="inline-start" /> Undo “{o.undo}” on #{o.number}
+          </Button>
+        ))}
       <p className="mt-3 text-right tabular text-2xl font-bold">{formatINR(toRupees(total))}</p>
       <Button
         className="mt-3 rounded-full bg-cta font-bold text-cta-foreground hover:bg-hh-orange-light"
