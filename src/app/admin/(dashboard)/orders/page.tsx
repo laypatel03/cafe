@@ -250,20 +250,10 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         </div>
       </form>
 
-      {total === 0 ? (
+      {total === 0 && (
         <p className="text-sm text-muted-foreground" role="status">
           No orders match.
         </p>
-      ) : (
-        <Pager
-          page={page}
-          pages={pages}
-          total={total}
-          perPage={perPage}
-          noun="orders"
-          href={pageHref}
-          sizes
-        />
       )}
 
       <ul className="space-y-3">
@@ -424,7 +414,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         ))}
       </ul>
 
-      {pages > 1 && (
+      {total > 0 && (
         <Pager
           page={page}
           pages={pages}

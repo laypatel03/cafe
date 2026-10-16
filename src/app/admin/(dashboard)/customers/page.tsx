@@ -155,20 +155,10 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         </div>
       </form>
 
-      {total === 0 ? (
+      {total === 0 && (
         <p className="text-sm text-muted-foreground" role="status">
           No customers match.
         </p>
-      ) : (
-        <Pager
-          page={page}
-          pages={pages}
-          total={total}
-          perPage={perPage}
-          noun="customers"
-          href={pageHref}
-          sizes
-        />
       )}
 
       <ul className="divide-y divide-border rounded-3xl border border-border bg-card">
@@ -206,7 +196,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         ))}
       </ul>
 
-      {pages > 1 && (
+      {total > 0 && (
         <Pager
           page={page}
           pages={pages}
