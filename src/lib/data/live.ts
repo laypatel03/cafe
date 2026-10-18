@@ -67,7 +67,7 @@ export type LiveBoard = {
   selections: LiveSelection[];
   orders: LiveOrder[];
   bills: LiveBill[];
-  /** bills completed with "pay later", any day, still not paid */
+  /** bills completed with "pay later" today, still not paid (earlier days are in Order history) */
   payLater: LiveBill[];
   serverTime: string;
 };
@@ -119,7 +119,7 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       },
     }),
     db.bill.findMany({
-      where: { paidAt: null, voidedAt: null, payLaterAt: { not: null } },
+      where: { paidAt: null, voidedAt: null, payLaterAt: { gte: startOfDay } },
       orderBy: { payLaterAt: "asc" },
       include: {
         orders: { select: { number: true }, orderBy: { number: "asc" } },

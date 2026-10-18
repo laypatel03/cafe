@@ -31,7 +31,9 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Make the bill – one bill for a guest's whole visit, even across several orders. Mark it paid by cash, UPI or card, and print a receipt.
 - Void a bill made by mistake, with a reason. Bill numbers never skip.
 - Find any order or bill by number, phone, name or date, and reprint it.
-- In Order history, filter by payment: payment pending (across all days), pay later, paid, or paid by cash, Google Pay, credit or debit card. The owner can change how a paid bill was paid, or set it back to payment pending if the guest didn't actually pay.
+- "Pay later" bills show on the live orders page only on the day they were marked. After that, find them in Order history (filter: pay later) and record the payment there.
+- Order history shows a reminder at the top when orders from earlier days still need payment – how many and the total – with a button to list them.
+- In Order history, filter by payment: payment pending (across all days), payment pending from earlier days only, pay later, paid, or paid by cash, Google Pay, credit or debit card. The owner can change how a paid bill was paid, or set it back to payment pending if the guest didn't actually pay.
 - Long lists (Order history, Customers, the Money book) are split into numbered pages. In Order history and Customers you can choose to show 10, 25 or 50 at a time.
 - Undo a mistake on the live orders page: each order shows "Undo" for its last step (accepted, sent to the kitchen, served, ready, picked up or cancelled), and you can keep undoing one step at a time. Payments can't be undone here – void the bill, or the owner changes it in Order history.
 - Mark a dish sold out in one tap.

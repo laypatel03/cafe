@@ -1,4 +1,4 @@
-import { Printer, Search } from "lucide-react";
+import { CircleAlert, Printer, Search } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { ORDER_STATUS, OrderStatusBadge } from "@/components/admin/order-status-badge";
@@ -30,7 +30,16 @@ import { PAYMENT_SHORT } from "@/lib/payments";
 
 export const metadata = { title: "Order history" };
 
-const PAY_FILTERS = ["PENDING", "PAY_LATER", "PAID", "CASH", "UPI", "CREDIT_CARD", "DEBIT_CARD"] as const;
+const PAY_FILTERS = [
+  "PENDING",
+  "PENDING_EARLIER",
+  "PAY_LATER",
+  "PAID",
+  "CASH",
+  "UPI",
+  "CREDIT_CARD",
+  "DEBIT_CARD",
+] as const;
 type PayFilter = (typeof PAY_FILTERS)[number];
 
 const paidBy = (...methods: PaymentMethod[]): Prisma.OrderWhereInput => ({
@@ -38,13 +47,22 @@ const paidBy = (...methods: PaymentMethod[]): Prisma.OrderWhereInput => ({
     is: { paidAt: { not: null }, voidedAt: null, ...(methods.length && { paymentMethod: { in: methods } }) },
   },
 });
-const PAY_WHERE: Record<PayFilter, Prisma.OrderWhereInput> = {
-  // not paid yet and still owed: no bill made, or a bill waiting for payment
-  PENDING: {
-    deletedAt: null,
-    status: { not: "CANCELLED" },
-    OR: [{ billId: null }, { bill: { is: { paidAt: null, voidedAt: null } } }],
-  },
+// not paid yet and still owed: no bill made, or a bill waiting for payment
+const PENDING: Prisma.OrderWhereInput = {
+  deletedAt: null,
+  status: { not: "CANCELLED" },
+  OR: [{ billId: null }, { bill: { is: { paidAt: null, voidedAt: null } } }],
+};
+/** Midnight today, server local time (the café runs in IST). */
+const startOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+const payWhere = (pay: PayFilter): Prisma.OrderWhereInput =>
+  pay === "PENDING_EARLIER" ? { ...PENDING, createdAt: { lt: startOfToday() } } : PAY_WHERE[pay];
+const PAY_WHERE: Record<Exclude<PayFilter, "PENDING_EARLIER">, Prisma.OrderWhereInput> = {
+  PENDING,
   PAY_LATER: { bill: { is: { payLaterAt: { not: null }, paidAt: null, voidedAt: null } } },
   PAID: paidBy(),
   CASH: paidBy("CASH"),
@@ -55,6 +73,7 @@ const PAY_WHERE: Record<PayFilter, Prisma.OrderWhereInput> = {
 };
 const PAY_FILTER_LABEL: Record<PayFilter, string> = {
   PENDING: "Payment pending",
+  PENDING_EARLIER: "Payment pending – earlier days",
   PAY_LATER: "Pay later",
   PAID: "Paid – any way",
   CASH: "Paid by cash",
@@ -110,13 +129,13 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         ? { OR: [{ number: Number(q) }, { bill: { number: Number(q) } }] }
         : { customerName: { contains: q, mode: "insensitive" } };
 
-  const owedOnly = f.pay === "PENDING" || f.pay === "PAY_LATER";
+  const owedOnly = f.pay === "PENDING" || f.pay === "PENDING_EARLIER" || f.pay === "PAY_LATER";
   const where: Prisma.OrderWhereInput = {
     // a number or phone search, or a "still owed" filter, looks across all dates
     ...((q && /^\d+$/.test(q)) || owedOnly ? {} : { createdAt: { gte: start, lt: end } }),
     ...(f.type && { type: f.type }),
     ...(f.status && { status: f.status }),
-    AND: [search ?? {}, f.pay ? PAY_WHERE[f.pay] : {}],
+    AND: [search ?? {}, f.pay ? payWhere(f.pay) : {}],
   };
 
   // owner only, while Settings → Editing → "Add and edit orders" is on
@@ -124,7 +143,15 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
   const menu = canEdit ? await getPublicMenu() : null;
 
   const perPage = resolvePerPage(f.per, 10);
-  const total = await db.order.count({ where });
+  const [total, earlierOwed] = await Promise.all([
+    db.order.count({ where }),
+    // orders from before today still waiting for payment, shown as a reminder above the filters
+    db.order.aggregate({
+      where: payWhere("PENDING_EARLIER"),
+      _count: true,
+      _sum: { totalPaise: true },
+    }),
+  ]);
   const { page, pages } = clampPage(f.page, total, perPage);
   const [orders] = await Promise.all([
     db.order.findMany({
@@ -181,6 +208,27 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         </div>
         {menu && <AddOrderButton menu={menu} />}
       </div>
+
+      {earlierOwed._count > 0 && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-3xl border border-hh-orange/40 bg-hh-orange/10 px-4 py-3"
+        >
+          <CircleAlert className="size-5 shrink-0 text-brand-text" aria-hidden />
+          <p className="flex-1 text-sm">
+            <span className="font-semibold">
+              {earlierOwed._count} {earlierOwed._count === 1 ? "order" : "orders"} from earlier days still
+              need payment
+            </span>{" "}
+            · <span className="tabular">{formatINR(toRupees(earlierOwed._sum.totalPaise ?? 0))}</span>
+          </p>
+          {f.pay !== "PENDING_EARLIER" && (
+            <Button asChild size="sm" variant="outline" className="rounded-full">
+              <Link href="/admin/orders?pay=PENDING_EARLIER">Show these orders</Link>
+            </Button>
+          )}
+        </div>
+      )}
 
       <form
         method="get"

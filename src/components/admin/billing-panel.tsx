@@ -120,8 +120,8 @@ export function BillingPanel({
               </span>
             </summary>
             <p className="mt-1 text-sm text-muted-foreground">
-              Orders completed without payment. When the guest pays, tap how they paid – it counts as a sale
-              on that day.
+              Today&apos;s orders completed without payment. When the guest pays, tap how they paid – it
+              counts as a sale on that day. Earlier days are in Order history.
             </p>
             <ul className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {payLater.map((b) => (
