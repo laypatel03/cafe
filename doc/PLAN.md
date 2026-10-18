@@ -133,6 +133,8 @@ Phase 0 is added in front of the doc's five phases so the look and the 3D are ag
 
 2A shipped a list-only version (guests pick, staff see it). The owner then clarified the core flow: **staff see picks live → guest taps Confirm (done selecting) → cashier confirms at the table with the guest's name + phone → kitchen → served → cashier bill → paid**. "Keep it simple" only ever meant minor extras. Live updates: Server-Sent Events backed by Postgres LISTEN/NOTIFY (no separate socket server; works across processes). Decisions: the cashier (not the guest) enters name + phone, no tax for now (Settings switch later), one bill per table visit, customers never see totals. Deferred minor extras: thermal KOT printing, discounts, reports, WhatsApp updates, online payment.
 
+18 Oct: thank-you/receipt SMS (P2B-11) switched on – sent by staff from the counter phone via an `sms:` link (free, no provider, no DLT). Automatic sending stays in Later.
+
 ### Phase 2 – Customer site
 - Landing page: 3D hero + scroll story, Today's Pick, promise points, bestsellers (from DB), Visit us, footer, SEO metadata + OG image.
 - QR menu `/menu` and `/t/[table]`: category tabs, filters (High protein, Light, Bestseller), search, item cards, detail sheet with add-ons/qty, sticky cart, nutrition note, dark mode, view-only mode.

@@ -29,6 +29,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Move orders along: send to the kitchen, then Served (dine-in) or Ready to collect and Picked up (takeaway).
 - See what guests are choosing before they order.
 - Make the bill – one bill for a guest's whole visit, even across several orders. Mark it paid by cash, UPI or card, and print a receipt.
+- After a guest pays, text them a thank-you from the counter phone: tap "Open messages" and the message app opens with their number and "Thank you for visiting Healthy Hunger! Bill #14 – ₹249 paid by UPI. See you again soon." ready – just press Send. It goes from the café's own number, so it's free. Paid bills in Order history have a "Text receipt" button too.
 - Void a bill made by mistake, with a reason. Bill numbers never skip.
 - Find any order or bill by number, phone, name or date, and reprint it.
 - "Pay later" bills show on the live orders page only on the day they were marked. After that, find them in Order history (filter: pay later) and record the payment there.

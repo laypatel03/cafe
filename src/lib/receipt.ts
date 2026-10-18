@@ -6,10 +6,10 @@ import { PAYMENT_SHORT } from "@/lib/payments";
 // counter phone's own messages app (an sms: link), so it costs nothing. Pure, so it's unit-tested.
 
 /**
- * Switched off for now (owner, 8 Oct 2026) – texting receipts comes later. Set to `true` to show
+ * Switched on by the owner, 18 Oct 2026 (built 8 Oct). Set to `false` to hide
  * the "Text the receipt" box after payment and the "Text receipt" button in order history.
  */
-export const RECEIPT_SMS_ENABLED = false;
+export const RECEIPT_SMS_ENABLED = true;
 
 export function receiptMessage(bill: {
   cafeName: string;
