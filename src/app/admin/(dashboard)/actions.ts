@@ -602,12 +602,7 @@ export async function receiptSms(billId: string): Promise<ReceiptSms> {
   if (!bill.paidAt) return { ok: false, error: `Bill #${bill.number} isn't paid yet.` };
   if (!bill.customerPhone) return { ok: false, error: "There's no phone number on this bill." };
 
-  const text = receiptMessage({
-    cafeName: (await getCafeDetails()).name,
-    number: bill.number,
-    totalPaise: bill.totalPaise,
-    paymentMethod: bill.paymentMethod,
-  });
+  const text = receiptMessage({ cafeName: (await getCafeDetails()).name });
   return {
     ok: true,
     to: me.role === "OWNER" ? bill.customerPhone : maskPhone(bill.customerPhone),
