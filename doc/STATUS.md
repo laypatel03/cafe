@@ -26,6 +26,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 ### Staff
 - New orders appear instantly with a chime. Accept them, change items, or cancel with a reason.
 - Take an order at the counter for a walk-in guest, using the same menu guests see on their phones – name needed, phone optional.
+- Returning guests don't have to give their details again: type their mobile number first and their name fills in by itself, with how many times they've visited.
 - Move orders along: send to the kitchen, then Served (dine-in) or Ready to collect and Picked up (takeaway).
 - See what guests are choosing before they order.
 - Make the bill – one bill for a guest's whole visit, even across several orders. Mark it paid by cash, UPI or card, and print a receipt.
@@ -46,6 +47,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Edit the menu: categories, dishes, prices, photos, add-ons, and hide or show items.
 - Add an "Other item" to an order – anything that isn't on the menu, with its own name and price. A minus price takes money off, so it works as a discount (the total never goes below ₹0). Owner only: on the live orders page (Edit items) and in Order history. Staff see these lines but can't change them. They don't count as dishes in reports or favourites.
 - Customers: search the list and open a profile with visits, spending, favourite dishes and staff notes.
+- Start a new order straight from a customer's page – their name and number are already filled in.
 - Stop offers for a guest, delete a guest's data when they ask, and download the customer list for Excel.
 - Reports: sales by hour, day and month, dine-in vs takeaway, top dishes, how many guests are regulars, expenses by category, and sales minus expenses.
 - See every expense for any period, and change or delete one. See past days at the cash counter and reopen today if a count was wrong.

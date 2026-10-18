@@ -1,4 +1,4 @@
-import { ArrowLeft, ReceiptText } from "lucide-react";
+import { ArrowLeft, Plus, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -66,6 +66,14 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Button
+            asChild
+            className="rounded-full bg-cta font-bold text-cta-foreground hover:bg-hh-orange-light"
+          >
+            <Link href={`/admin/counter-order?customer=${customer.id}`}>
+              <Plus data-icon="inline-start" /> New order
+            </Link>
+          </Button>
           {switches.customers && (
             <EditCustomerButton
               customer={{

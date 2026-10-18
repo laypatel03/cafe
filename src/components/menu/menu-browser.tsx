@@ -45,6 +45,8 @@ type Props = {
   initialItemId?: string;
   /** staff taking a walk-in guest's order with the same menu (see /admin/counter-order) */
   counter?: boolean;
+  /** counter order for a known guest (opened from their customer page): name and number filled in */
+  counterGuest?: { name: string; phone: string };
 };
 
 export function MenuBrowser({
@@ -54,6 +56,7 @@ export function MenuBrowser({
   orderingEnabled,
   initialItemId,
   counter = false,
+  counterGuest,
 }: Props) {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filter[]>([]);
@@ -136,7 +139,9 @@ export function MenuBrowser({
             </div>
             <p className="mt-3 text-white/85">
               {counter
-                ? "Pick the dishes with the guest, then add their name."
+                ? counterGuest
+                  ? `For ${counterGuest.name} – pick the dishes with them.`
+                  : "Pick the dishes with the guest, then add their name."
                 : "100% vegetarian · protein from real food"}
             </p>
             {!counter && (
@@ -292,7 +297,9 @@ export function MenuBrowser({
           orderingEnabled={orderingEnabled}
           onClose={() => setOpenItem(null)}
         />
-        {orderingEnabled && <CartBar items={items} addOns={addOns} counter={counter} />}
+        {orderingEnabled && (
+          <CartBar items={items} addOns={addOns} counter={counter} counterGuest={counterGuest} />
+        )}
       </div>
     </CartStoreContext.Provider>
   );

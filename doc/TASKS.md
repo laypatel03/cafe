@@ -160,6 +160,8 @@ Flow: guest picks items (**staff see it live**) → guest taps **Confirm – I'm
   ✅ 11 Oct: `/menu/pdf` (`src/lib/menu-pdf/`, @react-pdf/renderer, Figtree TTFs for the ₹ sign). Two columns, categories kept whole, add-ons per category, nutrition note in the footer; hidden items left out, sold-out marked, price 0 shows "MRP". `/admin/qr` has a second "PDF menu QR" (`/admin/print/qr?for=pdf`); "Menu PDF" buttons on Admin → Menu and the public menu. Verified: price changed in Admin → Menu shows in the PDF on the next open.
 - [x] **P4-06 Settings** – café details, ordering on/off, tax %, staff accounts (owner).
   ✅ 5 Oct: `/admin/settings` – Café (details, hours, Today's pick, "Guests can make lists" switch), Staff logins (create with one-time password, new password, switch off – both end their sessions), My password. Tax % left out while there are no totals.
+- [x] **P4-08 Order for a returning guest** (owner, 18 Oct) – start a counter order from a customer's page; at the counter a known number fills in the name.
+  ✅ 18 Oct: "New order" on `/admin/customers/[id]` → `/admin/counter-order?customer=<id>` (owner only; staff get a plain counter order) with name + number filled in. Counter details step now asks the number first; `findGuestByPhone` (staff + owner) fills the name of a known number and shows "Returning guest · N visits" – a name staff typed themselves is never replaced. Placing still upserts the customer by phone, so their visits add up.
 
 ## Phase 4B – Cash & expenses (owner, 8 Oct 2026)
 - [x] **P4B-01 Expenses** – record what the café spends; staff add, owner edits/deletes and sees any period; in Reports.

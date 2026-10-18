@@ -135,6 +135,8 @@ Phase 0 is added in front of the doc's five phases so the look and the 3D are ag
 
 18 Oct: thank-you/receipt SMS (P2B-11) switched on – sent by staff from the counter phone via an `sms:` link (free, no provider, no DLT). Automatic sending stays in Later.
 
+18 Oct: returning guests at the counter are found by mobile number (name fills in; a typed name wins). The owner can start a counter order from a customer's page; staff can't open it with a customer preselected, since they only ever see masked numbers.
+
 ### Phase 2 – Customer site
 - Landing page: 3D hero + scroll story, Today's Pick, promise points, bestsellers (from DB), Visit us, footer, SEO metadata + OG image.
 - QR menu `/menu` and `/t/[table]`: category tabs, filters (High protein, Light, Bestseller), search, item cards, detail sheet with add-ons/qty, sticky cart, nutrition note, dark mode, view-only mode.

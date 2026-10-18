@@ -29,6 +29,7 @@ import { maskPhone } from "@/lib/phone-mask";
 import { PAY_CHOICES, type PayChoice, PAYMENT_SHORT } from "@/lib/payments";
 import { RECEIPT_SMS_ENABLED, receiptMessage, smsLink } from "@/lib/receipt";
 import { type CounterOrderInput, CounterOrderSchema } from "@/lib/validators/place-order";
+import { INDIAN_MOBILE } from "@/lib/validators/phone";
 import { SelectionLinesSchema } from "@/lib/validators/selection";
 
 type Fail = { ok: false; error: string; problems?: string[] };
@@ -104,6 +105,21 @@ export async function createCounterOrder(
 
   await publish({ type: "order", orderId: order.id, number: order.number, status: "ACCEPTED" });
   return { ok: true, number: order.number };
+}
+
+/** Counter order: a returning guest's name from their number, so staff don't ask again. */
+export async function findGuestByPhone(
+  phone: string,
+): Promise<{ ok: true; guest: { name: string; visits: number } | null } | Fail> {
+  const me = await staff();
+  if ("ok" in me) return me;
+  const parsed = z.string().regex(INDIAN_MOBILE).safeParse(phone);
+  if (!parsed.success) return { ok: false, error: "Enter a 10-digit mobile number." };
+  const customer = await db.customer.findUnique({
+    where: { phone: parsed.data },
+    select: { name: true, orderCount: true },
+  });
+  return { ok: true, guest: customer && { name: customer.name, visits: customer.orderCount } };
 }
 
 /** Guest left without ordering – take their list off the board. */
