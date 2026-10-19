@@ -99,7 +99,7 @@ export const ARTICLES: Article[] = [
       creditUrl: "https://unsplash.com/photos/DHiil-gDSLA",
     },
     tryIt: {
-      text: "Next time you scan the QR, tap High protein and Light together – the Roasted Edamame Chaat is the standout.",
+      text: "Next time you scan the QR, tap the protein and calorie filters together – the Roasted Edamame Chaat is the standout.",
       dishIds: ["c-edamame", "c-chana"],
     },
   },

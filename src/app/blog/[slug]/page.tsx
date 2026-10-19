@@ -108,6 +108,10 @@ export default async function ArticlePage({ params }: PageProps<"/blog/[slug]">)
               </ul>
             </section>
           )}
+          <p className="mt-10 border-t border-border pt-4 text-sm text-muted-foreground">
+            General information, not medical or diet advice. Protein and calorie figures are approximate. If
+            you have a health condition or a special diet, check with your doctor or dietitian.
+          </p>
         </article>
 
         <section aria-labelledby="more-h" className="mx-auto mt-20 max-w-6xl px-5">

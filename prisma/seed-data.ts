@@ -113,7 +113,7 @@ export const menuItems: MenuItem[] = [
       id: "s-mediterranean",
       name: "Mediterranean Bowl",
       description:
-        "Hummus, crispy roasted chickpeas, fresh veggies & lemon-herb dressing. Vegan and gluten-free. 300 g.",
+        "Hummus, crispy roasted chickpeas, fresh veggies & lemon-herb dressing. Made without dairy or wheat, in a kitchen that uses both. 300 g.",
       ingredients: list(
         "Kabuli chana, tahini, garlic, lemon juice, olive oil, cucumber, tomato, black olives, lettuce, fresh parsley / coriander",
       ),
@@ -207,8 +207,7 @@ export const menuItems: MenuItem[] = [
     {
       id: "c-makhana",
       name: "Masala Makhana Chaat",
-      description:
-        "Roasted fox nuts with veggies and mint-coriander curd chutney. Light and low-fat. 1 cup (~190 g).",
+      description: "Roasted fox nuts with veggies and mint-coriander curd chutney. 1 cup (~190 g).",
       ingredients: list(
         "Makhana (fox nuts), ghee, tomato, cucumber, onion, mint-coriander curd chutney, pomegranate seeds, fresh coriander",
       ),
@@ -409,7 +408,7 @@ export const menuItems: MenuItem[] = [
       id: "m-apple-oats",
       name: "Apple Oats Smoothie (350 ml)",
       description:
-        "Crisp apple blended with rolled oats, dates, nuts and chia in chilled milk. Thick, creamy and naturally sweet.",
+        "Crisp apple blended with rolled oats, dates, nuts and chia in chilled milk. Thick and creamy, with dates for sweetness.",
       ingredients: list(
         "Apple (with skin), rolled oats, chilled toned milk, honey, dates, chia seeds, almonds, walnuts",
       ),
@@ -422,7 +421,7 @@ export const menuItems: MenuItem[] = [
       id: "m-apple-oats-small",
       name: "Apple Oats Smoothie – small (250 ml)",
       description:
-        "Crisp apple blended with rolled oats, dates, nuts and chia in chilled milk. Thick, creamy and naturally sweet.",
+        "Crisp apple blended with rolled oats, dates, nuts and chia in chilled milk. Thick and creamy, with dates for sweetness.",
       ingredients: list(
         "Apple (with skin), rolled oats, chilled toned milk, honey, dates, chia seeds, almonds, walnuts",
       ),
@@ -435,7 +434,7 @@ export const menuItems: MenuItem[] = [
       id: "m-choco-pb",
       name: "Chocolate Peanut Butter Smoothie (350 ml)",
       description:
-        "Rich cocoa and creamy peanut butter blended with frozen banana, muesli and nuts. Thick, chocolatey and naturally sweet.",
+        "Rich cocoa and creamy peanut butter blended with frozen banana, muesli and nuts. Thick and chocolatey, with banana for sweetness.",
       ingredients: list(
         "Amul Taaza toned milk, frozen banana, muesli, unsweetened cocoa, peanut butter, almonds, cashews, walnuts, dates, chocolate syrup, roasted peanuts",
       ),
@@ -448,7 +447,7 @@ export const menuItems: MenuItem[] = [
       id: "m-choco-pb-small",
       name: "Chocolate Peanut Butter Smoothie – small (250 ml)",
       description:
-        "Rich cocoa and creamy peanut butter blended with frozen banana, muesli and nuts. Thick, chocolatey and naturally sweet.",
+        "Rich cocoa and creamy peanut butter blended with frozen banana, muesli and nuts. Thick and chocolatey, with banana for sweetness.",
       ingredients: list(
         "Amul Taaza toned milk, frozen banana, muesli, unsweetened cocoa, peanut butter, almonds, cashews, walnuts, dates, chocolate syrup, roasted peanuts",
       ),
@@ -486,8 +485,8 @@ export const menuItems: MenuItem[] = [
     {
       id: "d-green-tea",
       name: "Honey Lemon Green Tea",
-      description: "Gentle green tea with natural honey and fresh lemon – a light, wellness-focused cup.",
-      ingredients: list("Green tea, natural honey, fresh lemon"),
+      description: "Green tea with honey and lemon.",
+      ingredients: list("Green tea, honey, lemon"),
       price: 69,
       protein: 0,
       kcal: 68,
@@ -517,8 +516,8 @@ export const menuItems: MenuItem[] = [
     {
       id: "d-coffee-honey",
       name: "Black Coffee with Honey",
-      description: "Strong black coffee sweetened with natural honey.",
-      ingredients: list("Black coffee, natural honey"),
+      description: "Strong black coffee sweetened with honey.",
+      ingredients: list("Black coffee, honey"),
       price: 49,
       protein: 0,
       kcal: 32,
@@ -528,7 +527,7 @@ export const menuItems: MenuItem[] = [
       id: "d-coffee-honey-lemon",
       name: "Black Coffee with Honey + Lemon",
       description: "Honey and fresh lemon together for a sweet-tangy cup.",
-      ingredients: list("Black coffee, natural honey, fresh lemon"),
+      ingredients: list("Black coffee, honey, lemon"),
       price: 59,
       protein: 0,
       kcal: 35,

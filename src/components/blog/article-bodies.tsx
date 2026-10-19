@@ -278,11 +278,11 @@ const ReadingTheMenu = ({ menu }: { menu: Menu }) => (
     <h2>The labels and filters</h2>
     <ul>
       <li>
-        <strong>High protein</strong> – dishes with <strong>{HIGH_PROTEIN_MIN_G} g of protein or more</strong>{" "}
-        per portion.
+        <strong>{HIGH_PROTEIN_MIN_G} g+ protein</strong> – dishes with{" "}
+        <strong>{HIGH_PROTEIN_MIN_G} g of protein or more</strong> per portion.
       </li>
       <li>
-        <strong>Light</strong> – dishes <strong>under {LIGHT_MAX_KCAL} kcal</strong>.
+        <strong>Under {LIGHT_MAX_KCAL} kcal</strong> – dishes with fewer than {LIGHT_MAX_KCAL} calories.
       </li>
       <li>
         <strong>Bestseller</strong> – the dishes our guests order most.
@@ -296,8 +296,8 @@ const ReadingTheMenu = ({ menu }: { menu: Menu }) => (
     <Table
       head={["If you want…", "Look for", "For example"]}
       rows={[
-        ["A filling meal after the gym", "High protein, 20 g+", "s-soya-paneer"],
-        ["A light evening snack", `Light, under ${LIGHT_MAX_KCAL} kcal`, "c-chana"],
+        ["A filling meal after the gym", "20 g+ protein", "s-soya-paneer"],
+        ["A light evening snack", `Under ${LIGHT_MAX_KCAL} kcal`, "c-chana"],
         ["The most protein for fewer calories", "Both filters together", "c-edamame"],
         ["A quick breakfast", "Oats", "o-classic"],
       ]

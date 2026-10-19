@@ -62,12 +62,12 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
           </div>
         )}
 
-        {/* Bottom-Left: High Protein Tag (Non-overlapping with top tags) */}
+        {/* Bottom-left: protein tag (non-overlapping with top tags) */}
         {isHighProt && (
           <div className="absolute bottom-2.5 left-2.5 z-10">
             <span className="inline-flex items-center gap-1 rounded-full bg-[#055c1b] px-2.5 py-0.5 text-[10px] font-black tracking-wider text-white uppercase shadow-sm">
               <Zap className="size-2.5 fill-current" aria-hidden />
-              <span>{item.protein >= 25 ? `Super ${item.protein}g+` : `${item.protein}g Prot`}</span>
+              <span>~{item.protein} g protein</span>
             </span>
           </div>
         )}
@@ -107,12 +107,12 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {item.protein > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[#055c1b] px-2.5 py-1 text-xs font-black text-white shadow-xs">
-                <Zap className="size-3.5 fill-current" /> {item.protein}g Protein
+                <Zap className="size-3.5 fill-current" /> ~{item.protein}g protein
               </span>
             )}
             {item.kcal > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full border border-[#d6e3d9] bg-[#f1f5f2] px-2.5 py-1 text-xs font-extrabold text-[#1c2e23] dark:border-[#2b4334] dark:bg-[#1d3325] dark:text-[#eef5ef]">
-                <Flame className="size-3.5 fill-[#ea580c] text-[#ea580c]" /> {item.kcal} kcal
+                <Flame className="size-3.5 fill-[#ea580c] text-[#ea580c]" /> ~{item.kcal} kcal
               </span>
             )}
             {item.ingredients.length > 0 && (

@@ -4,7 +4,7 @@ import { Hero, type HeroDish } from "@/components/landing/hero";
 import {
   Bestsellers,
   FromOurKitchen,
-  MacronutrientsAndCommunity,
+  HowWeCount,
   OurPromise,
   TodaysPick,
   VisitUs,
@@ -52,7 +52,7 @@ export default async function HomePage() {
         {pick && <TodaysPick item={pick} />}
         <OurPromise />
         {items.length > 0 && <Bestsellers items={items} orderingEnabled={isOrderingAllowed} />}
-        <MacronutrientsAndCommunity />
+        <HowWeCount />
         {cafe.blogEnabled && (
           <FromOurKitchen
             articles={[...ARTICLES].sort((a, b) => b.published.localeCompare(a.published)).slice(0, 3)}

@@ -4,9 +4,11 @@ import {
   ArrowRight,
   AtSign,
   CheckCircle2,
+  Dumbbell,
   Clock,
-  Egg,
   Flame,
+  Info,
+  Leaf,
   MapPin,
   MessageCircle,
   Phone,
@@ -14,7 +16,6 @@ import {
   Sparkles,
   Store,
   UtensilsCrossed,
-  Waves,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -124,28 +125,28 @@ export function TodaysPick({ item }: { item: MenuItem }) {
 
 const PROTOCOL_PILLARS = [
   {
-    icon: Waves,
-    title: "Zero Seed Oils",
-    body: "No inflammatory refined palm, sunflower, or soybean oils. We roast, sauté, and air-fry exclusively with pure cold-pressed oils and A2 Vedic ghee.",
-    tag: "Gut & Heart Friendly",
+    icon: Leaf,
+    title: "100% vegetarian",
+    body: "No meat, no eggs, ever. One kitchen, one promise.",
+    tag: "Veg only",
   },
   {
-    icon: Egg,
-    title: "Real Plant Protein",
-    body: "No artificial chemical powders or fake fillers. 20g to 38g protein verified from non-GMO paneer, organic tofu, sprouted moong, edamame & soya nuggets.",
-    tag: "Lab-Tested Density",
+    icon: Dumbbell,
+    title: "Protein from real food",
+    body: "Paneer, yoghurt, chana, sprouts, nuts – not just powder.",
+    tag: "Everyday ingredients",
   },
   {
     icon: UtensilsCrossed,
-    title: "100% Made to Order",
-    body: "Vegetables are sliced upon ticket trigger, sourdoughs are toasted hot, and dressings are emulsified freshly without preservatives or stabilizers.",
-    tag: "Maximum Crunch",
+    title: "Made in our kitchen",
+    body: "Bowls and salads are made every morning in small batches.",
+    tag: "Small batches",
   },
   {
     icon: ShieldCheck,
-    title: "Transparent Macros",
-    body: "Log with zero guesswork. We display exact grams of protein, complex carbs, healthy fats, and net active calories directly on receipt & menu.",
-    tag: "MyFitnessPal Friendly",
+    title: "Numbers you can see",
+    body: "Every dish shows our estimate of its protein and calories, worked out from the ingredients in the recipe.",
+    tag: "Our own estimates",
   },
 ];
 
@@ -157,9 +158,9 @@ export function OurPromise() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          eyebrow="The Clean Fuel Protocol"
-          title="How we redefine Vegetarian Street & Comfort Food"
-          subtitle="Healthy food shouldn't feel like a clinical chore. Every recipe is calibrated for intense taste, whole-food bio-availability, and sustained athletic energy."
+          eyebrow="Our promise"
+          title="Vegetarian street and comfort food, made simply"
+          subtitle="Ingredients you know, cooked in our own kitchen – and the protein and calories of each dish shown on the menu."
         />
 
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -224,16 +225,16 @@ export function Bestsellers({
   return (
     <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
       <SectionHeading
-        eyebrow="Trending in Kitchen Today"
-        title="Chef's High-Protein Favorites"
-        subtitle="Guest-voted bestsellers engineered with real-food macros, zero trans fats, and maximum taste."
+        eyebrow="Bestsellers"
+        title="What everyone orders"
+        subtitle="The dishes our guests order most."
       />
 
       {/* Filter Tabs */}
       <div className="mb-10 flex flex-wrap items-center justify-center gap-2">
         {[
           { id: "all", label: "All Signatures" },
-          { id: "high-protein", label: "High Protein (>20g)" },
+          { id: "high-protein", label: "20 g+ protein" },
           { id: "sourdough", label: "Sourdough Melts" },
           { id: "bowls", label: "Super Bowls" },
         ].map((tab) => (
@@ -316,11 +317,9 @@ export function Bestsellers({
       {/* Bottom CTA Banner */}
       <div className="mt-12 flex flex-col items-center justify-between gap-6 rounded-3xl bg-gradient-to-r from-[#055c1b] via-[#0c6b25] to-[#0e5518] p-6 text-white shadow-xl sm:flex-row sm:p-8">
         <div className="flex flex-col text-center sm:text-left">
-          <span className="text-xl font-black tracking-tight text-white sm:text-2xl">
-            Discover all 40+ Macro-Calibrated Delights
-          </span>
+          <span className="text-xl font-black tracking-tight text-white sm:text-2xl">See the full menu</span>
           <span className="mt-1 text-sm font-medium text-white/85">
-            Keto salads, stone-ground sourdough wraps, botanical smoothies & sugar-free chia bowls.
+            Salads and bowls, chaat, toasts, sandwiches, oats, smoothies, tea and coffee.
           </span>
         </div>
         <Link
@@ -335,156 +334,57 @@ export function Bestsellers({
   );
 }
 
-export function MacronutrientsAndCommunity() {
+const COUNT_STEPS = [
+  {
+    title: "We write down each recipe",
+    body: "Every ingredient that goes into one serving, and how much of it.",
+  },
+  {
+    title: "We add up the ingredients",
+    body: "Using the protein and calories of each ingredient, we total them for the dish.",
+  },
+  {
+    title: "We show the result on the menu",
+    body: "Next to every dish, so you can choose what suits you.",
+  },
+];
+
+/** How the café works out its protein and calorie numbers – they're estimates, not certified values. */
+export function HowWeCount() {
   return (
     <section className="border-t border-[#d7eadb] bg-[#f2faf3] py-20 sm:py-28 dark:border-[#24392b] dark:bg-[#0a1a0f]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading
-          eyebrow="Macronutrient Profile"
-          title="The Healthy Hunger Standard"
-          subtitle="Calibrated for athletic bioavailability, sustained energy, and zero post-meal fatigue."
+          eyebrow="How we count"
+          title="Where our protein and calorie numbers come from"
+          subtitle="We worked them out ourselves, dish by dish."
         />
 
-        <div className="mt-12 grid items-stretch gap-8 lg:grid-cols-12">
-          {/* Left: Macro Standard Breakdown */}
-          <div className="flex flex-col justify-between rounded-3xl border border-[#cde5d3] bg-white p-6 shadow-sm sm:p-8 lg:col-span-7 dark:border-[#24392b] dark:bg-[#16251b]">
-            <div>
-              <span className="text-xs font-black tracking-wider text-[#055c1b] uppercase dark:text-[#7ddc78]">
-                Balanced Nutrition Blueprint
+        <ol className="mt-12 grid gap-6 md:grid-cols-3">
+          {COUNT_STEPS.map((step, i) => (
+            <li
+              key={step.title}
+              className="rounded-3xl border border-[#cde5d3] bg-white p-6 shadow-sm dark:border-[#24392b] dark:bg-[#16251b]"
+            >
+              <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#055c1b] text-sm font-black text-white">
+                {i + 1}
               </span>
-              <h3 className="mt-1 text-2xl font-black text-[#0f1f15] dark:text-[#eef5ef]">
-                Precision Whole-Food Fuel
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed font-medium text-[#334b3c] dark:text-[#a7b8ac]">
-                Every recipe is formulated so you never have to trade culinary pleasure for fitness goals.
+              <h3 className="mt-4 text-lg font-black text-[#0f1f15] dark:text-[#eef5ef]">{step.title}</h3>
+              <p className="mt-1 text-sm leading-relaxed font-medium text-[#334b3c] dark:text-[#a7b8ac]">
+                {step.body}
               </p>
+            </li>
+          ))}
+        </ol>
 
-              <div className="mt-6 space-y-4">
-                <div>
-                  <div className="mb-1 flex justify-between text-xs font-bold">
-                    <span className="text-[#0f1f15] dark:text-[#eef5ef]">
-                      Clean Protein (Paneer, Tofu, Soya, Sprouts)
-                    </span>
-                    <span className="text-[#055c1b] dark:text-[#7ddc78]">28.4g (34%)</span>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#e8f1ea] dark:bg-[#24392b]">
-                    <div className="h-full w-[34%] rounded-full bg-[#055c1b]" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-1 flex justify-between text-xs font-bold">
-                    <span className="text-[#0f1f15] dark:text-[#eef5ef]">
-                      Slow-Burn Complex Carbs (Quinoa, Sourdough, Oats)
-                    </span>
-                    <span className="text-[#ea580c]">42.1g (46%)</span>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#e8f1ea] dark:bg-[#24392b]">
-                    <div className="h-full w-[46%] rounded-full bg-[#ea580c]" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-1 flex justify-between text-xs font-bold">
-                    <span className="text-[#0f1f15] dark:text-[#eef5ef]">
-                      Heart-Healthy Fats (Avocado, Cold-Pressed, Flax)
-                    </span>
-                    <span className="text-amber-500">12.5g (20%)</span>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#e8f1ea] dark:bg-[#24392b]">
-                    <div className="h-full w-[20%] rounded-full bg-amber-500" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-1 flex justify-between text-xs font-bold">
-                    <span className="text-[#0f1f15] dark:text-[#eef5ef]">
-                      Active Prebiotic Fiber (Gut Health)
-                    </span>
-                    <span className="text-[#55a90d]">11.2g (100% Daily Target)</span>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#e8f1ea] dark:bg-[#24392b]">
-                    <div className="h-full w-[100%] rounded-full bg-[#55a90d]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 border-t border-[#e8f1ea] pt-4 text-xs font-semibold text-[#334b3c] dark:border-[#24392b] dark:text-[#a7b8ac]">
-              QR codes on every dine-in table display precise glycemic load, sodium levels, and allergen flags
-              in real time.
-            </div>
-          </div>
-
-          {/* Right: Nutrition Transparency & Standards (No static reviews) */}
-          <div className="flex flex-col justify-between rounded-3xl border border-[#cde5d3] bg-white p-6 shadow-sm sm:p-8 lg:col-span-5 dark:border-[#24392b] dark:bg-[#16251b]">
-            <div>
-              <span className="text-xs font-black tracking-wider text-[#ea580c] uppercase">
-                Our Kitchen Integrity
-              </span>
-              <h3 className="mt-1 text-xl font-black text-[#0f1f15] sm:text-2xl dark:text-[#eef5ef]">
-                Zero Compromise Vegetarian
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed font-medium text-[#334b3c] dark:text-[#a7b8ac]">
-                We believe what we leave out of our food is just as important as what we put in.
-              </p>
-
-              <div className="mt-6 space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#055c1b]/10 text-[#055c1b] dark:bg-[#055c1b]/25 dark:text-[#7ddc78]">
-                    <ShieldCheck className="size-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-[#0f1f15] dark:text-[#eef5ef]">
-                      Zero Seed Oils Ever
-                    </h4>
-                    <p className="mt-0.5 text-xs leading-relaxed text-[#334b3c] dark:text-[#a7b8ac]">
-                      Only pure wood-pressed cold mustard oil, peanut oil, and traditional A2 Vedic ghee.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#ea580c]/10 text-[#ea580c]">
-                    <CheckCircle2 className="size-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-[#0f1f15] dark:text-[#eef5ef]">
-                      100% Unprocessed Dairy
-                    </h4>
-                    <p className="mt-0.5 text-xs leading-relaxed text-[#334b3c] dark:text-[#a7b8ac]">
-                      Fresh malai paneer sourced daily with zero synthetic starch fillers or chemical
-                      preservatives.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#55a90d]/10 text-[#55a90d]">
-                    <Sparkles className="size-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-[#0f1f15] dark:text-[#eef5ef]">
-                      Authentic Macro Counts
-                    </h4>
-                    <p className="mt-0.5 text-xs leading-relaxed text-[#334b3c] dark:text-[#a7b8ac]">
-                      Every single dish has certified protein, calories, and fiber verified by nutritionists.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 border-t border-[#e8f1ea] pt-4 dark:border-[#24392b]">
-              <Link
-                href="/menu"
-                className="inline-flex items-center gap-2 text-xs font-black text-[#055c1b] hover:underline dark:text-[#7ddc78]"
-              >
-                <span>Explore all macro-calibrated dishes</span>
-                <ArrowRight className="size-3.5" />
-              </Link>
-            </div>
-          </div>
+        <div className="mt-8 flex items-start gap-3 rounded-3xl border border-[#ea580c]/30 bg-[#ea580c]/5 p-5 sm:p-6">
+          <Info className="mt-0.5 size-5 shrink-0 text-[#c2410c]" aria-hidden />
+          <p className="text-sm leading-relaxed font-medium text-[#334b3c] dark:text-[#cde5d3]">
+            <strong className="text-[#0f1f15] dark:text-[#eef5ef]">These are our own estimates.</strong> They
+            are not lab-tested, and no nutritionist or dietitian has checked them. Portions and ingredients
+            vary a little, so the real numbers can be a bit higher or lower. If you have a medical condition,
+            follow a special diet or have a food allergy, please ask our staff before you order.
+          </p>
         </div>
       </div>
     </section>
@@ -545,8 +445,7 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
 
                 {/* Subtitle (No Wi-Fi, No work tables) */}
                 <p className="mt-3.5 max-w-xl text-sm leading-relaxed font-medium text-[#334b3c] sm:text-base dark:text-[#a7b8ac]">
-                  Step into our open-kitchen dining space. Featuring fresh wholesome meals prepared fresh to
-                  order, zero refined seed oils, and certified clean macros.
+                  Sit down for a bowl, grab a chaat on the go, or order takeaway from the menu on your phone.
                 </p>
 
                 {/* Two Sub-Blocks: Opening Hours & Café Location */}
@@ -648,7 +547,7 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
                 <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-full border border-[#055c1b]/20 bg-white/95 px-3.5 py-1.5 shadow-md backdrop-blur-md dark:bg-[#0e1a12]/95">
                   <VegMark className="size-4" />
                   <span className="text-xs font-extrabold tracking-wider text-[#055c1b] uppercase dark:text-[#7ddc78]">
-                    100% Pure Veg · Clean Dining
+                    100% Vegetarian
                   </span>
                 </div>
               </div>

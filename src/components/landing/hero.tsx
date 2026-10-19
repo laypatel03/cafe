@@ -194,7 +194,7 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
           {/* Top Pill Badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-[#055c1b]/20 bg-[#055c1b]/10 px-3.5 py-1.5 text-[12px] font-bold tracking-wider text-[#055c1b] uppercase dark:border-[#7ddc78]/30 dark:bg-[#055c1b]/25 dark:text-[#7ddc78]">
             <Leaf className="size-3.5 fill-current" aria-hidden />
-            <span>100% Vegetarian Café · Clean Macros</span>
+            <span>100% Vegetarian Café</span>
           </div>
 
           {/* Main Brand Logo */}
@@ -209,12 +209,12 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
           <h1 className="text-3xl leading-[1.12] font-extrabold tracking-tight text-[#0f1f15] sm:text-4xl lg:text-[42px] dark:text-[#eef5ef]">
             Protein from real food.
             <br />
-            <span className="text-[#055c1b] dark:text-[#7ddc78]">Made fresh every single day.</span>
+            <span className="text-[#055c1b] dark:text-[#7ddc78]">Made in our kitchen every day.</span>
           </h1>
 
           <p className="max-w-xl text-[16px] leading-relaxed font-medium text-[#273a2f] sm:text-[17px] dark:text-[#cde5d3]">
-            Wholesome salads, guilt-free street chaats, artisan sourdough melts, and high-protein oat bowls
-            crafted with zero refined seed oils, artificial sweeteners, or hidden nasties.
+            Salads and bowls, chaat, toasts, sandwiches, oats and smoothies – with our estimate of the protein
+            and calories shown for every dish.
           </p>
 
           {/* CTA Buttons */}
@@ -243,11 +243,11 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
           <div className="pointer-events-none absolute h-[380px] w-[290px] scale-95 rotate-6 transform rounded-[28px] bg-orange-200/50 shadow-md sm:w-[350px] dark:bg-orange-500/10" />
           <div className="pointer-events-none absolute h-[380px] w-[290px] scale-98 -rotate-3 transform rounded-[28px] bg-[#98f992]/40 shadow-md sm:w-[350px] dark:bg-[#055c1b]/20" />
 
-          {/* Floating Badge: Pure Veg */}
+          {/* Floating Badge: Veg */}
           <div className="absolute -top-3 right-4 z-40 flex items-center gap-2 rounded-full border border-[#055c1b]/30 bg-white px-3.5 py-1.5 shadow-md sm:right-8 dark:bg-[#16251b]">
             <VegMark className="size-4" />
             <span className="text-[12px] font-extrabold tracking-wider text-[#055c1b] uppercase dark:text-[#7ddc78]">
-              100% Pure Veg
+              100% Vegetarian
             </span>
           </div>
 
@@ -259,10 +259,12 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
             </span>
           </div>
 
-          {/* Floating Badge: Daily Fresh */}
+          {/* Floating Badge: Made in our kitchen */}
           <div className="absolute top-1/2 -right-4 z-40 flex items-center gap-1.5 rounded-full border border-[#055c1b]/20 bg-white px-3 py-1.5 shadow-md sm:-right-6 dark:border-[#24392b] dark:bg-[#16251b]">
             <ShieldCheck className="size-4 text-[#055c1b] dark:text-[#7ddc78]" />
-            <span className="text-[12px] font-bold text-[#0f1f15] dark:text-[#eef5ef]">Made Fresh Daily</span>
+            <span className="text-[12px] font-bold text-[#0f1f15] dark:text-[#eef5ef]">
+              Made in our kitchen
+            </span>
           </div>
 
           {/* Foreground Dish Stack */}

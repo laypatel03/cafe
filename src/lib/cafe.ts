@@ -1,2 +1,2 @@
 export const NUTRITION_NOTE =
-  "Protein and calorie values are approximate, not exact. They can vary with portion size, ingredients and seasonal fruits.";
+  "Protein and calories are our own estimates, worked out from the ingredients in each recipe. They are not lab-tested or checked by a nutritionist, and can vary with portion size and ingredients.";

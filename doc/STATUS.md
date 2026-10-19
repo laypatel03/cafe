@@ -16,7 +16,8 @@ Everything needed to take and bill orders is built and tested on a test computer
 ## What works today
 ### Guests
 - Open the menu on their phone from the QR – it loads in under 2 seconds on 4G. It has the café's real menu: salads and bowls, chaat, toasts, oats, smoothies, tea and coffee.
-- Browse by category, search, and filter by High protein, Light or Bestseller. Every dish shows the veg mark, protein, calories and price.
+- Browse by category, search, and filter by 15 g+ protein, under 300 kcal or Bestseller. Every dish shows the veg mark, protein, calories and price.
+- The website is honest about the numbers: it says protein and calories are our own estimates worked out from the ingredients – not lab-tested or checked by a nutritionist – and asks guests with allergies or special diets to talk to staff. It makes no health or "certified" claims.
 - Pick dishes and add-ons, then order with their name and number. Their phone remembers the details for next time.
 - Add an optional note for the kitchen and choose whether to receive offers.
 - Follow their order live: Waiting for staff → Accepted → In the kitchen → Served or Ready to collect → Paid.

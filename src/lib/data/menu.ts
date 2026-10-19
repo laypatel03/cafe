@@ -59,7 +59,7 @@ export const getPublicMenu = unstable_cache(
       })),
     };
   },
-  ["public-menu-v2"],
+  ["public-menu-v3"],
   { tags: [MENU_TAG] },
 );
 

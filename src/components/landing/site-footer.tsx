@@ -15,8 +15,8 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
             — Eat well, live well —
           </p>
           <p className="mt-2 max-w-sm text-xs leading-relaxed text-white/70">
-            100% vegetarian café engineered for clean athletic macros, cold-pressed purity, and wholesome
-            satiety.
+            A 100% vegetarian café. Protein and calories on our menu are our own estimates, worked out from
+            the ingredients.
           </p>
         </div>
         <nav className="flex flex-wrap gap-x-6 gap-y-2.5 text-sm font-bold text-white/85">

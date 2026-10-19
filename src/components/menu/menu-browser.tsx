@@ -8,7 +8,7 @@ import {
   FileText,
   Leaf,
   Search,
-  ShieldCheck,
+  Info,
   Sparkles,
   Star,
   X,
@@ -38,8 +38,9 @@ import { MenuItemCard } from "./menu-item-card";
 type Filter = "high-protein" | "light" | "bestseller";
 
 const FILTERS: { id: Filter; label: string; hint: string; icon: typeof Star }[] = [
-  { id: "high-protein", label: "High protein", hint: `${HIGH_PROTEIN_MIN_G}g+`, icon: Dumbbell },
-  { id: "light", label: "Light", hint: `<${LIGHT_MAX_KCAL} kcal`, icon: Feather },
+  // plain numbers rather than "High protein" / "Light", which are regulated nutrition claims
+  { id: "high-protein", label: `${HIGH_PROTEIN_MIN_G} g+ protein`, hint: "", icon: Dumbbell },
+  { id: "light", label: `Under ${LIGHT_MAX_KCAL} kcal`, hint: "", icon: Feather },
   { id: "bestseller", label: "Bestseller", hint: "", icon: Star },
 ];
 
@@ -141,10 +142,10 @@ export function MenuBrowser({
           </div>
 
           <div className="mx-auto flex max-w-7xl flex-col items-start gap-4">
-            {/* Top Guarantee Row */}
+            {/* Top badge row */}
             <div className="inline-flex items-center gap-2 rounded-full border border-[#055c1b]/20 bg-[#055c1b]/10 px-3.5 py-1.5 text-xs font-bold tracking-wider text-[#055c1b] uppercase dark:border-[#7ddc78]/30 dark:bg-[#055c1b]/25 dark:text-[#7ddc78]">
               <Leaf className="size-3.5 fill-current" />
-              <span>100% Vegetarian Café · Zero Palm Oil · Real Food Macros</span>
+              <span>100% Vegetarian Café</span>
             </div>
 
             <div className="flex w-full flex-col justify-between gap-4 sm:flex-row sm:items-baseline">
@@ -159,7 +160,7 @@ export function MenuBrowser({
                       ? counterGuest
                         ? `For ${counterGuest.name} – pick dishes with them, customize add-ons, then confirm their order ticket.`
                         : "Pick dishes with the guest, customize add-ons, then confirm their order ticket."
-                      : "Macro-balanced protein bowls, guilt-free street chaats, artisan sourdough melts and botanical smoothies."}
+                      : "Salads and bowls, chaat, toasts, sandwiches, oats and smoothies."}
                   </p>
                 </div>
               </div>
@@ -326,7 +327,7 @@ export function MenuBrowser({
                   <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80">
                     {hours && hours.length > 0
                       ? `Opening hours: ${hours.map((h) => `${h.days}: ${h.time}`).join(" • ")}`
-                      : "You can explore the full menu, complete macros, and certified ingredients."}
+                      : "You can still browse the full menu."}
                   </p>
                 </div>
               </div>
@@ -403,24 +404,21 @@ export function MenuBrowser({
             </section>
           ))}
 
-          {/* Clean Label Guarantee Banner */}
+          {/* About the numbers */}
           <div className="mt-16 flex flex-col items-center justify-between gap-6 rounded-3xl border border-[#cde5d3] bg-white p-6 shadow-sm sm:p-8 md:flex-row dark:border-[#24392b] dark:bg-[#16251b]">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#055c1b] text-white">
-                <ShieldCheck className="size-7" />
+                <Info className="size-7" aria-hidden />
               </div>
               <div>
                 <h3 className="text-lg font-black text-[#0f1f15] dark:text-[#eef5ef]">
-                  Clean Label Guarantee
+                  About the protein and calorie numbers
                 </h3>
                 <p className="mt-0.5 text-xs leading-relaxed font-medium text-[#334b3c] sm:text-sm dark:text-[#a7b8ac]">
-                  100% Unprocessed Paneer & Zero Seed Oil. Every gram of protein on our menu is certified from
-                  authentic local partners.
+                  {NUTRITION_NOTE} Have a food allergy or a special diet? Please ask our staff before you
+                  order.
                 </p>
               </div>
-            </div>
-            <div className="shrink-0 rounded-full bg-[#e8f4ec] px-4 py-2 text-xs font-bold text-[#055c1b] dark:bg-[#1f3325] dark:text-[#7ddc78]">
-              {NUTRITION_NOTE}
             </div>
           </div>
         </main>
