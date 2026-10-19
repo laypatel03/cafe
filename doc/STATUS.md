@@ -49,6 +49,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Edit the menu: categories, dishes, prices, photos, add-ons, and hide or show items.
 - Add an "Other item" to an order – anything that isn't on the menu, with its own name and price. A minus price takes money off, so it works as a discount (the total never goes below ₹0). Owner only: on the live orders page (Edit items) and in Order history. Staff see these lines but can't change them. They don't count as dishes in reports or favourites.
 - Customers: search the list and open a profile with visits, spending, favourite dishes and staff notes.
+- See who still owes money: the Customers page shows the total still to pay at the top, highlights every customer who owes (with how much), and can list only them. A customer's page shows what they owe, with a button to their unpaid orders. Orders from earlier days that weren't paid and "pay later" bills count; today's orders still being served don't.
 - Start a new order straight from a customer's page – their name and number are already filled in.
 - Stop offers for a guest, delete a guest's data when they ask, and download the customer list for Excel.
 - Reports: sales by hour, day and month, dine-in vs takeaway, top dishes, how many guests are regulars, expenses by category, and sales minus expenses.
