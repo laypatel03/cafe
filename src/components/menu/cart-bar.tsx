@@ -145,7 +145,7 @@ export function CartBar({
             <button
               type="button"
               onClick={openSheet}
-              className="mx-auto flex h-16 w-full max-w-xl items-center gap-3 rounded-full bg-hh-green-deep pr-2 pl-5 text-left text-white shadow-[0_20px_40px_-12px_rgba(14,85,24,0.6)] ring-1 ring-white/10"
+              className="mx-auto flex h-16 w-full max-w-xl items-center gap-3 rounded-full bg-[#0b3213] pr-2.5 pl-5 text-left text-white shadow-[0_20px_40px_-12px_rgba(5,92,27,0.5)] ring-1 ring-white/15 transition-all hover:bg-[#05220c] active:scale-[0.99] dark:bg-[#07240d] dark:hover:bg-[#051a09]"
             >
               {count > 0 ? (
                 <motion.span
@@ -154,32 +154,32 @@ export function CartBar({
                   animate={{ scale: 1 }}
                   className="relative"
                 >
-                  <ClipboardList className="size-6" aria-hidden />
-                  <span className="absolute -top-2 -right-2 flex size-5 items-center justify-center rounded-full bg-hh-orange tabular text-[11px] font-bold text-hh-ink">
+                  <ClipboardList className="size-6 text-white" aria-hidden />
+                  <span className="absolute -top-2 -right-2 flex size-5 items-center justify-center rounded-full bg-[#ea580c] tabular text-[11px] font-black text-white shadow-xs">
                     {count}
                   </span>
                 </motion.span>
               ) : headline?.status === "PREPARING" ? (
-                <ChefHat className="size-6" aria-hidden />
+                <ChefHat className="size-6 text-white" aria-hidden />
               ) : (
-                <CircleCheck className="size-6" aria-hidden />
+                <CircleCheck className="size-6 text-white" aria-hidden />
               )}
               <span className="flex-1">
-                <span className="block text-base leading-tight font-semibold">
+                <span className="block text-base leading-tight font-black text-white">
                   {count === 0
                     ? `Order #${headline?.number ?? latest?.number} · ${headline ? guestStatusLabel(headline) : "Placed"}`
                     : counter
                       ? "Counter order"
                       : "Your list"}
                 </span>
-                <span className="block text-xs text-white/80">
+                <span className="block text-xs font-medium text-white/80">
                   {count === 0
                     ? "Tap to follow your order · add more any time"
                     : `${count} item${count === 1 ? "" : "s"} · ${KIND_LABEL[kind]}`}
                 </span>
               </span>
               {count > 0 && (
-                <span className="rounded-full bg-cta px-5 py-3 text-sm font-bold text-cta-foreground">
+                <span className="rounded-full bg-[#ea580c] px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#c2410c]">
                   View list
                 </span>
               )}

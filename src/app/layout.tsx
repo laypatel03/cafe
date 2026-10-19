@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Baloo_2, Figtree, IBM_Plex_Mono } from "next/font/google";
+import { Baloo_2, Figtree, IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
+
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 // Rounded, friendly display face named in the brand guide
 const baloo = Baloo_2({
@@ -48,7 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${baloo.variable} ${figtree.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${baloo.variable} ${figtree.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>

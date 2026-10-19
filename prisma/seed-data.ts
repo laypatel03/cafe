@@ -13,7 +13,6 @@
 import type { AddOn, Category, CategorySlug, MenuItem, MenuTag } from "../src/lib/menu-types";
 
 export const categories: Category[] = [
-  { slug: "navratri", name: "Navratri special" },
   { slug: "salads", name: "Salads & bowls" },
   { slug: "chaat", name: "Chaat" },
   { slug: "sandwiches", name: "Sandwiches" },
@@ -23,6 +22,7 @@ export const categories: Category[] = [
   { slug: "smoothies", name: "Smoothies & bowls" },
   { slug: "drinks", name: "Tea & coffee" },
   { slug: "cold-drinks", name: "Cold drinks" },
+  { slug: "navratri", name: "Navratri special" },
 ];
 
 const addOn = (id: string, name: string, price: number): AddOn => ({
