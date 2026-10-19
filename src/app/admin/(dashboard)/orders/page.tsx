@@ -19,7 +19,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { getPublicMenu } from "@/lib/data/menu";
 import { db } from "@/lib/db";
-import { formatINR } from "@/lib/format";
+import { formatINR, startOfCafeDay } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { toCafeInput } from "@/lib/order-edit";
 import { maskPhone } from "@/lib/phone-mask";
@@ -53,14 +53,8 @@ const PENDING: Prisma.OrderWhereInput = {
   status: { not: "CANCELLED" },
   OR: [{ billId: null }, { bill: { is: { paidAt: null, voidedAt: null } } }],
 };
-/** Midnight today, server local time (the café runs in IST). */
-const startOfToday = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
 const payWhere = (pay: PayFilter): Prisma.OrderWhereInput =>
-  pay === "PENDING_EARLIER" ? { ...PENDING, createdAt: { lt: startOfToday() } } : PAY_WHERE[pay];
+  pay === "PENDING_EARLIER" ? { ...PENDING, createdAt: { lt: startOfCafeDay() } } : PAY_WHERE[pay];
 const PAY_WHERE: Record<Exclude<PayFilter, "PENDING_EARLIER">, Prisma.OrderWhereInput> = {
   PENDING,
   PAY_LATER: { bill: { is: { payLaterAt: { not: null }, paidAt: null, voidedAt: null } } },

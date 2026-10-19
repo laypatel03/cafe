@@ -1,6 +1,7 @@
 import "server-only";
 import type { OrderStatus, OrderType, Role, SelectionStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { startOfCafeDay } from "@/lib/format";
 import { type StatusLogEntry, stepToUndo } from "@/lib/order-flow";
 import { maskPhone } from "@/lib/phone-mask";
 import type { SelectionLine } from "@/lib/validators/selection";
@@ -85,8 +86,7 @@ const OPEN: OrderStatus[] = ["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED"];
  * from an earlier day that was never finished (so it can still be moved on, billed or cancelled).
  */
 export async function getLiveBoard(role: Role): Promise<LiveBoard> {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = startOfCafeDay();
   const [selections, orders, bills, payLater] = await Promise.all([
     db.selection.findMany({
       where: { status: { not: "CONFIRMED" }, updatedAt: { gt: new Date(Date.now() - 12 * 60 * 60 * 1000) } },
