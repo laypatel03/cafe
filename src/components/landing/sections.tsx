@@ -533,12 +533,12 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
               )}
             </div>
 
-            {/* Right Column: Ambiance Image Showcase */}
+            {/* Right column: a real photo of the café */}
             <div className="relative lg:col-span-5">
               <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[#cde5d3] bg-[#e2efe5] shadow-lg sm:aspect-[16/11] lg:aspect-[4/3] dark:border-[#24392b] dark:bg-[#1f3325]">
                 <Image
-                  src="/brand/cafe-ambiance.jpg"
-                  alt="Healthy Hunger Café Ambiance"
+                  src="/brand/cafe-interior.jpg"
+                  alt="Inside Healthy Hunger: wooden tables, green chairs and framed food posters on a grey wall"
                   fill
                   sizes="(min-width: 1024px) 40vw, 100vw"
                   className="object-cover"
