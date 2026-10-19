@@ -1,9 +1,10 @@
 "use client";
 
-import { Leaf, ShoppingBag, Utensils, User } from "lucide-react";
+import { ShoppingBag, Utensils, User } from "lucide-react";
 import { motion, useMotionValueEvent, useScroll } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
+import { LogoIcon } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useCart } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
@@ -32,9 +33,7 @@ export function SiteHeader() {
         {/* Brand Logo & Tagline */}
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-3 group" aria-label="Healthy Hunger – Home">
-            <div className="w-11 h-11 rounded-full bg-[#055c1b] dark:bg-[#0c6b25] flex items-center justify-center text-white shadow-sm shadow-emerald-950/20 group-hover:scale-105 transition-transform duration-200">
-              <Leaf className="size-5 fill-current text-white" aria-hidden />
-            </div>
+            <LogoIcon className="h-11 w-auto select-none group-hover:scale-105 transition-transform duration-200" priority />
             <div className="flex flex-col">
               <span className="text-xl font-extrabold text-[#0f1f15] dark:text-[#eef5ef] tracking-tight leading-none group-hover:text-[#055c1b] dark:group-hover:text-[#98f992] transition-colors">
                 Healthy Hunger

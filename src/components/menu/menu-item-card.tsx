@@ -85,11 +85,13 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
       {/* Content & Details */}
       <div className="flex flex-col justify-between flex-1 gap-2.5 min-w-0 z-10">
         <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-black text-[#055c1b] dark:text-[#7ddc78] uppercase tracking-wider">
-              {isBestseller ? "Chef's Peak Performance" : "Clean Whole Food"}
-            </span>
-          </div>
+          {item.ingredients.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-[#055c1b] dark:text-[#7ddc78] uppercase tracking-wider truncate">
+                {item.ingredients.slice(0, 3).join(" · ")}
+              </span>
+            </div>
+          )}
 
           <h3 className="text-base sm:text-lg font-black text-[#0f1f15] dark:text-[#eef5ef] leading-snug mt-0.5 group-hover:text-[#055c1b] dark:group-hover:text-[#7ddc78] transition-colors">
             {item.name}

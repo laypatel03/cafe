@@ -4,6 +4,7 @@ import { ArrowRight, Dumbbell, Flame, Leaf, ShieldCheck, Sparkles, Star, Store }
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { LogoWordmark } from "@/components/brand/logo";
 import { VegMark } from "@/components/brand/veg-mark";
 import { ItemImage } from "@/components/menu/item-art";
 import { formatINR } from "@/lib/format";
@@ -192,23 +193,12 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
             <span>100% Vegetarian Café · Clean Macros</span>
           </div>
 
-          {/* Dynamic Brand Title */}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-4xl sm:text-5xl lg:text-[52px] tracking-tight text-[#055c1b] dark:text-[#7ddc78]">
-                Healthy
-              </span>
-              <span className="font-extrabold text-4xl sm:text-5xl lg:text-[52px] tracking-tight text-[#ea580c]">
-                Hunger
-              </span>
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="h-[2px] w-8 bg-[#055c1b] dark:bg-[#7ddc78] rounded-full" />
-              <span className="text-[12px] text-[#055c1b] dark:text-[#7ddc78] tracking-widest uppercase font-extrabold">
-                Eat Well, Live Well
-              </span>
-              <span className="h-[2px] w-8 bg-[#055c1b] dark:bg-[#7ddc78] rounded-full" />
-            </div>
+          {/* Main Brand Logo */}
+          <div>
+            <LogoWordmark
+              priority
+              className="h-auto w-[min(88vw,22rem)] sm:w-[26rem] lg:w-[30rem] select-none"
+            />
           </div>
 
           {/* Headline & Subtitle */}

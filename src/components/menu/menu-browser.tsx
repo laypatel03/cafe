@@ -142,19 +142,22 @@ export function MenuBrowser({
             {/* Top Guarantee Row */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#055c1b]/10 dark:bg-[#055c1b]/25 border border-[#055c1b]/20 dark:border-[#7ddc78]/30 text-[#055c1b] dark:text-[#7ddc78] font-bold text-xs uppercase tracking-wider">
               <Leaf className="size-3.5 fill-current" />
-              <span>100% Vegetarian Café · Certified Zero Palm Oil · Real Food Macros</span>
+              <span>100% Vegetarian Café · Zero Palm Oil · Real Food Macros</span>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-baseline justify-between w-full gap-4">
-              <div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0f1f15] dark:text-[#eef5ef] tracking-tight">
-                  {counter ? "Counter Order" : "Menu"}
-                </h1>
-                <p className="mt-2 text-sm sm:text-base text-[#334b3c] dark:text-[#a7b8ac] font-medium max-w-2xl">
-                  {counter
-                    ? "Pick dishes with the guest, customize add-ons, then confirm their order ticket."
-                    : "Macro-balanced protein bowls, guilt-free street chaats, artisan sourdough melts and botanical smoothies."}
-                </p>
+              <div className="flex items-center gap-3.5">
+                <LogoIcon className="h-11 sm:h-13 w-auto shrink-0" priority />
+                <div>
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0f1f15] dark:text-[#eef5ef] tracking-tight">
+                    {counter ? "Counter Order" : "Menu"}
+                  </h1>
+                  <p className="mt-1 text-sm sm:text-base text-[#334b3c] dark:text-[#a7b8ac] font-medium max-w-2xl">
+                    {counter
+                      ? "Pick dishes with the guest, customize add-ons, then confirm their order ticket."
+                      : "Macro-balanced protein bowls, guilt-free street chaats, artisan sourdough melts and botanical smoothies."}
+                  </p>
+                </div>
               </div>
 
               {!counter && (
@@ -360,9 +363,6 @@ export function MenuBrowser({
                     <h2 id={`cat-${group.slug}`} className="text-2xl sm:text-3xl font-black text-[#0f1f15] dark:text-[#eef5ef] tracking-tight">
                       {group.name}
                     </h2>
-                    <p className="text-xs sm:text-sm font-semibold text-[#304537] dark:text-[#a7b8ac]">
-                      Engineered for clean satiety, complete amino profiles & sustained energy
-                    </p>
                   </div>
                 </div>
 
