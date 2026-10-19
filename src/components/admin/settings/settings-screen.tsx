@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormAction } from "@/hooks/use-form-action";
+import { useOpenNow } from "@/hooks/use-open-now";
 import { CAFE_TZ } from "@/lib/format";
 
 type Cafe = {
@@ -207,6 +208,8 @@ function EditingPanel({ edits }: { edits: Switches }) {
 function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: string }[] }) {
   const [state, onSubmit, pending] = useFormAction(saveCafeDetails, undefined);
   const [hours, setHours] = useState(cafe.hours.length ? cafe.hours : [{ days: "", time: "" }]);
+  // from the saved hours (the page reloads them after a save)
+  const openNow = useOpenNow(cafe.hours);
   const err = state?.fieldErrors ?? {};
   useEffect(() => {
     if (state?.ok) toast.success("Café details saved – the website is updated");
@@ -290,6 +293,18 @@ function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: stri
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Opening hours</legend>
+        <p className="text-xs text-muted-foreground">
+          Guests can order on the QR menu only inside these hours (counter orders work any time). Write days
+          like &ldquo;Mon – Sat&rdquo;, &ldquo;Sunday&rdquo; or &ldquo;Daily&rdquo;, and times like
+          &ldquo;7:30 am – 10:30 pm&rdquo;, &ldquo;8 am – 2 pm, 5 pm – 10 pm&rdquo; or &ldquo;Closed&rdquo;.
+        </p>
+        {cafe.hours.length > 0 && (
+          <p role="status" className="text-sm font-medium">
+            {openNow
+              ? "By the saved hours, guests can order right now."
+              : "By the saved hours, the QR menu is closed for orders right now."}
+          </p>
+        )}
         {hours.map((h, i) => (
           <div key={i} className="flex gap-2">
             <Input
@@ -328,6 +343,7 @@ function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: stri
             <Plus data-icon="inline-start" /> Add row
           </Button>
         )}
+        {err.hours && <p className="text-xs text-destructive">{err.hours}</p>}
       </fieldset>
 
       <Field

@@ -30,6 +30,7 @@ import {
   type CategorySlug,
   type MenuItem,
 } from "@/lib/menu-types";
+import { useOpenNow } from "@/hooks/use-open-now";
 import { cn } from "@/lib/utils";
 import { CartBar } from "./cart-bar";
 import { ItemSheet } from "./item-sheet";
@@ -54,7 +55,9 @@ type Props = {
   categories: Category[];
   items: MenuItem[];
   addOns: AddOn[];
+  /** Settings → "Guests can order" switch (the counter always passes true) */
   orderingEnabled: boolean;
+  /** the server's answer for the opening hours, until the page re-checks them itself */
   isWithinHours?: boolean;
   hours?: { days: string; time: string }[];
   initialItemId?: string;
@@ -68,13 +71,16 @@ export function MenuBrowser({
   categories,
   items,
   addOns,
-  orderingEnabled,
-  isWithinHours,
+  orderingEnabled: orderingSwitchOn,
+  isWithinHours: withinHoursAtLoad,
   hours,
   initialItemId,
   counter = false,
   counterGuest,
 }: Props) {
+  // opens and closes on time while the page stays open; staff counter orders ignore the hours
+  const isWithinHours = useOpenNow(counter ? undefined : hours, withinHoursAtLoad ?? true);
+  const orderingEnabled = orderingSwitchOn && isWithinHours;
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filter[]>([]);
   const [active, setActive] = useState<CategorySlug>(categories[0]?.slug);
