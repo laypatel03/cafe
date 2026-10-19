@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-figtree);
+  --font-sans: var(--font-jakarta), var(--font-figtree), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono);
-  --font-heading: var(--font-baloo);
+  --font-heading: var(--font-jakarta), var(--font-baloo);
   --color-brand: var(--brand);
   --color-brand-text: var(--brand-text);
   --color-surface: var(--surface);
@@ -22,8 +22,11 @@
   --color-hh-lime: var(--hh-lime);
   --color-hh-green-deep: var(--hh-green-deep);
   --color-hh-orange: var(--hh-orange);
+  --color-hh-orange-hover: var(--hh-orange-hover);
   --color-hh-orange-light: var(--hh-orange-light);
   --color-hh-ink: var(--hh-ink);
+  --color-hh-sub: var(--hh-sub);
+  --color-hh-body: var(--hh-body);
   --color-veg: var(--hh-veg);
   --color-status-new: var(--status-new);
   --color-status-accepted: var(--status-accepted);
@@ -71,17 +74,20 @@
 
 :root {
   /* Brand palette – see doc/brand-palette.jpg */
-  --hh-green: #167a24; /* Deep Leaf Green */
+  --hh-green: #055c1b; /* Deep Leaf Green */
   --hh-green-light: #55a90d; /* Fresh Green */
   --hh-lime: #78b90c; /* Bright Lime Green */
   --hh-green-deep: #0e5518; /* darker step of Deep Leaf, for footer and sidebar */
-  --hh-orange: #ff7800; /* Tangerine Orange */
+  --hh-orange: #ea580c; /* Vibrant Tangerine Orange */
+  --hh-orange-hover: #c2410c; /* Deep Orange on hover */
   --hh-orange-light: #ffb900; /* Golden Yellow */
   /* tangerine is too light for text on light backgrounds (2.7:1); this deeper tone passes AA */
   --hh-orange-text: #b85400;
-  --hh-ink: #1c2b22;
-  --hh-cream: #fbf9f1;
-  --hh-veg: #167a24;
+  --hh-ink: #0f1f15;
+  --hh-sub: #273a2f;
+  --hh-body: #334b3c;
+  --hh-cream: #f2faf3;
+  --hh-veg: #055c1b;
 
   --background: var(--hh-cream);
   --foreground: var(--hh-ink);
@@ -91,9 +97,9 @@
   --popover-foreground: var(--hh-ink);
   --primary: var(--hh-green);
   --primary-foreground: #ffffff;
-  /* orange call-to-action: white text fails on orange, so it carries dark ink */
+  /* orange call-to-action: white text on orange */
   --cta: var(--hh-orange);
-  --cta-foreground: var(--hh-ink);
+  --cta-foreground: #ffffff;
   --secondary: #eef6e6;
   --secondary-foreground: var(--hh-green-deep);
   --muted: #f2efe4;
@@ -136,6 +142,9 @@
 }
 
 .dark {
+  --hh-ink: #eef5ef;
+  --hh-sub: #cde5d3;
+  --hh-body: #a7b8ac;
   --background: #0e1a12;
   --foreground: #eef5ef;
   --card: #16251b;
@@ -145,7 +154,7 @@
   --primary: var(--hh-green);
   --primary-foreground: #ffffff;
   --cta: var(--hh-orange);
-  --cta-foreground: var(--hh-ink);
+  --cta-foreground: #ffffff;
   --secondary: #1d3325;
   --secondary-foreground: #d4edb8;
   --muted: #1a2b20;

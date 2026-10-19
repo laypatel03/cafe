@@ -125,7 +125,11 @@ function ItemSheetBody({
                   <li key={a.id}>
                     <label
                       htmlFor={id}
-                      className={`flex min-h-12 items-center gap-3 px-4 py-2 ${a.available ? "cursor-pointer" : "opacity-50"}`}
+                      className={`flex min-h-12 items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
+                        a.available
+                          ? "cursor-pointer hover:bg-[#e8f4ec]/70 dark:hover:bg-[#1f3325]/70 text-[#0f1f15] dark:text-[#eef5ef]"
+                          : "opacity-50"
+                      }`}
                     >
                       <Checkbox
                         id={id}
@@ -136,12 +140,12 @@ function ItemSheetBody({
                         }
                       />
                       <span className="flex-1">
-                        {a.name}
-                        <span className="block tabular text-xs text-muted-foreground">
+                        <span className="font-semibold text-sm">{a.name}</span>
+                        <span className="block tabular text-xs text-muted-foreground font-medium">
                           {a.available ? `+${a.protein} g protein · ${a.kcal} kcal` : "Sold out"}
                         </span>
                       </span>
-                      <span className="tabular text-sm font-medium">+{formatINR(a.price)}</span>
+                      <span className="tabular text-sm font-bold text-[#055c1b] dark:text-[#7ddc78]">+{formatINR(a.price)}</span>
                     </label>
                   </li>
                 );
@@ -151,11 +155,11 @@ function ItemSheetBody({
         )}
       </div>
 
-      {canOrder && (
+      {canOrder ? (
         <div className="sticky bottom-0 flex items-center gap-3 border-t border-border bg-popover/95 px-5 py-4 backdrop-blur">
           <QuantityStepper value={qty} onChange={setQty} label="Quantity" />
           <Button
-            className="h-11 flex-1 rounded-full bg-cta text-base font-bold text-cta-foreground hover:bg-hh-orange-light"
+            className="h-11 flex-1 rounded-full bg-[#ea580c] hover:bg-[#c2410c] text-base font-extrabold text-white hover:text-white shadow-md active:scale-95 transition-all"
             onClick={() => {
               add({
                 itemId: item.id,
@@ -170,6 +174,16 @@ function ItemSheetBody({
           >
             Add to my list
           </Button>
+        </div>
+      ) : (
+        <div className="sticky bottom-0 border-t border-border bg-popover/95 px-5 py-3.5 backdrop-blur text-center">
+          <p className="text-xs font-bold text-muted-foreground">
+            {!orderingEnabled
+              ? "Online ordering is currently closed outside working hours."
+              : !item.available
+              ? "This dish is currently sold out."
+              : "Price to be confirmed."}
+          </p>
         </div>
       )}
     </>

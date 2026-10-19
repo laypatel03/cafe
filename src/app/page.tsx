@@ -1,9 +1,10 @@
 import { connection } from "next/server";
 import { CafeJsonLd } from "@/components/landing/cafe-json-ld";
 import { Hero, type HeroDish } from "@/components/landing/hero";
-import { Bestsellers, OurPromise, TodaysPick, VisitUs } from "@/components/landing/sections";
+import { Bestsellers, MacronutrientsAndCommunity, OurPromise, TodaysPick, VisitUs } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
+import { isWithinWorkingHours } from "@/lib/cafe-hours";
 import { getCafeDetails, getPublicMenu } from "@/lib/data/menu";
 
 export default async function HomePage() {
@@ -11,7 +12,7 @@ export default async function HomePage() {
   await connection();
   const [{ items, categories }, cafe] = await Promise.all([getPublicMenu(), getCafeDetails()]);
   const pick = items.find((m) => m.id === cafe.todaysPickId) ?? items[0];
-  const bestsellers = items.filter((m) => m.tags.includes("bestseller"));
+  const isOrderingAllowed = cafe.orderingEnabled && isWithinWorkingHours(cafe.hours);
 
   // Hero cards: today's pick, then dishes with photos, bestsellers, then the most protein.
   const categoryName = new Map(categories.map((c) => [c.slug, c.name]));
@@ -42,7 +43,8 @@ export default async function HomePage() {
         <Hero dishes={heroDishes} />
         {pick && <TodaysPick item={pick} />}
         <OurPromise />
-        {bestsellers.length > 0 && <Bestsellers items={bestsellers} />}
+        {items.length > 0 && <Bestsellers items={items} orderingEnabled={isOrderingAllowed} />}
+        <MacronutrientsAndCommunity />
         <VisitUs cafe={cafe} />
       </main>
       <SiteFooter cafe={cafe} />

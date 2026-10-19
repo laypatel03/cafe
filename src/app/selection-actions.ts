@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { isWithinWorkingHours } from "@/lib/cafe-hours";
 import { getCafeDetails } from "@/lib/data/menu";
 import { loadMenuPrices } from "@/lib/data/menu-prices";
 import { db } from "@/lib/db";
@@ -88,7 +89,15 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   const { clientId, takeaway, name, phone, note, marketingConsent, items } = parsed.data;
 
   const cafe = await getCafeDetails();
-  if (!cafe.orderingEnabled) return { ok: false, error: "Ordering is paused right now. Please ask staff." };
+  const isWithinHours = isWithinWorkingHours(cafe.hours);
+  if (!cafe.orderingEnabled || !isWithinHours) {
+    return {
+      ok: false,
+      error: !isWithinHours
+        ? "The café is closed outside working hours. Ordering is currently disabled."
+        : "Ordering is paused right now. Please ask staff.",
+    };
+  }
   // guard rails against fake orders: per device/network and per phone number
   if (
     !(await consumeRateLimit(`order-ip:${await clientIp()}`, 10, 60 * 60)) ||

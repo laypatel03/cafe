@@ -13,7 +13,7 @@ async function main() {
   for (const [i, c] of categories.entries()) {
     await db.category.upsert({
       where: { slug: c.slug },
-      update: {},
+      update: { sortOrder: i },
       create: { slug: c.slug, name: c.name, sortOrder: i },
     });
   }
