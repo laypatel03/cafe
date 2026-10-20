@@ -215,7 +215,7 @@ export function Bestsellers({ items, orderingEnabled = true }: { items: MenuItem
     return item.tags.includes("bestseller") || item.protein >= 15 || item.photo;
   });
 
-  const displayList = (filteredItems.length > 0 ? filteredItems : items.filter((i) => i.available && i.price > 0)).slice(0, 6);
+  const displayList = (filteredItems.length > 0 ? filteredItems : items.filter((i) => i.available && i.price > 0)).slice(0, 3);
 
   return (
     <section className="py-20 sm:py-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
