@@ -2,16 +2,13 @@
 
 import {
   ArrowRight,
-  AtSign,
   CheckCircle2,
-  Dumbbell,
   Clock,
+  Dumbbell,
   Flame,
   Info,
   Leaf,
   MapPin,
-  MessageCircle,
-  Phone,
   ShieldCheck,
   Sparkles,
   Store,
@@ -414,16 +411,6 @@ export function FromOurKitchen({ articles }: { articles: Article[] }) {
 }
 
 export function VisitUs({ cafe }: { cafe: CafeDetails }) {
-  const links = [
-    cafe.phone && { icon: Phone, label: cafe.phone, href: `tel:${cafe.phone.replace(/\s/g, "")}` },
-    cafe.whatsapp && { icon: MessageCircle, label: "WhatsApp Order", href: `https://wa.me/${cafe.whatsapp}` },
-    cafe.instagram && {
-      icon: AtSign,
-      label: `@${cafe.instagram}`,
-      href: `https://instagram.com/${cafe.instagram}`,
-    },
-  ].filter((l) => !!l);
-
   return (
     <section id="visit" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
       <Reveal>
@@ -443,50 +430,38 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
                   Experience Healthy Hunger Café
                 </h2>
 
-                {/* Subtitle (No Wi-Fi, No work tables) */}
+                {/* Subtitle */}
                 <p className="mt-3.5 max-w-xl text-sm leading-relaxed font-medium text-[#334b3c] sm:text-base dark:text-[#a7b8ac]">
                   Sit down for a bowl, grab a chaat on the go, or order takeaway from the menu on your phone.
                 </p>
 
-                {/* Two Sub-Blocks: Opening Hours & Café Location */}
-                <div className="mt-8 grid grid-cols-1 gap-5 border-t border-[#e8f1ea] pt-6 sm:grid-cols-2 dark:border-[#24392b]">
-                  {/* Opening Hours */}
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#055c1b]/10 text-[#055c1b] dark:bg-[#055c1b]/25 dark:text-[#7ddc78]">
-                      <Clock className="size-5.5" />
-                    </div>
-                    <div>
-                      <span className="block text-xs font-black tracking-wider text-[#0f1f15] uppercase dark:text-[#eef5ef]">
-                        Opening Hours
-                      </span>
-                      <div className="mt-1 space-y-1 text-xs font-medium text-[#334b3c] dark:text-[#a7b8ac]">
-                        {cafe.hours.map((h) => (
-                          <div key={h.days}>
-                            <span className="font-bold text-[#0f1f15] dark:text-[#eef5ef]">{h.days}</span>
-                            <p className="tabular font-semibold text-[#055c1b] dark:text-[#7ddc78]">
-                              {h.time}
-                            </p>
-                          </div>
-                        ))}
+                {/* Opening Hours Block */}
+                <div className="mt-8 border-t border-[#e8f1ea] pt-6 dark:border-[#24392b]">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#055c1b]/10 text-[#055c1b] dark:bg-[#055c1b]/25 dark:text-[#7ddc78]">
+                        <Clock className="size-4.5" />
                       </div>
+                      <span className="text-xs font-black tracking-wider text-[#0f1f15] uppercase dark:text-[#eef5ef]">
+                        Weekly Opening Hours
+                      </span>
                     </div>
                   </div>
 
-                  {/* Café Location */}
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-2xl bg-orange-500/10 text-[#ea580c] dark:bg-orange-500/25">
-                      <MapPin className="size-5.5" />
-                    </div>
-                    <div>
-                      <span className="block text-xs font-black tracking-wider text-[#0f1f15] uppercase dark:text-[#eef5ef]">
-                        Café Location
-                      </span>
-                      <p className="mt-1 text-xs leading-relaxed font-medium text-[#334b3c] dark:text-[#a7b8ac]">
-                        {cafe.address && cafe.address !== "Address to be confirmed"
-                          ? cafe.address
-                          : "Chocolate Heaven Building Chikli, 301–310, Bilimora – Chikhli Rd, opp Olive Hospital Chikhli, Nandarkha, Bilimora, Gujarat 396325"}
-                      </p>
-                    </div>
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                    {cafe.hours.map((h) => (
+                      <div
+                        key={h.days}
+                        className="rounded-2xl border border-[#d6ebd9] bg-[#f4faf5] p-4 transition-colors hover:border-[#055c1b]/30 dark:border-[#24392b] dark:bg-[#132218]"
+                      >
+                        <span className="block text-[11px] font-black tracking-wider text-[#334b3c] uppercase dark:text-[#a7b8ac]">
+                          {h.days}
+                        </span>
+                        <p className="mt-1 text-base font-extrabold tracking-tight text-[#055c1b] tabular sm:text-lg dark:text-[#7ddc78]">
+                          {h.time}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -512,25 +487,6 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
                   <span>Order for Pickup</span>
                 </Link>
               </div>
-
-              {/* Social / Contact Badges */}
-              {links.length > 0 && (
-                <div className="mt-6 flex flex-wrap items-center gap-2">
-                  <span className="mr-1 text-xs font-bold text-[#5c7263] dark:text-[#a7b8ac]">Connect:</span>
-                  {links.map((l) => (
-                    <a
-                      key={l.href}
-                      href={l.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full border border-[#d6e3d9] bg-[#f1f5f2] px-3 py-1.5 text-[11px] font-bold text-[#1c2e23] transition-colors hover:bg-[#055c1b] hover:text-white dark:border-[#2b4334] dark:bg-[#1d3325] dark:text-[#eef5ef] dark:hover:bg-[#7ddc78] dark:hover:text-[#0e1a12]"
-                    >
-                      <l.icon className="size-3" />
-                      <span>{l.label}</span>
-                    </a>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Right column: a real photo of the café */}

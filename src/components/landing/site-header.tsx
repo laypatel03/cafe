@@ -35,10 +35,10 @@ export function SiteHeader({ showBlog = false }: { showBlog?: boolean }) {
         <div className="flex items-center gap-8">
           <Link href="/" className="group flex items-center gap-3" aria-label="Healthy Hunger – Home">
             <LogoIcon
-              className="h-11 w-auto transition-transform duration-200 select-none group-hover:scale-105"
+              className="h-10 sm:h-11 w-auto transition-transform duration-200 select-none group-hover:scale-105"
               priority
             />
-            <div className="flex flex-col">
+            <div className="hidden sm:flex flex-col">
               <span className="text-xl leading-none font-extrabold tracking-tight text-[#0f1f15] transition-colors group-hover:text-[#055c1b] dark:text-[#eef5ef] dark:group-hover:text-[#98f992]">
                 Healthy Hunger
               </span>
