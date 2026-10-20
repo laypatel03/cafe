@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 // Source artwork: doc/brand-palette.jpg (colours and lettering) and doc/brand-guide.jpg (HH mark). Cut-outs live in public/brand.
 const WORDMARK = { src: "/brand/hh-wordmark.webp", width: 1000, height: 247 };
 const NAME = { src: "/brand/hh-name.webp", width: 640, height: 128 };
-const ICON = { src: "/brand/hh-icon.png", width: 512, height: 391 };
+const ICON = { src: "/brand/hh-icon-512.webp", width: 512, height: 391 };
 
 type Props = { className?: string; priority?: boolean };
 
