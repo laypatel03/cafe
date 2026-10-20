@@ -1,6 +1,6 @@
 "use client";
 
-import { ChefHat, LoaderCircle, Pencil, X } from "lucide-react";
+import { ChefHat, LoaderCircle, Pencil, Undo2, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { advanceOrder, cancelOrder, updateOrderItems } from "@/app/admin/(dashboard)/actions";
@@ -15,8 +15,9 @@ import { toRupees } from "@/lib/money";
 import { ACTION_LABEL, availableActions, canCancel, canEditItems } from "@/lib/order-flow";
 import { cn } from "@/lib/utils";
 import { BillingPanel } from "./billing-panel";
-import { type EditableLine, ItemLinesEditor, toEditableLines } from "./item-lines-editor";
+import { type EditableLine, ItemLinesEditor, otherItems, toEditableLines } from "./item-lines-editor";
 import { OrderStatusBadge } from "./order-status-badge";
+import { undoStep } from "./undo-step";
 
 const GROUPS: { title: string; statuses: OrderStatus[]; hint: string }[] = [
   {
@@ -42,12 +43,14 @@ export function OrdersPanel({
   bills,
   payLater,
   menu,
+  isOwner,
   onChanged,
 }: {
   orders: LiveOrder[];
   bills: LiveBill[];
   payLater: LiveBill[];
   menu: PublicMenu;
+  isOwner: boolean;
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState<LiveOrder | null>(null);
@@ -116,7 +119,13 @@ export function OrdersPanel({
         </section>
       )}
 
-      <EditItemsDialog order={editing} menu={menu} onClose={() => setEditing(null)} onSaved={onChanged} />
+      <EditItemsDialog
+        order={editing}
+        menu={menu}
+        isOwner={isOwner}
+        onClose={() => setEditing(null)}
+        onSaved={onChanged}
+      />
       <CancelDialog order={cancelling} onClose={() => setCancelling(null)} onDone={onChanged} />
     </>
   );
@@ -141,7 +150,9 @@ function OrderCard({
     start(async () => {
       const res = await advanceOrder(o.id, action);
       if (res.ok) {
-        toast.success(`#${o.number} · ${ACTION_LABEL[action]}`);
+        toast.success(`#${o.number} · ${ACTION_LABEL[action]}`, {
+          action: { label: "Undo", onClick: () => start(() => undoStep(o, onChanged)) },
+        });
         onChanged();
       } else toast.error(res.error);
     });
@@ -240,6 +251,17 @@ function OrderCard({
           )}
         </div>
       )}
+      {o.undo && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="mt-2 self-start rounded-full text-muted-foreground"
+          disabled={pending}
+          onClick={() => start(() => undoStep(o, onChanged))}
+        >
+          <Undo2 data-icon="inline-start" /> Undo “{o.undo}”
+        </Button>
+      )}
     </li>
   );
 }
@@ -247,11 +269,13 @@ function OrderCard({
 function EditItemsDialog({
   order,
   menu,
+  isOwner,
   onClose,
   onSaved,
 }: {
   order: LiveOrder | null;
   menu: PublicMenu;
+  isOwner: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -259,7 +283,14 @@ function EditItemsDialog({
     <Dialog open={!!order} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         {order && (
-          <EditItemsForm key={order.id} order={order} menu={menu} onClose={onClose} onSaved={onSaved} />
+          <EditItemsForm
+            key={order.id}
+            order={order}
+            menu={menu}
+            isOwner={isOwner}
+            onClose={onClose}
+            onSaved={onSaved}
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -269,24 +300,30 @@ function EditItemsDialog({
 function EditItemsForm({
   order,
   menu,
+  isOwner,
   onClose,
   onSaved,
 }: {
   order: LiveOrder;
   menu: PublicMenu;
+  isOwner: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [lines, setLines] = useState<EditableLine[]>(() => toEditableLines(order.items));
+  const [lines, setLines] = useState<EditableLine[]>(() => toEditableLines(editableItems(order)));
   const [error, setError] = useState<{ message: string; problems?: string[] } | null>(null);
   const [pending, start] = useTransition();
-  const dropped = order.items.length - toEditableLines(order.items).length;
+  const dropped = order.items.length - toEditableLines(editableItems(order)).length;
 
   const save = () =>
     start(async () => {
       const res = await updateOrderItems(
         order.id,
-        lines.map((l) => ({ itemId: l.itemId, addOnIds: l.addOns.map((a) => a.id), quantity: l.quantity })),
+        lines
+          .filter((l) => !l.custom)
+          .map((l) => ({ itemId: l.itemId, addOnIds: l.addOns.map((a) => a.id), quantity: l.quantity })),
+        // staff can't change other items, so the server keeps the ones already on the order
+        isOwner ? otherItems(lines) : undefined,
       );
       if (res.ok) {
         toast.success(`Order #${order.number} updated`);
@@ -311,7 +348,7 @@ function EditItemsForm({
           save.
         </p>
       )}
-      <ItemLinesEditor lines={lines} onChange={setLines} menu={menu} />
+      <ItemLinesEditor lines={lines} onChange={setLines} menu={menu} allowOther={isOwner} />
       {error && (
         <div role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
           <p>{error.message}</p>
@@ -337,6 +374,10 @@ function EditItemsForm({
   );
 }
 
+/** Order items for the editor; other items bring their price along. */
+const editableItems = (order: LiveOrder) =>
+  order.items.map((i) => ({ ...i, ...(i.custom && { unitPrice: toRupees(i.unitPricePaise) }) }));
+
 const QUICK_REASONS = ["Guest left", "Item not available", "Duplicate order", "Guest changed their mind"];
 
 function CancelDialog({
@@ -359,7 +400,9 @@ function CancelDialog({
     start(async () => {
       const res = await cancelOrder(order.id, reason);
       if (res.ok) {
-        toast.success(`Order #${order.number} cancelled`);
+        toast.success(`Order #${order.number} cancelled`, {
+          action: { label: "Undo", onClick: () => void undoStep(order, onDone) },
+        });
         onDone();
         close();
       } else toast.error(res.error);

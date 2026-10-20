@@ -9,5 +9,5 @@ export const metadata = { title: { absolute: "Live orders · Dashboard" } };
 export default async function LiveOrdersPage() {
   const user = await requireUser();
   const [board, menu] = await Promise.all([getLiveBoard(user.role), getPublicMenu()]);
-  return <LiveBoard initial={board} menu={menu} />;
+  return <LiveBoard initial={board} menu={menu} isOwner={user.role === "OWNER"} />;
 }

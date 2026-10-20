@@ -9,7 +9,8 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useCart } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
 
-export function SiteHeader() {
+/** `showBlog`: the Blog link, only while the blog is switched on (or on the blog pages themselves). */
+export function SiteHeader({ showBlog = false }: { showBlog?: boolean }) {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   useMotionValueEvent(scrollY, "change", (y) => setScrolled(y > 20));
@@ -23,54 +24,66 @@ export function SiteHeader() {
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
       className={cn(
-        "fixed top-0 left-0 w-full z-50 transition-all duration-300",
+        "fixed top-0 left-0 z-50 w-full transition-all duration-300",
         scrolled
-          ? "bg-white/95 dark:bg-[#0e1a12]/95 backdrop-blur-md border-b border-[#d8e8dc] dark:border-[#24392b] shadow-[0_2px_14px_rgba(0,87,19,0.06)]"
-          : "bg-white/80 dark:bg-[#0e1a12]/80 backdrop-blur-sm border-b border-transparent"
+          ? "border-b border-[#d8e8dc] bg-white/95 shadow-[0_2px_14px_rgba(0,87,19,0.06)] backdrop-blur-md dark:border-[#24392b] dark:bg-[#0e1a12]/95"
+          : "border-b border-transparent bg-white/80 backdrop-blur-sm dark:bg-[#0e1a12]/80",
       )}
     >
-      <div className="h-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         {/* Brand Logo & Tagline */}
         <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-3 group" aria-label="Healthy Hunger – Home">
-            <LogoIcon className="h-11 w-auto select-none group-hover:scale-105 transition-transform duration-200" priority />
+          <Link href="/" className="group flex items-center gap-3" aria-label="Healthy Hunger – Home">
+            <LogoIcon
+              className="h-11 w-auto transition-transform duration-200 select-none group-hover:scale-105"
+              priority
+            />
             <div className="flex flex-col">
-              <span className="text-xl font-extrabold text-[#0f1f15] dark:text-[#eef5ef] tracking-tight leading-none group-hover:text-[#055c1b] dark:group-hover:text-[#98f992] transition-colors">
+              <span className="text-xl leading-none font-extrabold tracking-tight text-[#0f1f15] transition-colors group-hover:text-[#055c1b] dark:text-[#eef5ef] dark:group-hover:text-[#98f992]">
                 Healthy Hunger
               </span>
-              <span className="text-[11px] font-bold text-[#055c1b] dark:text-[#98f992] uppercase tracking-wider mt-1">
+              <span className="mt-1 text-[11px] font-bold tracking-wider text-[#055c1b] uppercase dark:text-[#98f992]">
                 100% Vegetarian Cafe
               </span>
             </div>
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-1.5 bg-[#e7f4eb] dark:bg-[#16251b] p-1.5 rounded-full border border-[#d2e8d8] dark:border-[#24392b]">
+          <nav className="hidden items-center gap-1.5 rounded-full border border-[#d2e8d8] bg-[#e7f4eb] p-1.5 md:flex dark:border-[#24392b] dark:bg-[#16251b]">
             <Link
               href="/menu"
-              className="px-5 py-2 rounded-full font-bold text-sm text-[#273a2f] dark:text-[#cde5d3] hover:text-[#055c1b] dark:hover:text-[#98f992] hover:bg-white/80 dark:hover:bg-[#1f3325] transition-colors"
+              className="rounded-full px-5 py-2 text-sm font-bold text-[#273a2f] transition-colors hover:bg-white/80 hover:text-[#055c1b] dark:text-[#cde5d3] dark:hover:bg-[#1f3325] dark:hover:text-[#98f992]"
             >
               Menu
             </Link>
-            <a
-              href="#promise"
-              className="px-5 py-2 rounded-full font-bold text-sm text-[#273a2f] dark:text-[#cde5d3] hover:text-[#055c1b] dark:hover:text-[#98f992] hover:bg-white/80 dark:hover:bg-[#1f3325] transition-colors"
+            {/* "/#…" so the links also work from the blog pages */}
+            <Link
+              href="/#promise"
+              className="rounded-full px-5 py-2 text-sm font-bold text-[#273a2f] transition-colors hover:bg-white/80 hover:text-[#055c1b] dark:text-[#cde5d3] dark:hover:bg-[#1f3325] dark:hover:text-[#98f992]"
             >
               Our Promise
-            </a>
-            <a
-              href="#visit"
-              className="px-5 py-2 rounded-full font-bold text-sm text-[#273a2f] dark:text-[#cde5d3] hover:text-[#055c1b] dark:hover:text-[#98f992] hover:bg-white/80 dark:hover:bg-[#1f3325] transition-colors"
+            </Link>
+            {showBlog && (
+              <Link
+                href="/blog"
+                className="rounded-full px-5 py-2 text-sm font-bold text-[#273a2f] transition-colors hover:bg-white/80 hover:text-[#055c1b] dark:text-[#cde5d3] dark:hover:bg-[#1f3325] dark:hover:text-[#98f992]"
+              >
+                Blog
+              </Link>
+            )}
+            <Link
+              href="/#visit"
+              className="rounded-full px-5 py-2 text-sm font-bold text-[#273a2f] transition-colors hover:bg-white/80 hover:text-[#055c1b] dark:text-[#cde5d3] dark:hover:bg-[#1f3325] dark:hover:text-[#98f992]"
             >
               Visit Us
-            </a>
+            </Link>
           </nav>
         </div>
 
         {/* Right Action Tools */}
         <div className="flex items-center gap-2.5 sm:gap-3">
           {/* Table Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white dark:bg-[#16251b] border border-[#cbe2d2] dark:border-[#24392b] text-[#0f1f15] dark:text-[#eef5ef] shadow-xs">
+          <div className="hidden items-center gap-1.5 rounded-full border border-[#cbe2d2] bg-white px-3.5 py-1.5 text-[#0f1f15] shadow-xs sm:flex dark:border-[#24392b] dark:bg-[#16251b] dark:text-[#eef5ef]">
             <Utensils className="size-4 text-[#055c1b] dark:text-[#98f992]" aria-hidden />
             <span className="text-xs font-bold tracking-tight">
               {kind === "PARCEL" ? "Takeaway" : "Dine-in"}
@@ -80,13 +93,13 @@ export function SiteHeader() {
           {/* Cart Button */}
           <Link
             href="/menu#sticky-cart"
-            className="relative flex items-center gap-2 px-4 py-2 rounded-full bg-[#ea580c] hover:bg-[#c2410c] text-white font-bold text-sm shadow-sm hover:shadow transition-all active:scale-95"
+            className="relative flex items-center gap-2 rounded-full bg-[#ea580c] px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#c2410c] hover:shadow active:scale-95"
             aria-label={`Cart with ${count} items`}
           >
             <ShoppingBag className="size-4.5 text-white" aria-hidden />
-            <span className="hidden sm:inline text-white font-bold">Cart</span>
+            <span className="hidden font-bold text-white sm:inline">Cart</span>
             {count > 0 && (
-              <span className="w-5 h-5 rounded-full bg-white text-[#ea580c] text-xs flex items-center justify-center font-black shadow-xs">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-black text-[#ea580c] shadow-xs">
                 {count}
               </span>
             )}
@@ -98,7 +111,7 @@ export function SiteHeader() {
           {/* Admin shortcut */}
           <Link
             href="/admin"
-            className="w-9 h-9 rounded-full bg-[#055c1b] dark:bg-[#0c6b25] hover:bg-[#0e5518] text-white flex items-center justify-center shadow-xs transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#055c1b] text-white shadow-xs transition-colors hover:bg-[#0e5518] dark:bg-[#0c6b25]"
             title="Staff Dashboard"
             aria-label="Staff Dashboard"
           >

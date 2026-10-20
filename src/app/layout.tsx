@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     template: "%s · Healthy Hunger",
   },
   description:
-    "Salads, chaats, sandwiches and oats bowls with protein from real food. 100% vegetarian, made fresh daily.",
+    "Salads, chaats, sandwiches and oats bowls with protein from real food. 100% vegetarian, made in our kitchen every day.",
 };
 
 export const viewport: Viewport = {

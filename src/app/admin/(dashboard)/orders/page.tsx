@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
+import { CircleAlert, Printer, Search } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { ORDER_STATUS, OrderStatusBadge } from "@/components/admin/order-status-badge";
@@ -8,6 +8,7 @@ import {
   EditOrderButton,
 } from "@/components/admin/orders/order-record-dialog";
 import { ChangePaymentButton, RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
+import { Pager } from "@/components/admin/pager";
 import { TextReceiptButton } from "@/components/admin/receipt-sms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,18 +19,27 @@ import { requireUser } from "@/lib/auth/dal";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { getPublicMenu } from "@/lib/data/menu";
 import { db } from "@/lib/db";
-import { formatINR } from "@/lib/format";
+import { formatINR, startOfCafeDay } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { toCafeInput } from "@/lib/order-edit";
 import { maskPhone } from "@/lib/phone-mask";
+import { clampPage, resolvePerPage } from "@/lib/paging";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
 import { cn } from "@/lib/utils";
 import { PAYMENT_SHORT } from "@/lib/payments";
 
 export const metadata = { title: "Order history" };
 
-const PAGE_SIZE = 50;
-const PAY_FILTERS = ["PENDING", "PAY_LATER", "PAID", "CASH", "UPI", "CREDIT_CARD", "DEBIT_CARD"] as const;
+const PAY_FILTERS = [
+  "PENDING",
+  "PENDING_EARLIER",
+  "PAY_LATER",
+  "PAID",
+  "CASH",
+  "UPI",
+  "CREDIT_CARD",
+  "DEBIT_CARD",
+] as const;
 type PayFilter = (typeof PAY_FILTERS)[number];
 
 const paidBy = (...methods: PaymentMethod[]): Prisma.OrderWhereInput => ({
@@ -37,13 +47,16 @@ const paidBy = (...methods: PaymentMethod[]): Prisma.OrderWhereInput => ({
     is: { paidAt: { not: null }, voidedAt: null, ...(methods.length && { paymentMethod: { in: methods } }) },
   },
 });
-const PAY_WHERE: Record<PayFilter, Prisma.OrderWhereInput> = {
-  // not paid yet and still owed: no bill made, or a bill waiting for payment
-  PENDING: {
-    deletedAt: null,
-    status: { not: "CANCELLED" },
-    OR: [{ billId: null }, { bill: { is: { paidAt: null, voidedAt: null } } }],
-  },
+// not paid yet and still owed: no bill made, or a bill waiting for payment
+const PENDING: Prisma.OrderWhereInput = {
+  deletedAt: null,
+  status: { not: "CANCELLED" },
+  OR: [{ billId: null }, { bill: { is: { paidAt: null, voidedAt: null } } }],
+};
+const payWhere = (pay: PayFilter): Prisma.OrderWhereInput =>
+  pay === "PENDING_EARLIER" ? { ...PENDING, createdAt: { lt: startOfCafeDay() } } : PAY_WHERE[pay];
+const PAY_WHERE: Record<Exclude<PayFilter, "PENDING_EARLIER">, Prisma.OrderWhereInput> = {
+  PENDING,
   PAY_LATER: { bill: { is: { payLaterAt: { not: null }, paidAt: null, voidedAt: null } } },
   PAID: paidBy(),
   CASH: paidBy("CASH"),
@@ -54,6 +67,7 @@ const PAY_WHERE: Record<PayFilter, Prisma.OrderWhereInput> = {
 };
 const PAY_FILTER_LABEL: Record<PayFilter, string> = {
   PENDING: "Payment pending",
+  PENDING_EARLIER: "Payment pending – earlier days",
   PAY_LATER: "Pay later",
   PAID: "Paid – any way",
   CASH: "Paid by cash",
@@ -72,7 +86,8 @@ const Filters = z.object({
     .optional()
     .catch(undefined),
   pay: z.enum(PAY_FILTERS).optional().catch(undefined),
-  page: z.coerce.number().int().min(1).max(1000).catch(1),
+  page: z.coerce.number().int().min(1).max(10000).catch(1),
+  per: z.string().optional().catch(undefined),
 });
 
 /** yyyy-mm-dd in the server's local time (the café runs in IST). */
@@ -108,26 +123,36 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         ? { OR: [{ number: Number(q) }, { bill: { number: Number(q) } }] }
         : { customerName: { contains: q, mode: "insensitive" } };
 
-  const owedOnly = f.pay === "PENDING" || f.pay === "PAY_LATER";
+  const owedOnly = f.pay === "PENDING" || f.pay === "PENDING_EARLIER" || f.pay === "PAY_LATER";
   const where: Prisma.OrderWhereInput = {
     // a number or phone search, or a "still owed" filter, looks across all dates
     ...((q && /^\d+$/.test(q)) || owedOnly ? {} : { createdAt: { gte: start, lt: end } }),
     ...(f.type && { type: f.type }),
     ...(f.status && { status: f.status }),
-    AND: [search ?? {}, f.pay ? PAY_WHERE[f.pay] : {}],
+    AND: [search ?? {}, f.pay ? payWhere(f.pay) : {}],
   };
 
   // owner only, while Settings → Editing → "Add and edit orders" is on
   const canEdit = user.role === "OWNER" && (await getEditSwitches()).orders;
   const menu = canEdit ? await getPublicMenu() : null;
 
-  const [total, orders] = await Promise.all([
+  const perPage = resolvePerPage(f.per, 10);
+  const [total, earlierOwed] = await Promise.all([
     db.order.count({ where }),
+    // orders from before today still waiting for payment, shown as a reminder above the filters
+    db.order.aggregate({
+      where: payWhere("PENDING_EARLIER"),
+      _count: true,
+      _sum: { totalPaise: true },
+    }),
+  ]);
+  const { page, pages } = clampPage(f.page, total, perPage);
+  const [orders] = await Promise.all([
     db.order.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      skip: (f.page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      skip: (page - 1) * perPage,
+      take: perPage,
       include: {
         items: true,
         bill: {
@@ -147,18 +172,19 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
       },
     }),
   ]);
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const pageHref = (page: number) => {
+  const pageHref = (to: { page: number; perPage: number }) => {
     const params = new URLSearchParams({
       ...(f.from && { from }),
-      ...(f.to && { to }),
+      ...(f.to && { to: f.to }),
       ...(f.q && { q: f.q }),
       ...(f.type && { type: f.type }),
       ...(f.status && { status: f.status }),
       ...(f.pay && { pay: f.pay }),
-      page: String(page),
+      ...(to.perPage !== 10 && { per: String(to.perPage) }),
+      ...(to.page > 1 && { page: String(to.page) }),
     });
-    return `/admin/orders?${params}`;
+    const qs = params.toString();
+    return qs ? `/admin/orders?${qs}` : "/admin/orders";
   };
   const showPhone = (p: string | null) => (p ? (user.role === "OWNER" ? p : maskPhone(p)) : null);
   const time = (d: Date) =>
@@ -177,10 +203,32 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         {menu && <AddOrderButton menu={menu} />}
       </div>
 
+      {earlierOwed._count > 0 && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-3xl border border-hh-orange/40 bg-hh-orange/10 px-4 py-3"
+        >
+          <CircleAlert className="size-5 shrink-0 text-brand-text" aria-hidden />
+          <p className="flex-1 text-sm">
+            <span className="font-semibold">
+              {earlierOwed._count} {earlierOwed._count === 1 ? "order" : "orders"} from earlier days still
+              need payment
+            </span>{" "}
+            · <span className="tabular">{formatINR(toRupees(earlierOwed._sum.totalPaise ?? 0))}</span>
+          </p>
+          {f.pay !== "PENDING_EARLIER" && (
+            <Button asChild size="sm" variant="outline" className="rounded-full">
+              <Link href="/admin/orders?pay=PENDING_EARLIER">Show these orders</Link>
+            </Button>
+          )}
+        </div>
+      )}
+
       <form
         method="get"
         className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_9rem_11rem_auto]"
       >
+        {perPage !== 10 && <input type="hidden" name="per" value={perPage} />}
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           Search
           <span className="relative">
@@ -244,10 +292,11 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         </div>
       </form>
 
-      <p className="text-sm text-muted-foreground" role="status">
-        {total === 0 ? "No orders match." : `${total} order${total === 1 ? "" : "s"}`}
-        {total > PAGE_SIZE && ` · page ${f.page} of ${pages}`}
-      </p>
+      {total === 0 && (
+        <p className="text-sm text-muted-foreground" role="status">
+          No orders match.
+        </p>
+      )}
 
       <ul className="space-y-3">
         {orders.map((o) => (
@@ -389,6 +438,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                         name: a.name,
                       })),
                       unitPrice: toRupees(i.unitPricePaise),
+                      custom: i.custom,
                     })),
                     paidBy: o.bill?.paidAt && !o.bill.voidedAt ? (o.bill.paymentMethod ?? null) : null,
                     billNumber: o.bill?.number ?? null,
@@ -406,28 +456,16 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         ))}
       </ul>
 
-      {pages > 1 && (
-        <nav className="flex items-center justify-center gap-2" aria-label="Pages">
-          <Button asChild variant="outline" size="sm" className="rounded-full" aria-disabled={f.page <= 1}>
-            <Link href={pageHref(Math.max(1, f.page - 1))}>
-              <ChevronLeft data-icon="inline-start" /> Newer
-            </Link>
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {f.page} / {pages}
-          </span>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            aria-disabled={f.page >= pages}
-          >
-            <Link href={pageHref(Math.min(pages, f.page + 1))}>
-              Older <ChevronRight data-icon="inline-end" />
-            </Link>
-          </Button>
-        </nav>
+      {total > 0 && (
+        <Pager
+          page={page}
+          pages={pages}
+          total={total}
+          perPage={perPage}
+          noun="orders"
+          href={pageHref}
+          sizes
+        />
       )}
     </div>
   );

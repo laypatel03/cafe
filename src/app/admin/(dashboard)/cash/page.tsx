@@ -107,8 +107,8 @@ export default async function CashPage() {
         </dl>
 
         <p className="mt-3 text-xs text-muted-foreground">
-          Not in the drawer: Google Pay {rupees(d.upiSalesPaise)} · Card {rupees(d.cardSalesPaise)} · {d.bills} paid
-          bill
+          Not in the drawer: Google Pay {rupees(d.upiSalesPaise)} · Card {rupees(d.cardSalesPaise)} ·{" "}
+          {d.bills} paid bill
           {d.bills === 1 ? "" : "s"} today
         </p>
 

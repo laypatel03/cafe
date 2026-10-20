@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import Link from "next/link";
 import { CardFeesForm, DeleteExtraSaleButton, ExtraSaleForm } from "@/components/admin/money/money-forms";
 import { MonthlyChart } from "@/components/admin/money/monthly-chart";
+import { Pager } from "@/components/admin/pager";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { today } from "@/lib/data/cash";
@@ -10,6 +11,7 @@ import { EXPENSE_CATEGORY } from "@/lib/expenses";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { margin, monthKey, monthLabel, type MoneyRow, resolveMonth, shiftMonth } from "@/lib/money-book";
+import { clampPage } from "@/lib/paging";
 import { PAYMENT_LABEL } from "@/lib/payments";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +38,9 @@ const SPLIT = [
   { key: "debit", label: "Debit card", className: "bg-violet-500" },
 ] as const;
 
+const DAYS_PER_PAGE = 10;
+const SALES_PER_PAGE = 10;
+
 const DAY_COLUMNS: { key: keyof MoneyRow; label: string; strong?: boolean }[] = [
   { key: "cash", label: "Cash" },
   { key: "upi", label: "Google Pay" },
@@ -51,11 +56,30 @@ const DAY_COLUMNS: { key: keyof MoneyRow; label: string; strong?: boolean }[] = 
 /** Owner only: every day's sales by how guests paid, card fees, expenses and profit. */
 export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/money">) {
   await requireUser("OWNER");
-  const month = resolveMonth(first((await searchParams).month));
+  const params = await searchParams;
+  const month = resolveMonth(first(params.month));
   const book = await getMoneyBook(month);
   const t = book.monthTotal;
   const isCurrent = month === monthKey(new Date());
-  const days = [...book.days].reverse(); // newest first
+  const allDays = [...book.days].reverse(); // newest first
+  // 10 days and 10 extra sales per page; ?dpage= and ?spage= so the two lists page on their own
+  const dayPaging = clampPage(Number(first(params.dpage)) || 1, allDays.length, DAYS_PER_PAGE);
+  const days = allDays.slice((dayPaging.page - 1) * DAYS_PER_PAGE, dayPaging.page * DAYS_PER_PAGE);
+  const salePaging = clampPage(Number(first(params.spage)) || 1, book.extraSales.length, SALES_PER_PAGE);
+  const extraSales = book.extraSales.slice(
+    (salePaging.page - 1) * SALES_PER_PAGE,
+    salePaging.page * SALES_PER_PAGE,
+  );
+  const pageLink = (key: "dpage" | "spage", anchor: string) => (to: { page: number }) => {
+    const q = new URLSearchParams();
+    if (!isCurrent) q.set("month", month);
+    const other = key === "dpage" ? "spage" : "dpage";
+    const keep = first(params[other]);
+    if (keep && keep !== "1") q.set(other, keep);
+    if (to.page > 1) q.set(key, String(to.page));
+    const qs = q.toString();
+    return `/admin/money${qs ? `?${qs}` : ""}#${anchor}`;
+  };
   const salesDays = book.days.filter((d) => d.sales > 0).length;
 
   const tiles: [string, number, string?][] = [
@@ -202,7 +226,7 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
             </tbody>
             <tfoot>
               <tr className="font-bold">
-                <td className="py-2 pr-3 text-left">Total</td>
+                <td className="py-2 pr-3 text-left">Month total</td>
                 {DAY_COLUMNS.map((c) => (
                   <td key={c.key} className="px-2 py-2 whitespace-nowrap">
                     <Amount paise={t[c.key] as number} strong />
@@ -212,6 +236,18 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
             </tfoot>
           </table>
         </div>
+        {dayPaging.pages > 1 && (
+          <div className="mt-3">
+            <Pager
+              page={dayPaging.page}
+              pages={dayPaging.pages}
+              total={allDays.length}
+              perPage={DAYS_PER_PAGE}
+              noun="days"
+              href={pageLink("dpage", "days-h")}
+            />
+          </div>
+        )}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -227,9 +263,9 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
             today={today()}
             defaultDay={isCurrent ? today() : (book.days.at(-1)?.key ?? today())}
           />
-          {book.extraSales.length > 0 && (
+          {extraSales.length > 0 && (
             <ul className="mt-4 divide-y divide-border text-sm">
-              {book.extraSales.map((s) => (
+              {extraSales.map((s) => (
                 <li key={s.id} className="flex items-center gap-3 py-2">
                   <div className="flex-1">
                     <p className="font-medium">
@@ -248,6 +284,18 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
                 </li>
               ))}
             </ul>
+          )}
+          {salePaging.pages > 1 && (
+            <div className="mt-3">
+              <Pager
+                page={salePaging.page}
+                pages={salePaging.pages}
+                total={book.extraSales.length}
+                perPage={SALES_PER_PAGE}
+                noun="sales"
+                href={pageLink("spage", "extra-h")}
+              />
+            </div>
           )}
         </section>
 

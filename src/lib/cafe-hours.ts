@@ -1,6 +1,7 @@
 /**
- * Working hours utility for Healthy Hunger Café.
- * The café operates in Indian Standard Time (Asia/Kolkata, UTC+5:30).
+ * Opening hours, as the owner types them in Settings ("Mon – Sat" / "7:30 am – 10:30 pm"), and
+ * whether guests can order right now. The café runs on Indian Standard Time (Asia/Kolkata).
+ * Pure, so it's unit-tested; Settings refuses hours this file can't read.
  */
 
 export type CafeHourSchedule = {
@@ -27,144 +28,130 @@ const DAY_MAP: Record<string, number> = {
   sat: 6,
   saturday: 6,
 };
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const DASH = /\s*(?:–|—|-|\bto\b)\s*/i;
+// "Mon – Fri, Sun" · "8 am – 2 pm & 5 pm – 10 pm"
+const LIST = /\s*(?:,|&|\band\b)\s*/i;
 
-/**
- * Parses time string like "7:30 am", "10:30 pm", "8 am", "22:00" into minutes from midnight.
- */
-function parseTimeToMinutes(raw: string): number | null {
-  const s = raw.trim().toLowerCase();
-  const match = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-  if (!match) return null;
-
-  let hours = parseInt(match[1], 10);
-  const minutes = match[2] ? parseInt(match[2], 10) : 0;
-  const meridiem = match[3];
-
-  if (meridiem === "pm" && hours < 12) hours += 12;
-  if (meridiem === "am" && hours === 12) hours = 0;
-
+/** "7:30 am", "7.30pm", "8 am", "22:00", "noon", "midnight" → minutes after midnight. */
+function parseTime(raw: string): number | null {
+  const s = raw.trim().toLowerCase().replace(/\s+/g, " ");
+  if (s === "noon" || s === "12 noon") return 12 * 60;
+  if (s === "midnight" || s === "12 midnight") return 24 * 60;
+  const m = s.match(/^(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|a\.m\.?|p\.m\.?)?$/);
+  if (!m) return null;
+  let hours = Number(m[1]);
+  const minutes = m[2] ? Number(m[2]) : 0;
+  const meridiem = m[3]?.replace(/\./g, "");
+  if (minutes > 59) return null;
+  if (meridiem) {
+    if (hours < 1 || hours > 12) return null;
+    hours = (hours % 12) + (meridiem === "pm" ? 12 : 0);
+  } else if (hours > 24 || (hours === 24 && minutes > 0)) {
+    return null;
+  }
   return hours * 60 + minutes;
 }
 
-/**
- * Parses days string like "Mon – Sat", "Sunday", "Mon - Sun", "Monday to Friday"
- * into an array of day integers (0 = Sunday, 1 = Monday, ..., 6 = Saturday).
- */
-function parseDaysToIndices(raw: string): number[] {
-  const s = raw.trim().toLowerCase();
-
-  // All days / Daily
-  if (
-    s.includes("daily") ||
-    s.includes("all day") ||
-    s.includes("every day") ||
-    s.includes("everyday") ||
-    s === "mon - sun" ||
-    s === "mon – sun" ||
-    s === "monday - sunday" ||
-    s === "monday – sunday"
-  ) {
-    return [0, 1, 2, 3, 4, 5, 6];
-  }
-
-  // Range: "Mon – Sat", "Mon - Sat", "Monday to Saturday"
-  const rangeMatch = s.match(/^([a-z]+)\s*(?:–|—|-|to)\s*([a-z]+)$/);
-  if (rangeMatch) {
-    const startIdx = DAY_MAP[rangeMatch[1]];
-    const endIdx = DAY_MAP[rangeMatch[2]];
-    if (startIdx !== undefined && endIdx !== undefined) {
-      const days: number[] = [];
-      let cur = startIdx;
-      while (true) {
-        days.push(cur);
-        if (cur === endIdx) break;
-        cur = (cur + 1) % 7;
+/** "Mon – Sat", "Sunday", "Daily", "Mon – Fri, Sun" → day numbers (0 = Sunday). */
+function parseDays(raw: string): number[] | null {
+  const s = raw.trim().toLowerCase().replace(/\./g, "");
+  if (/^(daily|every ?day|all days|all week|7 days)$/.test(s)) return ALL_DAYS;
+  const days = new Set<number>();
+  for (const part of s.split(LIST)) {
+    if (!part) continue;
+    const ends = part.split(DASH);
+    if (ends.length === 1 && DAY_MAP[part] !== undefined) {
+      days.add(DAY_MAP[part]);
+    } else if (ends.length === 2 && DAY_MAP[ends[0]] !== undefined && DAY_MAP[ends[1]] !== undefined) {
+      // wraps round the week, so "Sat – Mon" works too
+      for (let d = DAY_MAP[ends[0]]; ; d = (d + 1) % 7) {
+        days.add(d);
+        if (d === DAY_MAP[ends[1]]) break;
       }
-      return days;
+    } else {
+      return null;
     }
   }
+  return days.size > 0 ? [...days] : null;
+}
 
-  // Comma-separated: "Mon, Wed, Fri"
-  const parts = s.split(/[\s,]+/).filter(Boolean);
-  const matched = parts
-    .map((p) => DAY_MAP[p])
-    .filter((idx): idx is number => idx !== undefined);
-
-  if (matched.length > 0) {
-    return matched;
+/** "7:30 am – 10:30 pm", "8 am – 2 pm, 5 pm – 10 pm", "Closed" → [open, close] pairs in minutes. */
+function parseTimes(raw: string): [number, number][] | null {
+  const s = raw.trim().toLowerCase();
+  if (s === "closed") return [];
+  const ranges: [number, number][] = [];
+  for (const part of s.split(LIST)) {
+    const ends = part.split(DASH);
+    if (ends.length !== 2) return null;
+    const open = parseTime(ends[0]);
+    const close = parseTime(ends[1]);
+    if (open === null || close === null || open === close) return null;
+    ranges.push([open, close]);
   }
+  return ranges.length > 0 ? ranges : null;
+}
 
-  // Single day match
-  const single = DAY_MAP[s];
-  if (single !== undefined) return [single];
+type ParsedRow = { days: number[]; ranges: [number, number][] };
 
-  return [];
+function parseRow(row: CafeHourSchedule): ParsedRow | null {
+  const days = parseDays(row.days);
+  const ranges = parseTimes(row.time);
+  return days && ranges ? { days, ranges } : null;
+}
+
+/** What's wrong with one row of opening hours, in the owner's words – or null when it's fine. */
+export function hoursRowError(row: CafeHourSchedule): string | null {
+  if (!row.days.trim() || !row.time.trim()) return "Fill in both the days and the times.";
+  if (!parseDays(row.days)) {
+    return `Couldn't read the days "${row.days}". Write them like "Mon – Sat", "Sunday" or "Daily".`;
+  }
+  if (!parseTimes(row.time)) {
+    const sameTime = row.time.split(LIST).some((part) => {
+      const ends = part.split(DASH).map(parseTime);
+      return ends.length === 2 && ends[0] !== null && ends[0] === ends[1];
+    });
+    if (sameTime) return `"${row.time}" opens and closes at the same time. Put the closing time second.`;
+    return `Couldn't read the times "${row.time}". Write them like "7:30 am – 10:30 pm", or "Closed".`;
+  }
+  return null;
+}
+
+/** Day of the week (0 = Sunday) and minutes after midnight, in India. */
+function indiaNow(now: Date): { day: number; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    weekday: "short",
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    day: DAY_MAP[get("weekday").toLowerCase()] ?? 0,
+    minutes: Number(get("hour")) * 60 + Number(get("minute")),
+  };
 }
 
 /**
- * Checks whether a given Date is currently within the café's working hours.
- * Uses IST (Asia/Kolkata) timezone.
+ * Can guests order now, by the opening hours? No hours (or none readable) means always open, so a
+ * typo never locks guests out. A range that runs past midnight ("6 pm – 2 am") belongs to the day
+ * it starts on.
  */
 export function isWithinWorkingHours(
   schedules: CafeHourSchedule[] | null | undefined,
-  now: Date = new Date()
+  now: Date = new Date(),
 ): boolean {
-  if (!schedules || schedules.length === 0) {
-    // If no schedule configured, default to open
-    return true;
-  }
+  const rows = (schedules ?? []).map(parseRow).filter((r) => r !== null);
+  if (rows.length === 0) return true;
 
-  try {
-    // Extract current day, hour, and minute in Asia/Kolkata
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Kolkata",
-      weekday: "short",
-      hour: "numeric",
-      minute: "numeric",
-      hourCycle: "h23",
-    }).formatToParts(now);
-
-    const weekdayStr = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() ?? "";
-    const currentHour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-    const currentMinute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
-
-    const currentDayIdx = DAY_MAP[weekdayStr];
-    if (currentDayIdx === undefined) return true;
-
-    const currentMinutes = currentHour * 60 + currentMinute;
-
-    for (const schedule of schedules) {
-      const applicableDays = parseDaysToIndices(schedule.days);
-      if (!applicableDays.includes(currentDayIdx)) {
-        continue;
-      }
-
-      // Parse time range, e.g. "7:30 am – 10:30 pm"
-      const timeParts = schedule.time.split(/\s*(?:–|—|-|to)\s*/i);
-      if (timeParts.length !== 2) continue;
-
-      const startMin = parseTimeToMinutes(timeParts[0]);
-      const endMin = parseTimeToMinutes(timeParts[1]);
-
-      if (startMin === null || endMin === null) continue;
-
-      if (startMin <= endMin) {
-        // Standard daytime range (e.g., 7:30 AM to 10:30 PM)
-        if (currentMinutes >= startMin && currentMinutes <= endMin) {
-          return true;
-        }
-      } else {
-        // Overnight range (e.g., 8:00 PM to 2:00 AM)
-        if (currentMinutes >= startMin || currentMinutes <= endMin) {
-          return true;
-        }
-      }
-    }
-
-    // Checked all schedules for today and none matched the current time
-    return false;
-  } catch (err) {
-    console.error("Error evaluating working hours:", err);
-    return true;
-  }
+  const { day, minutes } = indiaNow(now);
+  const yesterday = (day + 6) % 7;
+  return rows.some((row) =>
+    row.ranges.some(([open, close]) => {
+      if (open < close) return row.days.includes(day) && minutes >= open && minutes < close;
+      // overnight: the evening part today, or the after-midnight part of yesterday's hours
+      return (row.days.includes(day) && minutes >= open) || (row.days.includes(yesterday) && minutes < close);
+    }),
+  );
 }

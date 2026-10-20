@@ -1,8 +1,8 @@
 import { z } from "zod";
+import { hoursRowError } from "@/lib/cafe-hours";
 import { INDIAN_MOBILE } from "./phone";
 
 const optional = <T extends z.ZodType<string, string>>(schema: T) => z.union([z.literal(""), schema]);
-const checkbox = z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean());
 
 export const CafeDetailsSchema = z.object({
   name: z.string().trim().min(2, "Name is too short").max(60),
@@ -32,8 +32,14 @@ export const CafeDetailsSchema = z.object({
   hours: z
     .array(z.object({ days: z.string().trim().max(30), time: z.string().trim().max(40) }))
     .max(7)
-    .transform((rows) => rows.filter((r) => r.days || r.time)),
-  orderingEnabled: checkbox,
+    .transform((rows) => rows.filter((r) => r.days || r.time))
+    // guests can only order inside these hours, so they must be readable
+    .superRefine((rows, ctx) => {
+      for (const [i, row] of rows.entries()) {
+        const problem = hoursRowError(row);
+        if (problem) ctx.addIssue({ code: "custom", message: `Row ${i + 1}: ${problem}` });
+      }
+    }),
   todaysPickId: z.string().max(40).default(""),
 });
 

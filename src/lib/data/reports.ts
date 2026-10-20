@@ -62,7 +62,7 @@ export async function getReport(range: ReportRange): Promise<Report> {
     db.$queryRaw<{ name: string; quantity: bigint; paise: bigint }[]>`
       SELECT i."itemName" AS name, SUM(i."quantity") AS quantity, SUM(i."lineTotalPaise") AS paise
       FROM "OrderItem" i JOIN "Order" o ON o."id" = i."orderId" JOIN "Bill" b ON b."id" = o."billId"
-      WHERE ${inRange} AND o."deletedAt" IS NULL
+      WHERE ${inRange} AND o."deletedAt" IS NULL AND NOT i."custom"
       GROUP BY i."itemName" ORDER BY quantity DESC, paise DESC LIMIT 10`,
     db.expense.groupBy({
       by: ["category"],

@@ -91,8 +91,8 @@ function ItemSheetBody({
           {[
             ...(hasNutrition(item)
               ? [
-                  ["Protein", `${protein} g`],
-                  ["Energy", `${kcal} kcal`],
+                  ["Protein*", `~${protein} g`],
+                  ["Energy*", `~${kcal} kcal`],
                 ]
               : []),
             ["Price", formatINR(item.price)],
@@ -103,6 +103,11 @@ function ItemSheetBody({
             </div>
           ))}
         </dl>
+        {hasNutrition(item) && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            *Our own estimate from the recipe, not lab-tested.
+          </p>
+        )}
 
         {item.ingredients.length > 0 && (
           <>
@@ -125,9 +130,9 @@ function ItemSheetBody({
                   <li key={a.id}>
                     <label
                       htmlFor={id}
-                      className={`flex min-h-12 items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
+                      className={`flex min-h-12 items-center gap-3 rounded-xl px-4 py-2.5 transition-colors ${
                         a.available
-                          ? "cursor-pointer hover:bg-[#e8f4ec]/70 dark:hover:bg-[#1f3325]/70 text-[#0f1f15] dark:text-[#eef5ef]"
+                          ? "cursor-pointer text-[#0f1f15] hover:bg-[#e8f4ec]/70 dark:text-[#eef5ef] dark:hover:bg-[#1f3325]/70"
                           : "opacity-50"
                       }`}
                     >
@@ -140,12 +145,14 @@ function ItemSheetBody({
                         }
                       />
                       <span className="flex-1">
-                        <span className="font-semibold text-sm">{a.name}</span>
-                        <span className="block tabular text-xs text-muted-foreground font-medium">
+                        <span className="text-sm font-semibold">{a.name}</span>
+                        <span className="block tabular text-xs font-medium text-muted-foreground">
                           {a.available ? `+${a.protein} g protein · ${a.kcal} kcal` : "Sold out"}
                         </span>
                       </span>
-                      <span className="tabular text-sm font-bold text-[#055c1b] dark:text-[#7ddc78]">+{formatINR(a.price)}</span>
+                      <span className="tabular text-sm font-bold text-[#055c1b] dark:text-[#7ddc78]">
+                        +{formatINR(a.price)}
+                      </span>
                     </label>
                   </li>
                 );
@@ -159,7 +166,7 @@ function ItemSheetBody({
         <div className="sticky bottom-0 flex items-center gap-3 border-t border-border bg-popover/95 px-5 py-4 backdrop-blur">
           <QuantityStepper value={qty} onChange={setQty} label="Quantity" />
           <Button
-            className="h-11 flex-1 rounded-full bg-[#ea580c] hover:bg-[#c2410c] text-base font-extrabold text-white hover:text-white shadow-md active:scale-95 transition-all"
+            className="h-11 flex-1 rounded-full bg-[#ea580c] text-base font-extrabold text-white shadow-md transition-all hover:bg-[#c2410c] hover:text-white active:scale-95"
             onClick={() => {
               add({
                 itemId: item.id,
@@ -176,13 +183,13 @@ function ItemSheetBody({
           </Button>
         </div>
       ) : (
-        <div className="sticky bottom-0 border-t border-border bg-popover/95 px-5 py-3.5 backdrop-blur text-center">
+        <div className="sticky bottom-0 border-t border-border bg-popover/95 px-5 py-3.5 text-center backdrop-blur">
           <p className="text-xs font-bold text-muted-foreground">
             {!orderingEnabled
               ? "Online ordering is currently closed outside working hours."
               : !item.available
-              ? "This dish is currently sold out."
-              : "Price to be confirmed."}
+                ? "This dish is currently sold out."
+                : "Price to be confirmed."}
           </p>
         </div>
       )}

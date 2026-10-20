@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { createCounterOrder } from "@/app/admin/(dashboard)/actions";
+import { createCounterOrder, findGuestByPhone } from "@/app/admin/(dashboard)/actions";
 import { type GuestOrder, getGuestOrders, placeOrder, syncSelection } from "@/app/selection-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -36,11 +36,13 @@ export function CartBar({
   items,
   addOns,
   counter = false,
+  counterGuest,
 }: {
   /** menu items and add-ons, so guests can change add-ons from the list */
   items: MenuItem[];
   addOns: AddOn[];
   counter?: boolean;
+  counterGuest?: { name: string; phone: string };
 }) {
   const useCart = useCartStore();
   const router = useRouter();
@@ -143,7 +145,7 @@ export function CartBar({
             <button
               type="button"
               onClick={openSheet}
-              className="mx-auto flex h-16 w-full max-w-xl items-center gap-3 rounded-full bg-[#0b3213] dark:bg-[#07240d] hover:bg-[#05220c] dark:hover:bg-[#051a09] pr-2.5 pl-5 text-left text-white shadow-[0_20px_40px_-12px_rgba(5,92,27,0.5)] ring-1 ring-white/15 transition-all active:scale-[0.99]"
+              className="mx-auto flex h-16 w-full max-w-xl items-center gap-3 rounded-full bg-[#0b3213] pr-2.5 pl-5 text-left text-white shadow-[0_20px_40px_-12px_rgba(5,92,27,0.5)] ring-1 ring-white/15 transition-all hover:bg-[#05220c] active:scale-[0.99] dark:bg-[#07240d] dark:hover:bg-[#051a09]"
             >
               {count > 0 ? (
                 <motion.span
@@ -177,7 +179,7 @@ export function CartBar({
                 </span>
               </span>
               {count > 0 && (
-                <span className="rounded-full bg-[#ea580c] hover:bg-[#c2410c] px-5 py-3 text-sm font-black text-white shadow-sm transition-colors">
+                <span className="rounded-full bg-[#ea580c] px-5 py-3 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#c2410c]">
                   View list
                 </span>
               )}
@@ -214,7 +216,7 @@ export function CartBar({
               kind={kind}
               count={count}
               counter={counter}
-              initial={counter ? null : guest}
+              initial={counter ? (counterGuest ?? null) : guest}
               lines={lines}
               onBack={() => setStep("list")}
               onPlaced={(order, details) => {
@@ -331,6 +333,30 @@ function DetailsStep({
   const [error, setError] = useState<{ message: string; problems?: string[] } | null>(null);
   const [pending, start] = useTransition();
   const phoneOk = counter && phone === "" ? true : INDIAN_MOBILE.test(phone);
+  // counter: a number the café already knows fills in the name, so returning guests aren't asked again
+  const [known, setKnown] = useState<{ phone: string; name: string; visits: number } | null>(null);
+  const autoName = useRef(initial?.name ?? "");
+  useEffect(() => {
+    if (!counter || !INDIAN_MOBILE.test(phone)) return;
+    let live = true;
+    void findGuestByPhone(phone)
+      .then((res) => {
+        if (!live || !res.ok || !res.guest) return;
+        const guest = res.guest;
+        setKnown({ phone, ...guest });
+        // only replace a name staff haven't typed themselves
+        setName((current) => {
+          if (current.trim() && current !== autoName.current) return current;
+          autoName.current = guest.name;
+          return guest.name;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [counter, phone]);
+  const returning = known && known.phone === phone ? known : null;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,6 +394,31 @@ function DetailsStep({
     });
   };
 
+  // at the counter the number comes first – it's how a returning guest is found
+  const phoneField = (
+    <div className="space-y-1.5">
+      <Label htmlFor="g-phone">{counter ? "Mobile number (optional)" : "Mobile number"}</Label>
+      <Input
+        id="g-phone"
+        type="tel"
+        inputMode="numeric"
+        autoComplete={counter ? "off" : "tel-national"}
+        maxLength={10}
+        placeholder="10-digit mobile"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+        aria-invalid={phone.length === 10 && !phoneOk}
+        required={!counter}
+        className="h-11"
+      />
+      {returning && (
+        <p className="text-sm text-brand-text">
+          Returning guest · {returning.visits} {returning.visits === 1 ? "visit" : "visits"}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <form onSubmit={submit} className="space-y-4 px-5 pt-6 pb-6">
       <div className="flex items-start gap-2">
@@ -381,12 +432,13 @@ function DetailsStep({
           <SheetDescription>
             {KIND_LABEL[kind]} · {count} item{count === 1 ? "" : "s"}.{" "}
             {counter
-              ? "The name is called out when the order is ready. The mobile number is optional."
+              ? "Enter the mobile number first – a returning guest's name fills in by itself. The number is optional."
               : "We use these to manage your order and call you when it's ready."}
           </SheetDescription>
         </div>
       </div>
 
+      {counter && phoneField}
       <div className="space-y-1.5">
         <Label htmlFor="g-name">{counter ? "Guest's name" : "Your name"}</Label>
         <Input
@@ -400,22 +452,7 @@ function DetailsStep({
           className="h-11"
         />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="g-phone">{counter ? "Mobile number (optional)" : "Mobile number"}</Label>
-        <Input
-          id="g-phone"
-          type="tel"
-          inputMode="numeric"
-          autoComplete={counter ? "off" : "tel-national"}
-          maxLength={10}
-          placeholder="10-digit mobile"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-          aria-invalid={phone.length === 10 && !phoneOk}
-          required={!counter}
-          className="h-11"
-        />
-      </div>
+      {!counter && phoneField}
       <div className="space-y-1.5">
         <Label htmlFor="g-note">Note to the kitchen (optional)</Label>
         <Textarea

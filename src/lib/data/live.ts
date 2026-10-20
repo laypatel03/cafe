@@ -1,6 +1,8 @@
 import "server-only";
 import type { OrderStatus, OrderType, Role, SelectionStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { startOfCafeDay } from "@/lib/format";
+import { type StatusLogEntry, stepToUndo } from "@/lib/order-flow";
 import { maskPhone } from "@/lib/phone-mask";
 import type { SelectionLine } from "@/lib/validators/selection";
 
@@ -21,7 +23,10 @@ export type LiveOrderItem = {
   name: string;
   quantity: number;
   addOns: { id: string; name: string }[];
+  unitPricePaise: number;
   lineTotalPaise: number;
+  /** "Other item" the owner typed in; a minus price is a discount */
+  custom: boolean;
 };
 
 export type LiveOrder = {
@@ -42,6 +47,8 @@ export type LiveOrder = {
   createdAt: string;
   /** placed before today and still not finished – left over from an earlier day */
   earlier: boolean;
+  /** the last step staff can take back ("Send to kitchen"), or null */
+  undo: string | null;
   items: LiveOrderItem[];
 };
 
@@ -61,10 +68,16 @@ export type LiveBoard = {
   selections: LiveSelection[];
   orders: LiveOrder[];
   bills: LiveBill[];
-  /** bills completed with "pay later", any day, still not paid */
+  /** bills completed with "pay later" today, still not paid (earlier days are in Order history) */
   payLater: LiveBill[];
   serverTime: string;
 };
+
+/** Matches undoOrderStep: a bill is made from served orders, so only a pickup can be taken back on one. */
+function undoLabel(o: { status: OrderStatus; billId: string | null; statusLogs: StatusLogEntry[] }) {
+  const step = stepToUndo(o.statusLogs, o.status);
+  return step && (!o.billId || step.from === "READY") ? step.label : null;
+}
 
 const OPEN: OrderStatus[] = ["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED"];
 
@@ -73,8 +86,7 @@ const OPEN: OrderStatus[] = ["NEW", "ACCEPTED", "PREPARING", "READY", "SERVED"];
  * from an earlier day that was never finished (so it can still be moved on, billed or cancelled).
  */
 export async function getLiveBoard(role: Role): Promise<LiveBoard> {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = startOfCafeDay();
   const [selections, orders, bills, payLater] = await Promise.all([
     db.selection.findMany({
       where: { status: { not: "CONFIRMED" }, updatedAt: { gt: new Date(Date.now() - 12 * 60 * 60 * 1000) } },
@@ -90,7 +102,14 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
         ],
       },
       orderBy: { createdAt: "desc" },
-      include: { items: true, bill: { select: { paidAt: true } } },
+      include: {
+        items: true,
+        bill: { select: { paidAt: true } },
+        statusLogs: {
+          orderBy: { createdAt: "asc" },
+          select: { fromStatus: true, toStatus: true, note: true },
+        },
+      },
     }),
     db.bill.findMany({
       where: { paidAt: null, voidedAt: null, payLaterAt: null },
@@ -100,7 +119,7 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       },
     }),
     db.bill.findMany({
-      where: { paidAt: null, voidedAt: null, payLaterAt: { not: null } },
+      where: { paidAt: null, voidedAt: null, payLaterAt: { gte: startOfDay } },
       orderBy: { payLaterAt: "asc" },
       include: {
         orders: { select: { number: true }, orderBy: { number: "asc" } },
@@ -141,13 +160,16 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       totalPaise: o.totalPaise,
       createdAt: o.createdAt.toISOString(),
       earlier: o.createdAt < startOfDay,
+      undo: undoLabel(o),
       items: o.items.map((i) => ({
         id: i.id,
         itemId: i.menuItemId,
         name: i.itemName,
         quantity: i.quantity,
         addOns: (i.addOns as { id: string; name: string }[]).map((a) => ({ id: a.id, name: a.name })),
+        unitPricePaise: i.unitPricePaise,
         lineTotalPaise: i.lineTotalPaise,
+        custom: i.custom,
       })),
     })),
     bills: bills.map(toLiveBill),

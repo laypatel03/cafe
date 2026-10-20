@@ -12,14 +12,13 @@ export const metadata: Metadata = {
 export default async function MenuPage({ searchParams }: PageProps<"/menu">) {
   const [{ item }, menu, cafe] = await Promise.all([searchParams, getPublicMenu(), getCafeDetails()]);
   const isWithinHours = isWithinWorkingHours(cafe.hours);
-  const isOrderingAllowed = cafe.orderingEnabled && isWithinHours;
 
   return (
     <MenuBrowser
       categories={menu.categories}
       items={menu.items}
       addOns={menu.addOns}
-      orderingEnabled={isOrderingAllowed}
+      orderingEnabled={cafe.orderingEnabled}
       isWithinHours={isWithinHours}
       hours={cafe.hours}
       initialItemId={typeof item === "string" ? item : undefined}

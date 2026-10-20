@@ -8,8 +8,10 @@ import {
   createStaff,
   resetStaffPassword,
   saveCafeDetails,
+  setBlogEnabled,
   setCustomerEdits,
   setOrderEdits,
+  setOrderingEnabled,
   setStaffActive,
 } from "@/app/admin/(dashboard)/settings/actions";
 import { ActionSwitch } from "@/components/admin/action-switch";
@@ -18,9 +20,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormAction } from "@/hooks/use-form-action";
+import { useOpenNow } from "@/hooks/use-open-now";
 import { CAFE_TZ } from "@/lib/format";
 
 type Cafe = {
@@ -32,9 +34,9 @@ type Cafe = {
   whatsapp: string;
   instagram: string;
   hours: { days: string; time: string }[];
-  orderingEnabled: boolean;
   todaysPickId: string;
 };
+type Switches = { orders: boolean; customers: boolean; ordering: boolean; blog: boolean };
 type Staff = {
   id: string;
   name: string;
@@ -54,7 +56,7 @@ export function SettingsScreen({
 }: {
   meId: string;
   cafe: Cafe;
-  edits: { orders: boolean; customers: boolean };
+  edits: Switches;
   staff: Staff[];
   items: { id: string; name: string }[];
 }) {
@@ -113,8 +115,47 @@ function Field({
 
 /* ------------------------------ editing ------------------------------ */
 
-function EditingPanel({ edits }: { edits: { orders: boolean; customers: boolean } }) {
-  const rows = [
+type SwitchRow = {
+  id: string;
+  title: string;
+  hint: string;
+  checked: boolean;
+  action: (on: boolean) => Promise<{ ok: true } | { error: string }>;
+  done: (on: boolean) => string;
+};
+
+function SwitchRows({ rows }: { rows: SwitchRow[] }) {
+  return rows.map((r) => (
+    <div key={r.id} className="flex items-center gap-3 rounded-2xl bg-secondary/60 p-3">
+      <div className="flex-1">
+        <p className="text-sm font-semibold">{r.title}</p>
+        <p className="text-xs text-muted-foreground">{r.hint}</p>
+      </div>
+      <ActionSwitch checked={r.checked} action={r.action} label={r.title} successMessage={r.done} />
+    </div>
+  ));
+}
+
+function EditingPanel({ edits }: { edits: Switches }) {
+  const site: SwitchRow[] = [
+    {
+      id: "ordering",
+      title: "Guests can make lists",
+      hint: "Off = the QR menu is view-only, with a note to order at the counter.",
+      checked: edits.ordering,
+      action: setOrderingEnabled,
+      done: (on) => (on ? "Guests can make lists again" : "The QR menu is view-only now"),
+    },
+    {
+      id: "blog",
+      title: "Show the blog",
+      hint: "Off = the Blog pages and links are hidden from guests. You can still preview them while logged in.",
+      checked: edits.blog,
+      action: setBlogEnabled,
+      done: (on) => (on ? "The blog is live on the website" : "The blog is hidden from guests"),
+    },
+  ];
+  const rows: SwitchRow[] = [
     {
       id: "orders",
       title: "Add and edit orders",
@@ -133,22 +174,32 @@ function EditingPanel({ edits }: { edits: { orders: boolean; customers: boolean 
     },
   ];
   return (
-    <section className="space-y-3 rounded-3xl border border-border bg-card p-5">
-      <p className="text-sm text-muted-foreground">
-        Keep these off day to day so past records can&apos;t be changed by mistake. Turn one on when you need
-        to fix something, then turn it off again. Only owners can edit, and every change is noted in the
-        order&apos;s history.
-      </p>
-      {rows.map((r) => (
-        <div key={r.id} className="flex items-center gap-3 rounded-2xl bg-secondary/60 p-3">
-          <div className="flex-1">
-            <p className="text-sm font-semibold">{r.title}</p>
-            <p className="text-xs text-muted-foreground">{r.hint}</p>
-          </div>
-          <ActionSwitch checked={r.checked} action={r.action} label={r.title} successMessage={r.done} />
+    <div className="space-y-4">
+      <section aria-labelledby="site-h" className="space-y-3 rounded-3xl border border-border bg-card p-5">
+        <div>
+          <h2 id="site-h" className="font-semibold">
+            Website and QR menu
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            What guests can see and do. Changes apply straight away.
+          </p>
         </div>
-      ))}
-    </section>
+        <SwitchRows rows={site} />
+      </section>
+      <section aria-labelledby="records-h" className="space-y-3 rounded-3xl border border-border bg-card p-5">
+        <div>
+          <h2 id="records-h" className="font-semibold">
+            Fixing past records
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Keep these off day to day so past records can&apos;t be changed by mistake. Turn one on when you
+            need to fix something, then turn it off again. Only owners can edit, and every change is noted in
+            the order&apos;s history.
+          </p>
+        </div>
+        <SwitchRows rows={rows} />
+      </section>
+    </div>
   );
 }
 
@@ -157,6 +208,8 @@ function EditingPanel({ edits }: { edits: { orders: boolean; customers: boolean 
 function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: string }[] }) {
   const [state, onSubmit, pending] = useFormAction(saveCafeDetails, undefined);
   const [hours, setHours] = useState(cafe.hours.length ? cafe.hours : [{ days: "", time: "" }]);
+  // from the saved hours (the page reloads them after a save)
+  const openNow = useOpenNow(cafe.hours);
   const err = state?.fieldErrors ?? {};
   useEffect(() => {
     if (state?.ok) toast.success("Café details saved – the website is updated");
@@ -165,23 +218,6 @@ function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: stri
 
   return (
     <form onSubmit={onSubmit} className="space-y-5 rounded-3xl border border-border bg-card p-5">
-      <div className="flex items-center gap-3 rounded-2xl bg-secondary/60 p-3">
-        <div className="flex-1">
-          <Label htmlFor="orderingEnabled" className="text-sm font-semibold">
-            Guests can make lists
-          </Label>
-          <p id="orderingEnabled-hint" className="text-xs text-muted-foreground">
-            Off = the QR menu is view-only, with a note to order at the counter.
-          </p>
-        </div>
-        <Switch
-          id="orderingEnabled"
-          name="orderingEnabled"
-          defaultChecked={cafe.orderingEnabled}
-          aria-describedby="orderingEnabled-hint"
-        />
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="name" label="Café name" error={err.name}>
           <Input
@@ -257,6 +293,18 @@ function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: stri
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Opening hours</legend>
+        <p className="text-xs text-muted-foreground">
+          Guests can order on the QR menu only inside these hours (counter orders work any time). Write days
+          like &ldquo;Mon – Sat&rdquo;, &ldquo;Sunday&rdquo; or &ldquo;Daily&rdquo;, and times like
+          &ldquo;7:30 am – 10:30 pm&rdquo;, &ldquo;8 am – 2 pm, 5 pm – 10 pm&rdquo; or &ldquo;Closed&rdquo;.
+        </p>
+        {cafe.hours.length > 0 && (
+          <p role="status" className="text-sm font-medium">
+            {openNow
+              ? "By the saved hours, guests can order right now."
+              : "By the saved hours, the QR menu is closed for orders right now."}
+          </p>
+        )}
         {hours.map((h, i) => (
           <div key={i} className="flex gap-2">
             <Input
@@ -295,6 +343,7 @@ function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: stri
             <Plus data-icon="inline-start" /> Add row
           </Button>
         )}
+        {err.hours && <p className="text-xs text-destructive">{err.hours}</p>}
       </fieldset>
 
       <Field

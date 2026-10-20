@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, Plus, Sparkles, Zap } from "lucide-react";
+import { Flame, Plus, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { VegMark } from "@/components/brand/veg-mark";
 import { formatINR } from "@/lib/format";
@@ -28,8 +28,8 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       whileTap={soldOut ? undefined : { scale: 0.99 }}
       className={cn(
-        "group relative flex flex-col sm:flex-row rounded-2xl p-4 border border-[#cde5d3] dark:border-[#24392b] bg-white dark:bg-[#16251b] shadow-sm hover:shadow-lg hover:border-[#055c1b]/40 dark:hover:border-[#7ddc78]/40 transition-all duration-300 gap-4",
-        soldOut && "opacity-65"
+        "group relative flex flex-col gap-4 rounded-2xl border border-[#cde5d3] bg-white p-4 shadow-sm transition-all duration-300 hover:border-[#055c1b]/40 hover:shadow-lg sm:flex-row dark:border-[#24392b] dark:bg-[#16251b] dark:hover:border-[#7ddc78]/40",
+        soldOut && "opacity-65",
       )}
     >
       {/* Invisible backdrop button for card click */}
@@ -41,11 +41,11 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
       />
 
       {/* Food Image Container */}
-      <div className="relative w-full sm:w-44 h-44 shrink-0 overflow-hidden rounded-xl bg-[#e2efe5] dark:bg-[#1f3325] pointer-events-none">
+      <div className="pointer-events-none relative h-44 w-full shrink-0 overflow-hidden rounded-xl bg-[#e2efe5] sm:w-44 dark:bg-[#1f3325]">
         <ItemImage
           item={item}
           sizes="(min-width: 640px) 176px, 100vw"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
 
         {/* Top-Left: Standard Pure Veg Mark */}
@@ -56,26 +56,26 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
         {/* Top-Right: Bestseller Tag */}
         {isBestseller && (
           <div className="absolute top-2.5 right-2.5 z-10">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#ea580c] text-white font-black text-[10px] uppercase tracking-wider shadow-sm">
+            <span className="inline-flex items-center rounded-full bg-[#ea580c] px-2.5 py-0.5 text-[10px] font-black tracking-wider text-white uppercase shadow-sm">
               Bestseller
             </span>
           </div>
         )}
 
-        {/* Bottom-Left: High Protein Tag (Non-overlapping with top tags) */}
+        {/* Bottom-left: protein tag (non-overlapping with top tags) */}
         {isHighProt && (
           <div className="absolute bottom-2.5 left-2.5 z-10">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#055c1b] text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#055c1b] px-2.5 py-0.5 text-[10px] font-black tracking-wider text-white uppercase shadow-sm">
               <Zap className="size-2.5 fill-current" aria-hidden />
-              <span>{item.protein >= 25 ? `Super ${item.protein}g+` : `${item.protein}g Prot`}</span>
+              <span>~{item.protein} g protein</span>
             </span>
           </div>
         )}
 
         {/* Sold out overlay */}
         {soldOut && (
-          <div className="absolute inset-0 bg-[#0f1f15]/70 backdrop-blur-xs flex items-center justify-center z-20">
-            <span className="px-3 py-1 rounded-full bg-white dark:bg-[#16251b] text-[#0f1f15] dark:text-[#eef5ef] text-xs font-black shadow-md">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0f1f15]/70 backdrop-blur-xs">
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#0f1f15] shadow-md dark:bg-[#16251b] dark:text-[#eef5ef]">
               Sold out
             </span>
           </div>
@@ -83,21 +83,21 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
       </div>
 
       {/* Content & Details */}
-      <div className="flex flex-col justify-between flex-1 gap-2.5 min-w-0 z-10">
+      <div className="z-10 flex min-w-0 flex-1 flex-col justify-between gap-2.5">
         <div className="flex flex-col">
           {item.ingredients.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-[#055c1b] dark:text-[#7ddc78] uppercase tracking-wider truncate">
+              <span className="truncate text-[11px] font-bold tracking-wider text-[#055c1b] uppercase dark:text-[#7ddc78]">
                 {item.ingredients.slice(0, 3).join(" · ")}
               </span>
             </div>
           )}
 
-          <h3 className="text-base sm:text-lg font-black text-[#0f1f15] dark:text-[#eef5ef] leading-snug mt-0.5 group-hover:text-[#055c1b] dark:group-hover:text-[#7ddc78] transition-colors">
+          <h3 className="mt-0.5 text-base leading-snug font-black text-[#0f1f15] transition-colors group-hover:text-[#055c1b] sm:text-lg dark:text-[#eef5ef] dark:group-hover:text-[#7ddc78]">
             {item.name}
           </h3>
 
-          <p className="text-xs sm:text-sm font-medium text-[#334b3c] dark:text-[#a7b8ac] leading-relaxed mt-1 line-clamp-2">
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed font-medium text-[#334b3c] sm:text-sm dark:text-[#a7b8ac]">
             {item.description}
           </p>
         </div>
@@ -106,17 +106,17 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
         {hasNutrition(item) && (
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {item.protein > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#055c1b] text-white text-xs font-black shadow-xs">
-                <Zap className="size-3.5 fill-current" /> {item.protein}g Protein
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#055c1b] px-2.5 py-1 text-xs font-black text-white shadow-xs">
+                <Zap className="size-3.5 fill-current" /> ~{item.protein}g protein
               </span>
             )}
             {item.kcal > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#f1f5f2] dark:bg-[#1d3325] border border-[#d6e3d9] dark:border-[#2b4334] text-[#1c2e23] dark:text-[#eef5ef] text-xs font-extrabold">
-                <Flame className="size-3.5 text-[#ea580c] fill-[#ea580c]" /> {item.kcal} kcal
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#d6e3d9] bg-[#f1f5f2] px-2.5 py-1 text-xs font-extrabold text-[#1c2e23] dark:border-[#2b4334] dark:bg-[#1d3325] dark:text-[#eef5ef]">
+                <Flame className="size-3.5 fill-[#ea580c] text-[#ea580c]" /> ~{item.kcal} kcal
               </span>
             )}
             {item.ingredients.length > 0 && (
-              <span className="hidden md:inline-flex px-2 py-0.5 rounded-full bg-[#e8f4ec] dark:bg-[#1f3325] text-[#22382a] dark:text-[#cde5d3] text-[11px] font-bold">
+              <span className="hidden rounded-full bg-[#e8f4ec] px-2 py-0.5 text-[11px] font-bold text-[#22382a] md:inline-flex dark:bg-[#1f3325] dark:text-[#cde5d3]">
                 {item.ingredients.slice(0, 2).join(" · ")}
               </span>
             )}
@@ -124,16 +124,16 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
         )}
 
         {/* Price & Action Row */}
-        <div className="flex items-center justify-between pt-2.5 border-t border-[#e8f1ea] dark:border-[#24392b] mt-auto">
+        <div className="mt-auto flex items-center justify-between border-t border-[#e8f1ea] pt-2.5 dark:border-[#24392b]">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-black text-[#0f1f15] dark:text-[#eef5ef] tabular">
+            <span className="tabular text-xl font-black text-[#0f1f15] dark:text-[#eef5ef]">
               {formatINR(item.price)}
             </span>
           </div>
 
           <div className="z-20">
             {soldOut ? (
-              <span className="px-3 py-1.5 rounded-full bg-[#f1f5f2] dark:bg-[#1d3325] text-[#64796c] dark:text-[#a7b8ac] text-xs font-bold">
+              <span className="rounded-full bg-[#f1f5f2] px-3 py-1.5 text-xs font-bold text-[#64796c] dark:bg-[#1d3325] dark:text-[#a7b8ac]">
                 Unavailable
               </span>
             ) : orderingEnabled ? (
@@ -143,17 +143,17 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
                   e.stopPropagation();
                   onOpen(item);
                 }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#ea580c] hover:bg-[#c2410c] text-white font-extrabold text-xs shadow-sm hover:shadow active:scale-95 transition-all cursor-pointer"
+                className="flex cursor-pointer items-center gap-1.5 rounded-full bg-[#ea580c] px-4 py-2 text-xs font-extrabold text-white shadow-sm transition-all hover:bg-[#c2410c] hover:shadow active:scale-95"
                 aria-label={`Add ${item.name}`}
               >
                 <Plus className="size-4 text-white" aria-hidden />
-                <span className="text-white font-extrabold">Add</span>
+                <span className="font-extrabold text-white">Add</span>
               </button>
             ) : (
               <button
                 type="button"
                 disabled
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#e8f1ea] dark:bg-[#1e2e22] text-[#819988] dark:text-[#5d7363] font-bold text-xs cursor-not-allowed select-none border border-[#d2e2d6] dark:border-[#283d2e] opacity-80"
+                className="flex cursor-not-allowed items-center gap-1.5 rounded-full border border-[#d2e2d6] bg-[#e8f1ea] px-3.5 py-1.5 text-xs font-bold text-[#819988] opacity-80 select-none dark:border-[#283d2e] dark:bg-[#1e2e22] dark:text-[#5d7363]"
                 aria-label={`${item.name} – Ordering closed outside working hours`}
                 title="Ordering is closed outside working hours"
               >

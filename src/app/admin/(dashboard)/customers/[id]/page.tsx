@@ -1,4 +1,4 @@
-import { ArrowLeft, ReceiptText } from "lucide-react";
+import { ArrowLeft, CircleAlert, Plus, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { favouriteItems } from "@/lib/customer-stats";
 import { getEditSwitches } from "@/lib/data/edit-switches";
+import { owedByCustomer } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
@@ -29,7 +30,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const customer = await db.customer.findUnique({ where: { id } });
   if (!customer) notFound();
 
-  const [orders, lines, orderTotal, switches] = await Promise.all([
+  const [orders, lines, orderTotal, switches, owedMap] = await Promise.all([
     db.order.findMany({
       where: { customerId: id },
       orderBy: { createdAt: "desc" },
@@ -37,12 +38,15 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
       include: { items: { select: { itemName: true, quantity: true } }, bill: { select: { number: true } } },
     }),
     db.orderItem.findMany({
-      where: { order: { customerId: id } },
+      // other items (discounts and such) aren't dishes, so they're never a favourite
+      where: { order: { customerId: id }, custom: false },
       select: { itemName: true, quantity: true, order: { select: { status: true } } },
     }),
     db.order.count({ where: { customerId: id } }),
     getEditSwitches(),
+    owedByCustomer([id]),
   ]);
+  const owes = owedMap.get(id);
   const favourites = favouriteItems(lines.map((l) => ({ ...l, status: l.order.status })));
   const average = customer.orderCount > 0 ? Math.round(customer.totalSpendPaise / customer.orderCount) : 0;
 
@@ -65,6 +69,14 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Button
+            asChild
+            className="rounded-full bg-cta font-bold text-cta-foreground hover:bg-hh-orange-light"
+          >
+            <Link href={`/admin/counter-order?customer=${customer.id}`}>
+              <Plus data-icon="inline-start" /> New order
+            </Link>
+          </Button>
           {switches.customers && (
             <EditCustomerButton
               customer={{
@@ -87,6 +99,24 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           )}
         </div>
       </div>
+
+      {owes && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-3xl border border-hh-orange/40 bg-hh-orange/10 px-4 py-3"
+        >
+          <CircleAlert className="size-5 shrink-0 text-brand-text" aria-hidden />
+          <p className="flex-1 text-sm">
+            <span className="font-semibold">
+              Still to pay: <span className="tabular">{formatINR(toRupees(owes.paise))}</span>
+            </span>{" "}
+            · {owes.orders} unpaid {owes.orders === 1 ? "order" : "orders"} from earlier days or on pay later
+          </p>
+          <Button asChild size="sm" variant="outline" className="rounded-full">
+            <Link href={`/admin/orders?q=${customer.phone}&pay=PENDING`}>Show unpaid orders</Link>
+          </Button>
+        </div>
+      )}
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[

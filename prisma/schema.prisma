@@ -214,6 +214,8 @@ model OrderItem {
   quantity       Int
   addOns         Json      @default("[]") // [{ id, name, pricePaise }]
   lineTotalPaise Int
+  // "Other item" the owner typed in instead of a dish – a negative price is a discount
+  custom         Boolean   @default(false)
 }
 
 model OrderStatusLog {
@@ -265,6 +267,8 @@ model CafeSettings {
   instagram        String   @default("")
   hours            Json     @default("[]") // [{ days, time }]
   orderingEnabled  Boolean  @default(true)
+  // the public Blog pages and links; off = hidden from guests (staff who are logged in can still preview)
+  blogEnabled      Boolean  @default(false)
   taxBasisPoints   Int      @default(0) // 500 = 5 %
   todaysPickId     String?
   // what the card machine provider keeps, in basis points (180 = 1.8 %); taken off profit in the money book

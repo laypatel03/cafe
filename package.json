@@ -17,6 +17,7 @@
     "postinstall": "prisma generate",
     "staff:add": "tsx scripts/add-staff.ts",
     "menu:load": "tsx scripts/load-menu.ts",
+    "db:demo": "tsx scripts/demo-data.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm lint && pnpm test",

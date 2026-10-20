@@ -133,6 +133,12 @@ Phase 0 is added in front of the doc's five phases so the look and the 3D are ag
 
 2A shipped a list-only version (guests pick, staff see it). The owner then clarified the core flow: **staff see picks live → guest taps Confirm (done selecting) → cashier confirms at the table with the guest's name + phone → kitchen → served → cashier bill → paid**. "Keep it simple" only ever meant minor extras. Live updates: Server-Sent Events backed by Postgres LISTEN/NOTIFY (no separate socket server; works across processes). Decisions: the cashier (not the guest) enters name + phone, no tax for now (Settings switch later), one bill per table visit, customers never see totals. Deferred minor extras: thermal KOT printing, discounts, reports, WhatsApp updates, online payment.
 
+18 Oct: thank-you/receipt SMS (P2B-11) switched on – sent by staff from the counter phone via an `sms:` link (free, no provider, no DLT). Automatic sending stays in Later.
+
+18 Oct: returning guests at the counter are found by mobile number (name fills in; a typed name wins). The owner can start a counter order from a customer's page; staff can't open it with a customer preselected, since they only ever see masked numbers.
+
+19 Oct: no nutrition claims we can't back up – protein and calories are the café's own estimates from the ingredients (owner). The site says so wherever numbers appear, uses plain numbers instead of "High protein"/"Light", and avoids health, certification and ingredient-sourcing claims. Not legal advice: worth a quick check by someone who knows FSSAI rules before launch.
+
 ### Phase 2 – Customer site
 - Landing page: 3D hero + scroll story, Today's Pick, promise points, bestsellers (from DB), Visit us, footer, SEO metadata + OG image.
 - QR menu `/menu` and `/t/[table]`: category tabs, filters (High protein, Light, Bestseller), search, item cards, detail sheet with add-ons/qty, sticky cart, nutrition note, dark mode, view-only mode.
@@ -181,4 +187,6 @@ Resolved: brand colours (new green/orange brand, 4 Oct 2026); dine-in needs name
 | Is there a thermal printer at the counter or in the kitchen? | Kitchen tickets and the receipt size |
 | How many staff logins are needed at launch? | Setting up staff accounts |
 | The web address (domain) and the opening date | Going live, and the launch timeline |
+| The café's FSSAI licence (or registration) number | Showing it on the website, menu and bills (P2-14) |
+| Keep the tagline "Protein from real food"? "Real", "pure", "fresh" and "natural" are words FSSAI's advertising rules restrict | Final wording on the home page and PDF menu |
 | For the home-page 3D dish: scan one of our own dishes, or use a free online model with a credit line? | The real-looking 3D dish |

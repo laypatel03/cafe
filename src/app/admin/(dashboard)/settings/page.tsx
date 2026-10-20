@@ -38,10 +38,14 @@ export default async function SettingsPage() {
         whatsapp: settings.whatsapp,
         instagram: settings.instagram,
         hours: (settings.hours as { days: string; time: string }[]) ?? [],
-        orderingEnabled: settings.orderingEnabled,
         todaysPickId: settings.todaysPickId ?? "",
       }}
-      edits={{ orders: settings.orderEditsEnabled, customers: settings.customerEditsEnabled }}
+      edits={{
+        orders: settings.orderEditsEnabled,
+        customers: settings.customerEditsEnabled,
+        ordering: settings.orderingEnabled,
+        blog: settings.blogEnabled,
+      }}
       staff={staff.map((s) => ({ ...s, lastLoginAt: s.lastLoginAt?.toISOString() ?? null }))}
       items={items}
     />

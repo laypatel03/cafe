@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CustomLinesSchema } from "@/lib/custom-lines";
 import { fromCafeInput } from "@/lib/order-edit";
 import { PAY_CHOICES } from "@/lib/payments";
 import { MAX_LINE_QUANTITY } from "@/lib/pricing";
@@ -44,7 +45,6 @@ const EditLinesSchema = z
     }),
   )
   .max(40)
-  .min(1, "Add at least one item")
   .transform((lines) =>
     lines.map(({ unitPrice, ...l }) => ({
       ...l,
@@ -59,6 +59,8 @@ const fields = {
   phone: optionalPhone,
   note: z.string().trim().max(200, "Keep the note under 200 characters").default(""),
   items: EditLinesSchema,
+  /** "Other item" lines the owner typed in; a minus price is a discount */
+  others: CustomLinesSchema,
 };
 
 /** An order that already happened and was paid, added from Order history. */

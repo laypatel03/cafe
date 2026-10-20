@@ -1,24 +1,17 @@
-import { formatINR } from "@/lib/format";
-import { toRupees } from "@/lib/money";
-import { PAYMENT_SHORT } from "@/lib/payments";
-
-// The receipt text a guest gets by SMS once their bill is paid. Staff send it from the
+// The thank-you text a guest gets by SMS once their bill is paid. Staff send it from the
 // counter phone's own messages app (an sms: link), so it costs nothing. Pure, so it's unit-tested.
 
 /**
- * Switched off for now (owner, 8 Oct 2026) – texting receipts comes later. Set to `true` to show
+ * Switched on by the owner, 18 Oct 2026 (built 8 Oct). Set to `false` to hide
  * the "Text the receipt" box after payment and the "Text receipt" button in order history.
  */
-export const RECEIPT_SMS_ENABLED = false;
+export const RECEIPT_SMS_ENABLED = true;
 
-export function receiptMessage(bill: {
-  cafeName: string;
-  number: number;
-  totalPaise: number;
-  paymentMethod: keyof typeof PAYMENT_SHORT | null;
-}) {
-  const paid = bill.paymentMethod ? ` paid by ${PAYMENT_SHORT[bill.paymentMethod]}` : " paid";
-  return `Thank you for visiting ${bill.cafeName}! Bill #${bill.number} – ${formatINR(toRupees(bill.totalPaise))}${paid}. See you again soon.`;
+const REVIEW_URL = "https://g.page/r/Cb44MqB8wgCAEBM/review";
+const SITE = "healthyhungercafe.com";
+
+export function receiptMessage(bill: { cafeName: string }) {
+  return `Thank you for visiting ${bill.cafeName}! 🥗 Enjoyed your meal? Please leave us a quick review: ${REVIEW_URL} · Menu: ${SITE}`;
 }
 
 /**
