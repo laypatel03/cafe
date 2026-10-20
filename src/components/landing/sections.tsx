@@ -499,13 +499,6 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
                   sizes="(min-width: 1024px) 40vw, 100vw"
                   className="object-cover"
                 />
-                {/* Bottom Floating Badge */}
-                <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-full border border-[#055c1b]/20 bg-white/95 px-3.5 py-1.5 shadow-md backdrop-blur-md dark:bg-[#0e1a12]/95">
-                  <VegMark className="size-4" />
-                  <span className="text-xs font-extrabold tracking-wider text-[#055c1b] uppercase dark:text-[#7ddc78]">
-                    100% Vegetarian
-                  </span>
-                </div>
               </div>
             </div>
           </div>

@@ -27,62 +27,52 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
 
   return (
     <footer id="footer" className="border-t border-white/10 bg-[#07240d] text-white dark:bg-[#041307]">
-      <div className="mx-auto max-w-7xl px-4 pt-16 pb-12 sm:px-6 lg:px-8">
-        {/* Main 4-Column Grid */}
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4 lg:gap-12">
-          {/* Column 1: Brand & Ethos */}
+      <div className="mx-auto max-w-7xl px-4 pt-10 pb-8 sm:px-6 lg:px-8">
+        {/* Main 4-Column Grid: Brand, Explore (first nav), Location, Contact */}
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4 lg:gap-10">
+          {/* Column 1: Brand */}
           <div className="flex flex-col">
             <Link href="/" className="inline-flex items-center group" aria-label="Healthy Hunger – Home">
-              <LogoIcon className="h-14 w-auto transition-transform duration-200 group-hover:scale-105 select-none" alt="Healthy Hunger" />
+              <LogoIcon className="h-12 w-auto transition-transform duration-200 group-hover:scale-105 select-none" alt="Healthy Hunger" />
             </Link>
-            <p className="mt-4 text-xs leading-relaxed text-white/75">
-              A 100% vegetarian café in Bilimora. Mindfully prepared real-food meals, protein-rich bowls,
-              fresh sourdough melts, and guilt-free street chaats.
+            <p className="mt-3 text-xs leading-relaxed text-white/75">
+              Mindfully prepared real-food meals, protein-rich bowls, fresh sourdough melts, and guilt-free street chaats in Bilimora.
             </p>
-
-            {/* Social & Chat Icons */}
-            <div className="mt-6 flex items-center gap-2.5">
-              {cafe.whatsapp && (
-                <a
-                  href={`https://wa.me/${cafe.whatsapp}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Order on WhatsApp"
-                  className="flex size-10 items-center justify-center rounded-xl bg-white/10 text-emerald-400 transition-all hover:bg-emerald-600 hover:text-white hover:scale-105"
-                  title="Chat on WhatsApp"
-                >
-                  <WhatsAppIcon className="size-5" />
-                </a>
-              )}
-              {cafe.instagram && (
-                <a
-                  href={`https://instagram.com/${cafe.instagram}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Follow on Instagram"
-                  className="flex size-10 items-center justify-center rounded-xl bg-white/10 text-pink-400 transition-all hover:bg-gradient-to-tr hover:from-amber-500 hover:via-pink-500 hover:to-purple-600 hover:text-white hover:scale-105"
-                  title="Follow on Instagram"
-                >
-                  <InstagramIcon className="size-5" />
-                </a>
-              )}
-              {cafe.phone && (
-                <a
-                  href={`tel:${cafe.phone.replace(/\s/g, "")}`}
-                  aria-label="Call Café"
-                  className="flex size-10 items-center justify-center rounded-xl bg-white/10 text-white/90 transition-all hover:bg-[#055c1b] hover:text-white hover:scale-105"
-                  title="Call Café"
-                >
-                  <Phone className="size-4.5" />
-                </a>
-              )}
-            </div>
           </div>
 
-          {/* Column 2: Café Location */}
+          {/* Column 2: Explore (Placed First) */}
           <div className="flex flex-col">
-            <div className="flex items-center gap-2 text-sm font-black tracking-wider text-[#ffb900] uppercase">
-              <MapPin className="size-4" />
+            <div className="text-xs font-black tracking-wider text-[#ffb900] uppercase">
+              <span>Explore</span>
+            </div>
+            <nav className="mt-3 flex flex-col space-y-2 text-xs font-semibold text-white/85">
+              <Link href="/menu" className="transition-colors hover:text-[#ffb900]">
+                Full Menu & Prices
+              </Link>
+              <Link href="/#promise" className="transition-colors hover:text-[#ffb900]">
+                Our Promise & Food Standard
+              </Link>
+              <Link href="/#visit" className="transition-colors hover:text-[#ffb900]">
+                Dine-In Space & Ambiance
+              </Link>
+              {cafe.blogEnabled && (
+                <Link href="/blog" className="inline-flex items-center gap-1.5 transition-colors hover:text-[#ffb900]">
+                  <span>Blog & Nutrition Stories</span>
+                  <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
+                    New
+                  </span>
+                </Link>
+              )}
+              <Link href="/privacy" className="transition-colors hover:text-[#ffb900]">
+                Privacy & Allergen Policy
+              </Link>
+            </nav>
+          </div>
+
+          {/* Column 3: Café Location */}
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5 text-xs font-black tracking-wider text-[#ffb900] uppercase">
+              <MapPin className="size-3.5" />
               <span>Café Location</span>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-white/80">
@@ -93,7 +83,7 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
                 href={cafe.mapUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 transition-colors hover:text-emerald-300 hover:underline"
+                className="mt-2.5 inline-flex items-center gap-1 text-xs font-bold text-emerald-400 transition-colors hover:text-emerald-300 hover:underline"
               >
                 <span>Get Directions on Maps</span>
                 <ArrowUpRight className="size-3.5" />
@@ -101,13 +91,13 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
             )}
           </div>
 
-          {/* Column 3: Contact & Orders */}
+          {/* Column 4: Contact & Orders */}
           <div className="flex flex-col">
-            <div className="flex items-center gap-2 text-sm font-black tracking-wider text-[#ffb900] uppercase">
-              <Phone className="size-4" />
+            <div className="flex items-center gap-1.5 text-xs font-black tracking-wider text-[#ffb900] uppercase">
+              <Phone className="size-3.5" />
               <span>Contact & Orders</span>
             </div>
-            <div className="mt-3 space-y-3.5 text-xs">
+            <div className="mt-3 space-y-2.5 text-xs">
               {cafe.whatsapp && (
                 <div>
                   <span className="block text-[11px] font-medium text-white/60">WhatsApp Order:</span>
@@ -150,41 +140,12 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
               )}
             </div>
           </div>
-
-          {/* Column 4: Explore & Story */}
-          <div className="flex flex-col">
-            <div className="text-sm font-black tracking-wider text-[#ffb900] uppercase">
-              <span>Explore</span>
-            </div>
-            <nav className="mt-3 flex flex-col space-y-2.5 text-xs font-semibold text-white/85">
-              <Link href="/menu" className="transition-colors hover:text-[#ffb900]">
-                Full Menu & Prices
-              </Link>
-              <Link href="/#promise" className="transition-colors hover:text-[#ffb900]">
-                Our Promise & Food Standard
-              </Link>
-              <Link href="/#visit" className="transition-colors hover:text-[#ffb900]">
-                Dine-In Space & Ambiance
-              </Link>
-              {cafe.blogEnabled && (
-                <Link href="/blog" className="inline-flex items-center gap-1.5 transition-colors hover:text-[#ffb900]">
-                  <span>Blog & Nutrition Stories</span>
-                  <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
-                    New
-                  </span>
-                </Link>
-              )}
-              <Link href="/privacy" className="transition-colors hover:text-[#ffb900]">
-                Privacy & Allergen Policy
-              </Link>
-            </nav>
-          </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Note */}
-        <div className="mt-14 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 text-center sm:flex-row sm:text-left text-xs font-medium text-white/60">
+        {/* Bottom Bar: Copyright */}
+        <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-white/10 pt-4 text-center sm:flex-row sm:text-left text-xs font-medium text-white/60">
           <div>
-            © {new Date().getFullYear()} {cafe.name || "Healthy Hunger"}. 100% Vegetarian Café · All rights reserved.
+            © {new Date().getFullYear()} {cafe.name || "Healthy Hunger"}. All rights reserved.
           </div>
         </div>
       </div>
