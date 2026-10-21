@@ -4,6 +4,7 @@
 
 Café landing page + phone-first QR menu + staff dashboard. One Next.js app, PostgreSQL.
 Scope: `doc/goal` · Phases & design: `doc/PLAN.md` · **Work queue: `doc/TASKS.md`** (do one task per session).
+**Find code via `doc/INDEX.md`** (routes, actions, lib modules, topic → files) and behaviour rules via `doc/USER-STORIES.md` before grepping; open only the files they list. Update both when you add/move modules or change behaviour.
 
 ## Stack
 Next.js 16 (App Router, RSC, `src/proxy.ts` not middleware) · React 19 · TypeScript strict · Tailwind v4 (tokens in `src/app/globals.css`) · shadcn/ui (radix-nova, `src/components/ui`) · Motion · zustand (cart) · Zod 4 · Prisma 7 + `@prisma/adapter-pg` (client generated to `src/generated/prisma` – never edit) · jose JWT sessions + argon2 · sharp.

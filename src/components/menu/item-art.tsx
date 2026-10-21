@@ -1,5 +1,5 @@
 import { Citrus, CupSoda, GlassWater, Salad, Sandwich, Snowflake, Soup, Sparkles, Wheat } from "lucide-react";
-import Image from "next/image";
+import { FadeImage } from "@/components/brand/fade-image";
 import type { CategorySlug } from "@/lib/menu-types";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,10 @@ export function ItemArt({ category, className }: { category: CategorySlug; class
       style={{ background: `linear-gradient(140deg, ${a.from}, ${a.to})` }}
     >
       <div className="absolute -top-1/3 -right-1/4 size-[90%] rounded-full bg-white/15 blur-xl" />
-      <a.icon className="relative size-1/2 max-h-16 max-w-16 text-white/90 drop-shadow-md" strokeWidth={1.5} />
+      <a.icon
+        className="relative size-1/2 max-h-16 max-w-16 text-white/90 drop-shadow-md"
+        strokeWidth={1.5}
+      />
     </div>
   );
 }
@@ -48,10 +51,9 @@ export function ItemImage({
   if (!item.photo) return <ItemArt category={item.category} className={className} />;
   return (
     <div className={cn("relative overflow-hidden bg-muted", className)}>
-      <Image
+      <FadeImage
         src={item.photo}
         alt={item.name}
-        fill
         sizes={sizes}
         priority={priority}
         className="object-cover"

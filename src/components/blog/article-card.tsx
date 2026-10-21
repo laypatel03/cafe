@@ -1,7 +1,7 @@
 import { ArrowRight, Dumbbell, Flame } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { VegMark } from "@/components/brand/veg-mark";
+import { FadeImage } from "@/components/brand/fade-image";
 import { ItemImage } from "@/components/menu/item-art";
 import { type Article, articleDate } from "@/lib/articles";
 import type { MenuItem } from "@/lib/menu-types";
@@ -14,13 +14,12 @@ export function ArticleCard({ article: a, priority }: { article: Article; priori
       className="group flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card transition-transform hover:-translate-y-1"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-muted">
-        <Image
+        <FadeImage
           src={a.cover.src}
           alt={a.cover.alt}
-          fill
           priority={priority}
           sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-[opacity,transform] duration-500 group-hover:scale-105"
         />
       </div>
       <div className="flex flex-1 flex-col p-5">
