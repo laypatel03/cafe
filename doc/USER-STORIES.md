@@ -43,7 +43,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **G-07 – Honest nutrition numbers**
 *As a guest I want to know where the protein/calorie numbers come from so that I can trust them.*
-- Rules: numbers are the café's own estimates from ingredients – say so wherever they appear (`NUTRITION_NOTE`); no health, certification or sourcing claims; allergy note points to staff.
+- Rules: numbers are the café's own estimates from ingredients – say so wherever they appear (`NUTRITION_NOTE`); no health, certification or sourcing claims; allergy note points to staff; photos are "for reference only" (`PHOTO_NOTE`, menu footer box + item sheet when it has a photo).
 - Code: `lib/cafe.ts`, `brand/nutrition-label.tsx`, `landing/sections.tsx`, `lib/menu-pdf/document.tsx`.
 
 **G-08 – Home page, PDF menu, blog, privacy**
@@ -111,7 +111,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **O-01 – Manage the menu**
 *As the owner I want to edit categories, dishes, prices, nutrition, photos and add-ons so that the menu is always right.*
-- Rules: prices in paise; photos converted to WebP ≤1200 px, old file deleted on replace; hidden ≠ sold out; reorder with move buttons; `updateTag(MENU_TAG)` after every write; bulk load from `prisma/seed-data.ts` via `pnpm menu:load`.
+- Rules: prices in paise; photos converted to WebP ≤1200 px, old file deleted on replace; hidden ≠ sold out; reorder items by drag (grip, within a category; `setMenuItemOrder` saves the full order, rejects if the item set changed) or move buttons (keyboard); no drag while searching; `updateTag(MENU_TAG)` after every write; bulk load from `prisma/seed-data.ts` via `pnpm menu:load`.
 - Code: `(dashboard)/menu/*`, `admin/menu/*`, `lib/validators/menu.ts`, `lib/uploads.ts`, `lib/data/admin-menu.ts`, `scripts/load-menu.ts`.
 
 **O-02 – Other items and discounts**
@@ -141,7 +141,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **O-07 – Settings**
 *As the owner I want to set café details, hours, Today's pick, switches and staff logins so that the app fits how we work.*
-- Rules: hours rejected if they can't be parsed; switches: ordering, blog, order edits, customer edits; resetting a password/deactivating bumps `sessionVersion` (logs out); `updateTag(SETTINGS_TAG)` after writes.
+- Rules: hours rejected if they can't be parsed; FSSAI licence is 14 digits (spaces stripped) or empty, footer badge shows only when set; GA ID must be `G-` + 4–15 letters/digits (it's put in an inline script), loaded only off `/admin` and the privacy note switches its cookie sentence when set; switches: ordering, blog, order edits, customer edits; resetting a password/deactivating bumps `sessionVersion` (logs out); `updateTag(SETTINGS_TAG)` after writes.
 - Code: `(dashboard)/settings/*`, `admin/settings/settings-screen.tsx`, `lib/validators/settings.ts`, `lib/cafe-hours.ts`.
 
 **O-08 – QR cards**

@@ -33,6 +33,8 @@ type Cafe = {
   phone: string;
   whatsapp: string;
   instagram: string;
+  fssaiLicence: string;
+  gaMeasurementId: string;
   hours: { days: string; time: string }[];
   todaysPickId: string;
 };
@@ -287,6 +289,42 @@ function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: stri
             defaultValue={cafe.instagram}
             className="h-10"
             aria-invalid={!!err.instagram}
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          id="fssaiLicence"
+          label="FSSAI licence number"
+          hint="14 digits, from your FSSAI licence. Shown in the website footer."
+          error={err.fssaiLicence}
+        >
+          <Input
+            id="fssaiLicence"
+            name="fssaiLicence"
+            inputMode="numeric"
+            maxLength={20}
+            defaultValue={cafe.fssaiLicence}
+            className="h-10"
+            aria-invalid={!!err.fssaiLicence}
+          />
+        </Field>
+        <Field
+          id="gaMeasurementId"
+          label="Google Analytics ID"
+          hint="Measurement ID, like G-AB12CD34EF. Counts visits to the public pages, never the staff screens. Leave empty to turn off."
+          error={err.gaMeasurementId}
+        >
+          <Input
+            id="gaMeasurementId"
+            name="gaMeasurementId"
+            maxLength={20}
+            autoCapitalize="characters"
+            spellCheck={false}
+            defaultValue={cafe.gaMeasurementId}
+            className="h-10"
+            aria-invalid={!!err.gaMeasurementId}
           />
         </Field>
       </div>

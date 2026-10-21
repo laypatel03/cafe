@@ -265,6 +265,8 @@ model CafeSettings {
   phone            String   @default("")
   whatsapp         String   @default("")
   instagram        String   @default("")
+  fssaiLicence     String   @default("") // 14 digits; shown with the FSSAI mark in the site footer
+  gaMeasurementId  String   @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
   hours            Json     @default("[]") // [{ days, time }]
   orderingEnabled  Boolean  @default(true)
   // the public Blog pages and links; off = hidden from guests (staff who are logged in can still preview)

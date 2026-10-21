@@ -45,7 +45,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `src/app/selection-actions.ts` | **Guest**: `syncSelection` (live pick list), `placeOrder`, `getGuestOrders` |
 | `(dashboard)/actions.ts` | **Live board**: `createCounterOrder`, `findGuestByPhone`, `removeSelection`, `updateOrderItems`, `advanceOrder`, `undoOrderStep`, `cancelOrder`, `generateBill`, `markBillPaid`, `markBillPayLater`, `voidBill`, `receiptSms` |
 | `(dashboard)/orders/actions.ts` | `addPastOrder`, `editOrder`, `deleteOrder` (soft), `changeBillPayment` |
-| `(dashboard)/menu/actions.ts` | items / categories / add-ons CRUD, move, `setItemAvailable` (staff) |
+| `(dashboard)/menu/actions.ts` | items / categories / add-ons CRUD, move, `setMenuItemOrder` (drag), `setItemAvailable` (staff) |
 | `(dashboard)/cash/actions.ts` | `setOpeningCash`, `closeDay`, `reopenDay`, `saveExpense`, `deleteExpense` |
 | `(dashboard)/money/actions.ts` | `addExtraSale`, `deleteExtraSale`, `saveCardFees` |
 | `(dashboard)/customers/actions.ts` | notes, `withdrawConsent`, `deleteCustomer`, `addCustomer`, `updateCustomer` |
@@ -110,7 +110,7 @@ Every action: `assertUser(role?)` (throws) → Zod parse (`lib/validators/*`) �
 | `Customer` | Keyed by 10-digit `phone`; consent, notes, counters |
 | `Selection` | Guest's live pick list per device (12 h TTL); staff watch it |
 | `StaffUser` | `role` STAFF/OWNER; `sessionVersion` bump = logout everywhere |
-| `CafeSettings` | Single row id=1: details, `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
+| `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
 | `Expense`, `CashDay`, `ExtraSale` | Money book / cash drawer; `CashDay.day` = `yyyy-mm-dd` IST |
 | `RateLimit` | Fixed window counters |
 

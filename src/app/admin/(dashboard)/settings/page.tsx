@@ -37,6 +37,8 @@ export default async function SettingsPage() {
         phone: settings.phone,
         whatsapp: settings.whatsapp,
         instagram: settings.instagram,
+        fssaiLicence: settings.fssaiLicence,
+        gaMeasurementId: settings.gaMeasurementId,
         hours: (settings.hours as { days: string; time: string }[]) ?? [],
         todaysPickId: settings.todaysPickId ?? "",
       }}

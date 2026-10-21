@@ -71,6 +71,10 @@ export type CafeDetails = {
   phone: string;
   whatsapp: string;
   instagram: string;
+  /** 14 digits, or "" until the owner adds it in Settings */
+  fssaiLicence: string;
+  /** Google Analytics 4 Measurement ID, or "" for none */
+  gaMeasurementId: string;
   hours: { days: string; time: string }[];
   orderingEnabled: boolean;
   /** the public Blog; off = guests get "not found" and no blog links */
@@ -91,6 +95,8 @@ export const getCafeDetails = unstable_cache(
       phone: s.phone,
       whatsapp: s.whatsapp,
       instagram: s.instagram,
+      fssaiLicence: s.fssaiLicence,
+      gaMeasurementId: s.gaMeasurementId,
       hours: (s.hours as CafeDetails["hours"]) ?? [],
       orderingEnabled: s.orderingEnabled,
       blogEnabled: s.blogEnabled,

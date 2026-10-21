@@ -29,6 +29,22 @@ export const CafeDetailsSchema = z.object({
       .transform((v) => v.replace(/^@/, ""))
       .pipe(z.string().regex(/^[\w.]{1,30}$/, "Instagram username without @")),
   ).default(""),
+  fssaiLicence: optional(
+    z
+      .string()
+      .transform((v) => v.replace(/\s/g, ""))
+      .pipe(z.string().regex(/^\d{14}$/, "The 14-digit number on your FSSAI licence")),
+  ).default(""),
+  // goes into an inline gtag script, so only the exact G-… shape is allowed
+  gaMeasurementId: optional(
+    z
+      .string()
+      .trim()
+      .toUpperCase()
+      .pipe(
+        z.string().regex(/^G-[A-Z0-9]{4,15}$/, "The Measurement ID from Google Analytics, like G-AB12CD34EF"),
+      ),
+  ).default(""),
   hours: z
     .array(z.object({ days: z.string().trim().max(30), time: z.string().trim().max(40) }))
     .max(7)

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 // Keep in step with what the app actually does (see Order, Customer, CafeSettings).
-const UPDATED = "5 October 2026";
+const UPDATED = "21 October 2026";
 
 export default async function PrivacyPage() {
   await connection();
@@ -60,10 +60,19 @@ export default async function PrivacyPage() {
               is quicker. This stays in your browser.
             </li>
           </ul>
-          <p className="mt-2">
-            We don&apos;t ask for your email, we don&apos;t take payments online, and the site has no
-            advertising or tracking cookies.
-          </p>
+          {cafe.gaMeasurementId ? (
+            <p className="mt-2">
+              We don&apos;t ask for your email, we don&apos;t take payments online, and the site has no
+              advertising cookies. We use Google Analytics to count visits and see which pages are used; it
+              sets cookies and Google receives your IP address and device details. It never sees your name,
+              phone number or order.
+            </p>
+          ) : (
+            <p className="mt-2">
+              We don&apos;t ask for your email, we don&apos;t take payments online, and the site has no
+              advertising or tracking cookies.
+            </p>
+          )}
         </section>
 
         <section>

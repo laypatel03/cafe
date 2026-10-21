@@ -18,7 +18,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Open the menu on their phone from the QR – it loads in under 2 seconds on 4G. It has the café's real menu: salads and bowls, chaat, toasts, oats, smoothies, tea and coffee.
 - Browse by category, search, and filter by 15 g+ protein, under 300 kcal or Bestseller. Every dish shows the veg mark, protein, calories and price.
 - Guests can order on the QR menu only during the opening hours set in Settings. Change the hours and the menu follows straight away – a menu already open on a guest's phone opens and closes on time by itself. Settings shows whether guests can order right now, and won't save hours it can't understand. Counter orders work any time.
-- The website is honest about the numbers: it says protein and calories are our own estimates worked out from the ingredients – not lab-tested or checked by a nutritionist – and asks guests with allergies or special diets to talk to staff. It makes no health or "certified" claims.
+- The website is honest about the numbers: it says protein and calories are our own estimates worked out from the ingredients – not lab-tested or checked by a nutritionist – and asks guests with allergies or special diets to talk to staff. It also says the photos are for reference only and the dish may look a little different. It makes no health or "certified" claims.
 - Pick dishes and add-ons, then order with their name and number. Their phone remembers the details for next time.
 - Add an optional note for the kitchen and choose whether to receive offers.
 - Follow their order live: Waiting for staff → Accepted → In the kitchen → Served or Ready to collect → Paid.
@@ -46,7 +46,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - A clear warning shows if the internet drops, and the screen catches up when it's back.
 
 ### Owner
-- Edit the menu: categories, dishes, prices, photos, add-ons, and hide or show items.
+- Edit the menu: categories, dishes, prices, photos, add-ons, and hide or show items. Drag dishes by the grip (⋮⋮) to change their order within a category – the QR menu follows at once.
 - Add an "Other item" to an order – anything that isn't on the menu, with its own name and price. A minus price takes money off, so it works as a discount (the total never goes below ₹0). Owner only: on the live orders page (Edit items) and in Order history. Staff see these lines but can't change them. They don't count as dishes in reports or favourites.
 - Customers: search the list and open a profile with visits, spending, favourite dishes and staff notes.
 - See who still owes money: the Customers page shows the total still to pay at the top, highlights every customer who owes (with how much), and can list only them. A customer's page shows what they owe, with a button to their unpaid orders. Orders from earlier days that weren't paid and "pay later" bills count; today's orders still being served don't.
@@ -55,4 +55,4 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Reports: sales by hour, day and month, dine-in vs takeaway, top dishes, how many guests are regulars, expenses by category, and sales minus expenses.
 - See every expense for any period, and change or delete one. See past days at the cash counter and reopen today if a count was wrong.
 - Print the café QR cards.
-- Settings: café details and hours, Today's pick, switch ordering on or off, and staff logins.
+- Settings: café details and hours, FSSAI licence number (shown in the website footer once added), Google Analytics ID (counts visits to the public pages, not the staff screens; the privacy note mentions it once it's on), Today's pick, switch ordering on or off, and staff logins.

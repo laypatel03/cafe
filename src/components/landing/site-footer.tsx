@@ -32,11 +32,15 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4 lg:gap-10">
           {/* Column 1: Brand */}
           <div className="flex flex-col">
-            <Link href="/" className="inline-flex items-center group" aria-label="Healthy Hunger – Home">
-              <LogoIcon className="h-12 w-auto transition-transform duration-200 group-hover:scale-105 select-none" alt="Healthy Hunger" />
+            <Link href="/" className="group inline-flex items-center" aria-label="Healthy Hunger – Home">
+              <LogoIcon
+                className="h-12 w-auto transition-transform duration-200 select-none group-hover:scale-105"
+                alt="Healthy Hunger"
+              />
             </Link>
             <p className="mt-3 text-xs leading-relaxed text-white/75">
-              Mindfully prepared real-food meals, protein-rich bowls, fresh sourdough melts, and guilt-free street chaats in Bilimora.
+              Mindfully prepared real-food meals, protein-rich bowls, fresh sourdough melts, and guilt-free
+              street chaats in Bilimora.
             </p>
           </div>
 
@@ -56,7 +60,10 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
                 Dine-In Space & Ambiance
               </Link>
               {cafe.blogEnabled && (
-                <Link href="/blog" className="inline-flex items-center gap-1.5 transition-colors hover:text-[#ffb900]">
+                <Link
+                  href="/blog"
+                  className="inline-flex items-center gap-1.5 transition-colors hover:text-[#ffb900]"
+                >
                   <span>Blog & Nutrition Stories</span>
                   <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
                     New
@@ -75,9 +82,7 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
               <MapPin className="size-3.5" />
               <span>Café Location</span>
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-white/80">
-              {address}
-            </p>
+            <p className="mt-3 text-xs leading-relaxed text-white/80">{address}</p>
             {cafe.mapUrl && (
               <a
                 href={cafe.mapUrl}
@@ -143,10 +148,16 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
         </div>
 
         {/* Bottom Bar: Copyright */}
-        <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-white/10 pt-4 text-center sm:flex-row sm:text-left text-xs font-medium text-white/60">
+        <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-white/10 pt-4 text-center text-xs font-medium text-white/60 sm:flex-row sm:text-left">
           <div>
             © {new Date().getFullYear()} {cafe.name || "Healthy Hunger"}. All rights reserved.
           </div>
+          {cafe.fssaiLicence && (
+            <div className="inline-flex items-center gap-2 rounded-md bg-white px-2.5 py-1 text-[#0f1f15]">
+              <span className="font-extrabold tracking-wide text-[#1f4e9c] lowercase">fssai</span>
+              <span className="font-semibold">Lic. No. {cafe.fssaiLicence}</span>
+            </div>
+          )}
         </div>
       </div>
     </footer>
