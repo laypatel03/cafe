@@ -5,7 +5,6 @@ import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LogoWordmark } from "@/components/brand/logo";
-import { VegMark } from "@/components/brand/veg-mark";
 import { ItemImage } from "@/components/menu/item-art";
 import { formatINR } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -242,14 +241,6 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
           {/* Decorative backdrop cards */}
           <div className="pointer-events-none absolute h-[380px] w-[290px] scale-95 rotate-6 transform rounded-[28px] bg-orange-200/50 shadow-md sm:w-[350px] dark:bg-orange-500/10" />
           <div className="pointer-events-none absolute h-[380px] w-[290px] scale-98 -rotate-3 transform rounded-[28px] bg-[#98f992]/40 shadow-md sm:w-[350px] dark:bg-[#055c1b]/20" />
-
-          {/* Floating Badge: Veg */}
-          <div className="absolute -top-3 right-4 z-40 flex items-center gap-2 rounded-full border border-[#055c1b]/30 bg-white px-3.5 py-1.5 shadow-md sm:right-8 dark:bg-[#16251b]">
-            <VegMark className="size-4" />
-            <span className="text-[12px] font-extrabold tracking-wider text-[#055c1b] uppercase dark:text-[#7ddc78]">
-              100% Vegetarian
-            </span>
-          </div>
 
           {/* Floating Badge: Real Food Protein */}
           <div className="absolute -bottom-3 -left-2 z-40 flex items-center gap-2 rounded-full border border-orange-200 bg-white px-3.5 py-2 shadow-md sm:left-2 dark:border-orange-500/30 dark:bg-[#16251b]">
