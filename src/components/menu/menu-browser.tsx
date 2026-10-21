@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LogoIcon } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { NUTRITION_NOTE } from "@/lib/cafe";
+import { NUTRITION_NOTE, PHOTO_NOTE } from "@/lib/cafe";
 import { CartStoreContext, useCart, useCounterCart } from "@/lib/cart-store";
 import {
   HIGH_PROTEIN_MIN_G,
@@ -418,11 +418,11 @@ export function MenuBrowser({
               </div>
               <div>
                 <h3 className="text-lg font-black text-[#0f1f15] dark:text-[#eef5ef]">
-                  About the protein and calorie numbers
+                  About the photos and numbers
                 </h3>
                 <p className="mt-0.5 text-xs leading-relaxed font-medium text-[#334b3c] sm:text-sm dark:text-[#a7b8ac]">
-                  {NUTRITION_NOTE} Have a food allergy or a special diet? Please ask our staff before you
-                  order.
+                  {PHOTO_NOTE} {NUTRITION_NOTE} Have a food allergy or a special diet? Please ask our staff
+                  before you order.
                 </p>
               </div>
             </div>

@@ -6,6 +6,7 @@ import { VegMark } from "@/components/brand/veg-mark";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { PHOTO_NOTE } from "@/lib/cafe";
 import { useCartStore } from "@/lib/cart-store";
 import { formatINR } from "@/lib/format";
 import { hasNutrition, type AddOn, type MenuItem } from "@/lib/menu-types";
@@ -108,6 +109,7 @@ function ItemSheetBody({
             *Our own estimate from the recipe, not lab-tested.
           </p>
         )}
+        {item.photo && <p className="mt-1 text-xs text-muted-foreground">{PHOTO_NOTE}</p>}
 
         {item.ingredients.length > 0 && (
           <>
