@@ -2,6 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { AuthError, assertUser } from "@/lib/auth/dal";
 import { MENU_TAG } from "@/lib/data/menu";
 import { db } from "@/lib/db";
@@ -157,6 +158,30 @@ export async function moveMenuItem(id: string, dir: Direction) {
         (x, n) => tx.menuItem.update({ where: { id: x }, data: { sortOrder: n } }),
       );
     });
+    menuChanged();
+    return { ok: true as const };
+  });
+}
+
+const ItemOrderSchema = z.object({
+  categoryId: z.string().min(1).max(40),
+  ids: z.array(z.string().min(1).max(40)).max(500),
+});
+
+/** Drag-and-drop on the menu manager: the full new order of one category's items. */
+export async function setMenuItemOrder(categoryId: string, ids: string[]) {
+  return guard(async () => {
+    await assertUser("OWNER");
+    const parsed = ItemOrderSchema.safeParse({ categoryId, ids });
+    if (!parsed.success) return { error: "Couldn't save the new order." };
+    const current = await db.menuItem.findMany({ where: { categoryId }, select: { id: true } });
+    const known = new Set(current.map((c) => c.id));
+    // someone else added or removed an item meanwhile: refresh instead of guessing
+    if (new Set(ids).size !== known.size || !ids.every((id) => known.has(id))) {
+      revalidatePath("/admin/menu");
+      return { error: "The menu changed meanwhile – try again." };
+    }
+    await db.$transaction(ids.map((id, n) => db.menuItem.update({ where: { id }, data: { sortOrder: n } })));
     menuChanged();
     return { ok: true as const };
   });
