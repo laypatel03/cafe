@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingBag, Utensils, User } from "lucide-react";
+import { ShoppingBag, Utensils } from "lucide-react";
 import { motion, useMotionValueEvent, useScroll } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
@@ -35,10 +35,10 @@ export function SiteHeader({ showBlog = false }: { showBlog?: boolean }) {
         <div className="flex items-center gap-8">
           <Link href="/" className="group flex items-center gap-3" aria-label="Healthy Hunger – Home">
             <LogoIcon
-              className="h-10 sm:h-11 w-auto transition-transform duration-200 select-none group-hover:scale-105"
+              className="h-10 w-auto transition-transform duration-200 select-none group-hover:scale-105 sm:h-11"
               priority
             />
-            <div className="hidden sm:flex flex-col">
+            <div className="hidden flex-col sm:flex">
               <span className="text-xl leading-none font-extrabold tracking-tight text-[#0f1f15] transition-colors group-hover:text-[#055c1b] dark:text-[#eef5ef] dark:group-hover:text-[#98f992]">
                 Healthy Hunger
               </span>
@@ -107,16 +107,6 @@ export function SiteHeader({ showBlog = false }: { showBlog?: boolean }) {
 
           {/* Theme Toggle */}
           <ThemeToggle />
-
-          {/* Admin shortcut */}
-          <Link
-            href="/admin"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#055c1b] text-white shadow-xs transition-colors hover:bg-[#0e5518] dark:bg-[#0c6b25]"
-            title="Staff Dashboard"
-            aria-label="Staff Dashboard"
-          >
-            <User className="size-4 text-white" aria-hidden />
-          </Link>
         </div>
       </div>
     </motion.header>

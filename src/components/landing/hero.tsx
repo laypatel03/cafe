@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Dumbbell, Flame, Leaf, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Dumbbell, Flame, ShieldCheck, Store } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -190,12 +190,6 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12">
         {/* Left Column: Copy & Actions */}
         <div className="z-10 flex flex-col items-start gap-5 lg:col-span-6">
-          {/* Top Pill Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#055c1b]/20 bg-[#055c1b]/10 px-3.5 py-1.5 text-[12px] font-bold tracking-wider text-[#055c1b] uppercase dark:border-[#7ddc78]/30 dark:bg-[#055c1b]/25 dark:text-[#7ddc78]">
-            <Leaf className="size-3.5 fill-current" aria-hidden />
-            <span>100% Vegetarian Café</span>
-          </div>
-
           {/* Main Brand Logo */}
           <div>
             <LogoWordmark
