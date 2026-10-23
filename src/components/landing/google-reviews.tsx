@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowUpRight, Check, PenLine, Quote, Salad, Star } from "lucide-react";
+import { ArrowRight, ArrowUpRight, PenLine, Quote, Salad, Star } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Reveal } from "@/components/brand/reveal";
@@ -179,8 +179,7 @@ function PromiseCard() {
         Salads and bowls, chaat, toasts, sandwiches, oats and smoothies – cooked with ingredients you know,
         with our estimate of the protein and calories shown for every dish.
       </p>
-      <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/15 pt-4 text-sm">
-        <span className="font-semibold text-white/85">100% vegetarian</span>
+      <div className="mt-6 flex items-center justify-end gap-3 border-t border-white/15 pt-4 text-sm">
         <Link
           href="/menu"
           className="group inline-flex items-center gap-1 font-bold underline-offset-4 hover:underline"
@@ -243,9 +242,6 @@ export function GoogleReviews({ data }: { data: ReviewsSection }) {
               <span className="border-l border-[#e3ece5] pl-3 text-sm font-medium text-[#334b3c] dark:border-[#24392b] dark:text-[#a7b8ac]">
                 {data.count.toLocaleString("en-IN")} {data.count === 1 ? "review" : "reviews"} on Google
               </span>
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-2xl border border-[#cde5d3] bg-[#eef8f0] px-4 py-2.5 text-sm font-semibold text-[#055c1b] dark:border-[#24392b] dark:bg-[#132a1a] dark:text-[#7ddc78]">
-              <Check className="size-4" aria-hidden /> 100% vegetarian
             </span>
           </div>
 

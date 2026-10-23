@@ -1,4 +1,5 @@
 import { ArrowUpRight, MapPin, Phone } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { LogoIcon } from "@/components/brand/logo";
 import type { CafeDetails } from "@/lib/data/menu";
@@ -154,7 +155,7 @@ export function SiteFooter({ cafe }: { cafe: CafeDetails }) {
           </div>
           {cafe.fssaiLicence && (
             <div className="inline-flex items-center gap-2 rounded-md bg-white px-2.5 py-1 text-[#0f1f15]">
-              <span className="font-extrabold tracking-wide text-[#1f4e9c] lowercase">fssai</span>
+              <Image src="/brand/fssai.webp" alt="FSSAI" width={334} height={183} className="h-4 w-auto" />
               <span className="font-semibold">Lic. No. {cafe.fssaiLicence}</span>
             </div>
           )}
