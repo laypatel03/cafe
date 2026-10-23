@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { CafeJsonLd } from "@/components/landing/cafe-json-ld";
-import { GoogleReviews } from "@/components/landing/google-reviews";
+import { GoogleReviews, type ReviewsSection } from "@/components/landing/google-reviews";
 import { Hero, type HeroDish, type HeroReviews } from "@/components/landing/hero";
 import {
   Bestsellers,
@@ -16,6 +16,7 @@ import { ARTICLES } from "@/lib/articles";
 import { isWithinWorkingHours } from "@/lib/cafe-hours";
 import { getGoogleReviews } from "@/lib/data/google-reviews";
 import { getCafeDetails, getPublicMenu } from "@/lib/data/menu";
+import { markDishes } from "@/lib/google-reviews";
 
 export default async function HomePage() {
   // Rendered per request (cheap – the data below is cached) so builds don't need the database.
@@ -52,6 +53,14 @@ export default async function HomePage() {
     faces: reviews.reviews.map((r) => ({ name: r.author, photo: r.photo })),
   };
 
+  const reviewsSection: ReviewsSection | null = reviews && {
+    ...reviews,
+    ...markDishes(
+      reviews.reviews,
+      items.map((m) => ({ id: m.id, name: m.name })),
+    ),
+  };
+
   return (
     <>
       <CafeJsonLd cafe={cafe} />
@@ -67,7 +76,7 @@ export default async function HomePage() {
             articles={[...ARTICLES].sort((a, b) => b.published.localeCompare(a.published)).slice(0, 3)}
           />
         )}
-        {reviews && <GoogleReviews data={reviews} />}
+        {reviewsSection && <GoogleReviews data={reviewsSection} />}
         <VisitUs cafe={cafe} />
       </main>
       <SiteFooter cafe={cafe} />

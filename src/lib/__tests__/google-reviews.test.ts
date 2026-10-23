@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parsePlace } from "@/lib/google-reviews";
+import { markDishes, parsePlace } from "@/lib/google-reviews";
 
 describe("parsePlace", () => {
   it("maps a Places (New) response to rating, count and reviews", () => {
@@ -60,5 +60,42 @@ describe("parsePlace", () => {
 
   it("copes with a place that has no reviews yet", () => {
     expect(parsePlace({})).toEqual({ rating: 0, count: 0, mapsUrl: "", reviews: [] });
+  });
+});
+
+describe("markDishes", () => {
+  const menu = [
+    { id: "a", name: "Mexican Rice Bowl" },
+    { id: "b", name: "Sote Veg Plate" },
+    { id: "c", name: "Tea" },
+  ];
+  const review = (text: string) => ({ author: "R", authorUrl: "", photo: "", rating: 5, text, when: "" });
+
+  it("marks dish names in any case without changing the text", () => {
+    const { reviews, lovedFor } = markDishes(
+      [
+        review("Food mast, especially Mexican  rice bowl!"),
+        review("The sote veg plate and mexican rice bowl"),
+      ],
+      menu,
+    );
+    expect(reviews[0].parts).toEqual([
+      { text: "Food mast, especially " },
+      { text: "Mexican  rice bowl", dish: "a" },
+      { text: "!" },
+    ]);
+    expect(reviews[0].parts.map((p) => p.text).join("")).toBe("Food mast, especially Mexican  rice bowl!");
+    expect(reviews[1].dishes.map((d) => d.id)).toEqual(["b", "a"]);
+    expect(lovedFor.map((d) => d.id)).toEqual(["a", "b"]);
+  });
+
+  it("only matches whole words", () => {
+    const { reviews, lovedFor } = markDishes([review("Steady team, great tea.")], menu);
+    expect(reviews[0].parts.filter((p) => p.dish)).toEqual([{ text: "tea", dish: "c" }]);
+    expect(lovedFor).toHaveLength(1);
+  });
+
+  it("leaves reviews as one part when no dish is named", () => {
+    expect(markDishes([review("Lovely place")], []).reviews[0].parts).toEqual([{ text: "Lovely place" }]);
   });
 });
