@@ -107,6 +107,7 @@ Key rules baked into the server layer:
 - One open dine-in order per table; per-phone hourly limit; ordering-off switch checked on every order.
 - Every status change writes `OrderStatusLog` with the staff user.
 - Phone masked (`98xxxxxx21`) for staff role; full phone + CSV only for owner.
+- Roles: STAFF, OWNER, DEVELOPER (23 Oct, owner asked for a login that manages the website without seeing accounts or order history). Access is opt-in: `requireUser()`/`assertUser()` default to the café team (staff + owner), so a new page stays closed to developers unless it passes `"website"` or `"anyone"`.
 - Menu edits call `revalidateTag('menu')` so the static menu refreshes instantly.
 
 ---

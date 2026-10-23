@@ -11,7 +11,7 @@ export const metadata = { title: "QR code" };
  * The PDF QR is view-only – it opens the menu as a PDF built from the live menu.
  */
 export default async function QrPage() {
-  await requireUser("OWNER");
+  await requireUser("website");
   const url = menuUrl();
   const pdfUrl = menuPdfUrl();
   const [qr, pdfQr] = await Promise.all([qrSvg(url), qrSvg(pdfUrl)]);

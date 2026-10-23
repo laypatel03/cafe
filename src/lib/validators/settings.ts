@@ -76,7 +76,7 @@ export const StaffSchema = z.object({
     .toLowerCase()
     .regex(/^[a-z0-9._-]{3,32}$/, "3–32 lowercase letters, numbers, dots or dashes"),
   phone: optional(z.string().trim().regex(INDIAN_MOBILE, "10-digit mobile number")).default(""),
-  role: z.enum(["STAFF", "OWNER"]).default("STAFF"),
+  role: z.enum(["STAFF", "OWNER", "DEVELOPER"]).default("STAFF"),
 });
 
 export const PasswordChangeSchema = z

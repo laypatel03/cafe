@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   changeMyPassword,
   createStaff,
+  deleteStaff,
   resetStaffPassword,
   saveCafeDetails,
   setBlogEnabled,
@@ -20,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { ROLE_LABEL } from "@/components/admin/nav-items";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormAction } from "@/hooks/use-form-action";
 import { useOpenNow } from "@/hooks/use-open-now";
@@ -47,19 +49,21 @@ type Staff = {
   name: string;
   username: string;
   phone: string | null;
-  role: "STAFF" | "OWNER";
+  role: "STAFF" | "OWNER" | "DEVELOPER";
   active: boolean;
   lastLoginAt: string | null;
 };
 
 export function SettingsScreen({
   meId,
+  isOwner,
   cafe,
   edits,
   staff,
   items,
 }: {
   meId: string;
+  isOwner: boolean;
   cafe: Cafe;
   edits: Switches;
   staff: Staff[];
@@ -72,18 +76,20 @@ export function SettingsScreen({
         <TabsList>
           <TabsTrigger value="cafe">Café</TabsTrigger>
           <TabsTrigger value="editing">Editing</TabsTrigger>
-          <TabsTrigger value="staff">Staff logins</TabsTrigger>
+          {isOwner && <TabsTrigger value="staff">Staff logins</TabsTrigger>}
           <TabsTrigger value="password">My password</TabsTrigger>
         </TabsList>
         <TabsContent value="cafe" className="mt-4">
           <CafeForm cafe={cafe} items={items} />
         </TabsContent>
         <TabsContent value="editing" className="mt-4">
-          <EditingPanel edits={edits} />
+          <EditingPanel edits={edits} isOwner={isOwner} />
         </TabsContent>
-        <TabsContent value="staff" className="mt-4">
-          <StaffPanel staff={staff} meId={meId} />
-        </TabsContent>
+        {isOwner && (
+          <TabsContent value="staff" className="mt-4">
+            <StaffPanel staff={staff} meId={meId} />
+          </TabsContent>
+        )}
         <TabsContent value="password" className="mt-4">
           <PasswordForm />
         </TabsContent>
@@ -141,7 +147,7 @@ function SwitchRows({ rows }: { rows: SwitchRow[] }) {
   ));
 }
 
-function EditingPanel({ edits }: { edits: Switches }) {
+function EditingPanel({ edits, isOwner }: { edits: Switches; isOwner: boolean }) {
   const site: SwitchRow[] = [
     {
       id: "ordering",
@@ -191,19 +197,24 @@ function EditingPanel({ edits }: { edits: Switches }) {
         </div>
         <SwitchRows rows={site} />
       </section>
-      <section aria-labelledby="records-h" className="space-y-3 rounded-3xl border border-border bg-card p-5">
-        <div>
-          <h2 id="records-h" className="font-semibold">
-            Fixing past records
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Keep these off day to day so past records can&apos;t be changed by mistake. Turn one on when you
-            need to fix something, then turn it off again. Only owners can edit, and every change is noted in
-            the order&apos;s history.
-          </p>
-        </div>
-        <SwitchRows rows={rows} />
-      </section>
+      {isOwner && (
+        <section
+          aria-labelledby="records-h"
+          className="space-y-3 rounded-3xl border border-border bg-card p-5"
+        >
+          <div>
+            <h2 id="records-h" className="font-semibold">
+              Fixing past records
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Keep these off day to day so past records can&apos;t be changed by mistake. Turn one on when you
+              need to fix something, then turn it off again. Only owners can edit, and every change is noted
+              in the order&apos;s history.
+            </p>
+          </div>
+          <SwitchRows rows={rows} />
+        </section>
+      )}
     </div>
   );
 }
@@ -474,6 +485,7 @@ function PasswordReveal({
 
 function StaffPanel({ staff, meId }: { staff: Staff[]; meId: string }) {
   const [shown, setShown] = useState<{ username: string; password: string } | null>(null);
+  const [removing, setRemoving] = useState<Staff | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [pending, start] = useTransition();
 
@@ -491,7 +503,7 @@ function StaffPanel({ staff, meId }: { staff: Staff[]; meId: string }) {
               </p>
               <p className="text-xs text-muted-foreground">
                 {s.username}
-                {s.phone && ` · ${s.phone}`} · {s.role === "OWNER" ? "Owner" : "Staff"} ·{" "}
+                {s.phone && ` · ${s.phone}`} · {ROLE_LABEL[s.role]} ·{" "}
                 {s.lastLoginAt
                   ? `last login ${new Date(s.lastLoginAt).toLocaleDateString("en-IN", { timeZone: CAFE_TZ })}`
                   : "never logged in"}
@@ -524,6 +536,16 @@ function StaffPanel({ staff, meId }: { staff: Staff[]; meId: string }) {
                     }
                   />
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Delete ${s.name}'s login`}
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={pending}
+                  onClick={() => setRemoving(s)}
+                >
+                  <Trash2 />
+                </Button>
               </>
             )}
           </li>
@@ -541,6 +563,41 @@ function StaffPanel({ staff, meId }: { staff: Staff[]; meId: string }) {
         />
       </div>
       <PasswordReveal shown={shown} onClose={() => setShown(null)} />
+      <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
+        <DialogContent>
+          <DialogTitle>Delete {removing?.name}&apos;s login?</DialogTitle>
+          <DialogDescription>
+            {removing?.username} is logged out and can&apos;t log in again. Past orders, bills and expenses
+            stay as they are but will no longer show who did them. To stop someone for now, switch off
+            &ldquo;Can log in&rdquo; instead.
+          </DialogDescription>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoving(null)}>
+              Keep
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  if (!removing) return;
+                  const res = await deleteStaff(removing.id);
+                  if ("error" in res) toast.error(res.error);
+                  else toast.success(`${removing.name}'s login is deleted`);
+                  setRemoving(null);
+                })
+              }
+            >
+              {pending ? (
+                <LoaderCircle className="animate-spin" data-icon="inline-start" />
+              ) : (
+                <Trash2 data-icon="inline-start" />
+              )}
+              Delete login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -581,6 +638,7 @@ function NewStaffForm({ onCreated }: { onCreated: (username: string, password: s
         <NativeSelect id="staff-role" name="role" defaultValue="STAFF" className="h-10">
           <option value="STAFF">Staff – table lists + sold out</option>
           <option value="OWNER">Owner – everything</option>
+          <option value="DEVELOPER">Developer – menu, website settings and QR; no orders or money</option>
         </NativeSelect>
       </Field>
       <div className="sm:col-span-2">

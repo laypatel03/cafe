@@ -32,11 +32,11 @@ async function guard<T>(fn: () => Promise<T>): Promise<T | { error: string }> {
   }
 }
 
-/* ---------------------------- staff + owner ---------------------------- */
+/* ------------------------ staff, owner, developer ------------------------ */
 
 export async function setItemAvailable(id: string, available: boolean) {
   return guard(async () => {
-    await assertUser();
+    await assertUser("anyone");
     await db.menuItem.update({ where: { id }, data: { available } });
     menuChanged();
     return { ok: true as const };
@@ -45,18 +45,18 @@ export async function setItemAvailable(id: string, available: boolean) {
 
 export async function setAddOnAvailable(id: string, available: boolean) {
   return guard(async () => {
-    await assertUser();
+    await assertUser("anyone");
     await db.addOn.update({ where: { id }, data: { available } });
     menuChanged();
     return { ok: true as const };
   });
 }
 
-/* ------------------------------ owner only ------------------------------ */
+/* --------------------------- owner + developer --------------------------- */
 
 export async function saveMenuItem(_prev: FormState, formData: FormData): Promise<FormState> {
   try {
-    await assertUser("OWNER");
+    await assertUser("website");
   } catch (e) {
     if (e instanceof AuthError) return { error: e.message };
     throw e;
@@ -116,7 +116,7 @@ export async function saveMenuItem(_prev: FormState, formData: FormData): Promis
 
 export async function deleteMenuItem(id: string) {
   return guard(async () => {
-    await assertUser("OWNER");
+    await assertUser("website");
     // past orders keep their copied name and price (OrderItem.menuItemId is set to null)
     const item = await db.menuItem.delete({ where: { id }, select: { photo: true } });
     await deleteUpload(item.photo);
@@ -143,7 +143,7 @@ async function reorder(
 
 export async function moveMenuItem(id: string, dir: Direction) {
   return guard(async () => {
-    await assertUser("OWNER");
+    await assertUser("website");
     const item = await db.menuItem.findUniqueOrThrow({ where: { id }, select: { categoryId: true } });
     const siblings = await db.menuItem.findMany({
       where: { categoryId: item.categoryId },
@@ -171,7 +171,7 @@ const ItemOrderSchema = z.object({
 /** Drag-and-drop on the menu manager: the full new order of one category's items. */
 export async function setMenuItemOrder(categoryId: string, ids: string[]) {
   return guard(async () => {
-    await assertUser("OWNER");
+    await assertUser("website");
     const parsed = ItemOrderSchema.safeParse({ categoryId, ids });
     if (!parsed.success) return { error: "Couldn't save the new order." };
     const current = await db.menuItem.findMany({ where: { categoryId }, select: { id: true } });
@@ -189,7 +189,7 @@ export async function setMenuItemOrder(categoryId: string, ids: string[]) {
 
 export async function saveCategory(_prev: FormState, formData: FormData): Promise<FormState> {
   try {
-    await assertUser("OWNER");
+    await assertUser("website");
   } catch (e) {
     if (e instanceof AuthError) return { error: e.message };
     throw e;
@@ -213,7 +213,7 @@ export async function saveCategory(_prev: FormState, formData: FormData): Promis
 
 export async function setCategoryVisible(id: string, visible: boolean) {
   return guard(async () => {
-    await assertUser("OWNER");
+    await assertUser("website");
     await db.category.update({ where: { id }, data: { visible } });
     menuChanged();
     return { ok: true as const };
@@ -222,7 +222,7 @@ export async function setCategoryVisible(id: string, visible: boolean) {
 
 export async function moveCategory(id: string, dir: Direction) {
   return guard(async () => {
-    await assertUser("OWNER");
+    await assertUser("website");
     const all = await db.category.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: { id: true },
@@ -242,7 +242,7 @@ export async function moveCategory(id: string, dir: Direction) {
 
 export async function deleteCategory(id: string) {
   return guard(async () => {
-    await assertUser("OWNER");
+    await assertUser("website");
     const count = await db.menuItem.count({ where: { categoryId: id } });
     if (count > 0) return { error: `Move or delete its ${count} item${count > 1 ? "s" : ""} first.` };
     await db.category.delete({ where: { id } });
@@ -253,7 +253,7 @@ export async function deleteCategory(id: string) {
 
 export async function saveAddOn(_prev: FormState, formData: FormData): Promise<FormState> {
   try {
-    await assertUser("OWNER");
+    await assertUser("website");
   } catch (e) {
     if (e instanceof AuthError) return { error: e.message };
     throw e;
@@ -274,7 +274,7 @@ export async function saveAddOn(_prev: FormState, formData: FormData): Promise<F
 
 export async function deleteAddOn(id: string) {
   return guard(async () => {
-    await assertUser("OWNER");
+    await assertUser("website");
     await db.addOn.delete({ where: { id } });
     menuChanged();
     return { ok: true as const };

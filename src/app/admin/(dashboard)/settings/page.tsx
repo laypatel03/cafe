@@ -5,21 +5,25 @@ import { db } from "@/lib/db";
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const me = await requireUser("OWNER");
+  const me = await requireUser("website");
+  const isOwner = me.role === "OWNER";
   const [settings, staff, items] = await Promise.all([
     db.cafeSettings.findUniqueOrThrow({ where: { id: 1 } }),
-    db.staffUser.findMany({
-      orderBy: [{ active: "desc" }, { role: "desc" }, { name: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        phone: true,
-        role: true,
-        active: true,
-        lastLoginAt: true,
-      },
-    }),
+    // developers manage the website, not logins
+    !isOwner
+      ? []
+      : db.staffUser.findMany({
+          orderBy: [{ active: "desc" }, { role: "desc" }, { name: "asc" }],
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            phone: true,
+            role: true,
+            active: true,
+            lastLoginAt: true,
+          },
+        }),
     db.menuItem.findMany({
       where: { visible: true },
       orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }],
@@ -29,6 +33,7 @@ export default async function SettingsPage() {
   return (
     <SettingsScreen
       meId={me.id}
+      isOwner={isOwner}
       cafe={{
         name: settings.name,
         tagline: settings.tagline,

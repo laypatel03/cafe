@@ -24,20 +24,44 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   return { id: user.id, name: user.name, username: user.username, role: user.role };
 });
 
-/** For pages: redirect to login (or the dashboard if the role is too low). */
-export async function requireUser(role?: Role): Promise<CurrentUser> {
+/**
+ * Who may open what. The default is the café team: developers manage the website only and
+ * never see orders, money or customers, so a new page stays closed to them unless it opts in.
+ */
+const ACCESS = {
+  team: ["STAFF", "OWNER"],
+  OWNER: ["OWNER"],
+  website: ["OWNER", "DEVELOPER"],
+  anyone: ["STAFF", "OWNER", "DEVELOPER"],
+} as const satisfies Record<string, readonly Role[]>;
+export type Access = keyof typeof ACCESS;
+
+const DENIED: Record<Access, string> = {
+  team: "Developer logins can't open orders or money.",
+  OWNER: "Only the owner can do this.",
+  website: "Only the owner or a developer can do this.",
+  anyone: "",
+};
+
+export const canAccess = (role: Role, access: Access) => (ACCESS[access] as readonly Role[]).includes(role);
+
+/** Where a role lands in the dashboard. */
+export const homeFor = (role: Role) => (role === "DEVELOPER" ? "/admin/menu" : "/admin");
+
+/** For pages: redirect to login (or the role's own start page if it may not open this one). */
+export async function requireUser(access: Access = "team"): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/admin/session-ended");
-  if (role === "OWNER" && user.role !== "OWNER") redirect("/admin");
+  if (!canAccess(user.role, access)) redirect(homeFor(user.role));
   return user;
 }
 
 export class AuthError extends Error {}
 
 /** For server actions: throw instead of redirecting. */
-export async function assertUser(role?: Role): Promise<CurrentUser> {
+export async function assertUser(access: Access = "team"): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) throw new AuthError("Please log in again.");
-  if (role === "OWNER" && user.role !== "OWNER") throw new AuthError("Only the owner can do this.");
+  if (!canAccess(user.role, access)) throw new AuthError(DENIED[access]);
   return user;
 }

@@ -107,6 +107,14 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 ---
 
+## Developer (role DEVELOPER – website only)
+
+- Can: Menu (everything the owner can: dishes, prices, photos, add-ons, categories, order, sold out), QR code, Settings → Café (details, hours, FSSAI, Analytics, Place ID, Today's pick), Settings → Editing → "Website and QR menu" switches, My password.
+- Can't: Live orders, Order history, counter orders, bills, Cash counter, Expenses, Money book, Customers, Reports, Staff logins, the "Fixing past records" switches, CSV exports. Those pages redirect to `/admin/menu`; the actions and APIs refuse.
+- Created by an owner in Settings → Staff logins.
+
+---
+
 ## Owner (role OWNER – everything staff can do, plus)
 
 **O-01 – Manage the menu**
@@ -141,7 +149,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **O-07 – Settings**
 *As the owner I want to set café details, hours, Today's pick, switches and staff logins so that the app fits how we work.*
-- Rules: hours rejected if they can't be parsed; FSSAI licence is 14 digits (spaces stripped) or empty, footer badge shows only when set; GA ID must be `G-` + 4–15 letters/digits (it's put in an inline script), loaded only off `/admin` and the privacy note switches its cookie sentence when set; switches: ordering, blog, order edits, customer edits; resetting a password/deactivating bumps `sessionVersion` (logs out); `updateTag(SETTINGS_TAG)` after writes.
+- Rules: hours rejected if they can't be parsed; FSSAI licence is 14 digits (spaces stripped) or empty, footer badge shows only when set; GA ID must be `G-` + 4–15 letters/digits (it's put in an inline script), loaded only off `/admin` and the privacy note switches its cookie sentence when set; switches: ordering, blog, order edits, customer edits; resetting a password/deactivating bumps `sessionVersion` (logs out); owner can delete a login (`deleteStaff`, after a confirm) – not their own, not the last active owner; history rows keep their data with the staff link set to null (no name shown); `updateTag(SETTINGS_TAG)` after writes.
 - Code: `(dashboard)/settings/*`, `admin/settings/settings-screen.tsx`, `lib/validators/settings.ts`, `lib/cafe-hours.ts`.
 
 **O-08 – QR cards**

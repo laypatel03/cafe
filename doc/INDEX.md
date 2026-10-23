@@ -52,7 +52,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `(dashboard)/settings/actions.ts` | `saveCafeDetails`, switches (`setOrderingEnabled`, `setBlogEnabled`, `setOrderEdits`, `setCustomerEdits`), staff accounts, `changeMyPassword` |
 | `src/app/admin/login/actions.ts` | `login`, `logout` |
 
-Every action: `assertUser(role?)` (throws) → Zod parse (`lib/validators/*`) → `db` write → `publish()` (realtime) and/or `updateTag(MENU_TAG|SETTINGS_TAG)`.
+Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) → `db` write → `publish()` (realtime) and/or `updateTag(MENU_TAG|SETTINGS_TAG)`.
 
 ## 3. `src/lib` modules
 
@@ -110,7 +110,7 @@ Every action: `assertUser(role?)` (throws) → Zod parse (`lib/validators/*`) �
 | `Bill` | Dine-in: one per visit; takeaway: per order. `paymentMethod`, `paidAt`, `payLaterAt`; voided never deleted (`voidedAt`, `voidedOrderNumbers`) |
 | `Customer` | Keyed by 10-digit `phone`; consent, notes, counters |
 | `Selection` | Guest's live pick list per device (12 h TTL); staff watch it |
-| `StaffUser` | `role` STAFF/OWNER; `sessionVersion` bump = logout everywhere |
+| `StaffUser` | `role` STAFF/OWNER/DEVELOPER; `sessionVersion` bump = logout everywhere |
 | `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `googlePlaceId` (home page reviews), `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
 | `Expense`, `CashDay`, `ExtraSale` | Money book / cash drawer; `CashDay.day` = `yyyy-mm-dd` IST |
 | `RateLimit` | Fixed window counters |
@@ -119,7 +119,7 @@ Enum labels for UI: `PaymentMethod` → `lib/payments.ts` (legacy `CARD` = credi
 
 ## 5. Cross-cutting rules & gotchas
 
-- **Auth:** pages `requireUser(role?)` (redirects), actions `assertUser(role?)` (throws `AuthError`). `src/proxy.ts` only checks the cookie signature.
+- **Auth:** pages `requireUser(access?)` (redirects to `homeFor(role)`), actions `assertUser(access?)` (throws `AuthError`). Access in `lib/auth/dal.ts`: `team` (default: staff + owner), `OWNER`, `website` (owner + developer), `anyone`. `src/proxy.ts` only checks the cookie signature.
 - **Owner-only:** money, customers, reports, QR, settings, menu edits, Other items, editing past orders (also needs Settings switch), full phone numbers. Staff see `maskPhone()`.
 - **Time:** server runs `TZ=Asia/Kolkata` (`package.json` scripts + `instrumentation.ts`); "today" = `startOfCafeDay` / `lib/data/cash.ts#today`.
 - **Money:** integer paise everywhere; server recomputes totals (`pricing.ts`); never trust client prices.

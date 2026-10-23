@@ -9,7 +9,7 @@ import { getItemFormOptions } from "../form-data";
 export const metadata = { title: "Edit item" };
 
 export default async function EditItemPage({ params }: PageProps<"/admin/menu/items/[id]">) {
-  await requireUser("OWNER");
+  await requireUser("website");
   const { id } = await params;
   const [item, options] = await Promise.all([getMenuItemForEdit(id), getItemFormOptions()]);
   if (!item) notFound();

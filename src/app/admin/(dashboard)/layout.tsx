@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardLayout({ children }: LayoutProps<"/admin">) {
-  const user = await requireUser();
+  const user = await requireUser("anyone");
   return (
     <div className="flex min-h-svh bg-background">
       <AdminSidebar user={user} />

@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import type { CurrentUser } from "@/lib/auth/dal";
 import { cn } from "@/lib/utils";
-import { NAV, type NavItem } from "./nav-items";
+import { NAV, type NavItem, ROLE_LABEL } from "./nav-items";
 
 const ICONS = {
   orders: ClipboardList,
@@ -88,7 +88,7 @@ function UserBlock({ user }: { user: CurrentUser }) {
     <div className="flex items-center gap-2 border-t border-sidebar-border pt-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold">{user.name}</p>
-        <p className="text-xs text-white/70">{user.role === "OWNER" ? "Owner" : "Staff"}</p>
+        <p className="text-xs text-white/70">{ROLE_LABEL[user.role]}</p>
       </div>
       <ThemeToggle className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground" />
       <form action={logout}>

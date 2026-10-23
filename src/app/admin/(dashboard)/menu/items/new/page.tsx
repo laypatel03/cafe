@@ -7,7 +7,7 @@ import { getItemFormOptions } from "../form-data";
 export const metadata = { title: "Add item" };
 
 export default async function NewItemPage({ searchParams }: PageProps<"/admin/menu/items/new">) {
-  await requireUser("OWNER");
+  await requireUser("website");
   const [{ category }, options] = await Promise.all([searchParams, getItemFormOptions()]);
   return (
     <div className="mx-auto max-w-5xl">

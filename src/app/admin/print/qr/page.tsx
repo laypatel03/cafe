@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "QR cards", robots: { index: false } 
  * `?for=pdf` prints the view-only PDF menu code instead of the ordering one.
  */
 export default async function PrintQrPage({ searchParams }: PageProps<"/admin/print/qr">) {
-  await requireUser("OWNER");
+  await requireUser("website");
   const pdf = (await searchParams).for === "pdf";
   const url = pdf ? menuPdfUrl() : menuUrl();
   const qr = await qrSvg(url);

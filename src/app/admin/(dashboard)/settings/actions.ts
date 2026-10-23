@@ -3,7 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
-import { AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
+import { type Access, AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { SETTINGS_TAG } from "@/lib/data/menu";
@@ -18,9 +18,9 @@ import {
 
 type Result = { ok: true } | { error: string };
 
-async function owner(): Promise<CurrentUser | { error: string }> {
+async function allowed(access: Access): Promise<CurrentUser | { error: string }> {
   try {
-    return await assertUser("OWNER");
+    return await assertUser(access);
   } catch (e) {
     if (e instanceof AuthError) return { error: e.message };
     throw e;
@@ -32,7 +32,7 @@ const newPassword = () => randomBytes(9).toString("base64url");
 /* ------------------------------- café ------------------------------- */
 
 export async function saveCafeDetails(_prev: FormState, formData: FormData): Promise<FormState> {
-  const me = await owner();
+  const me = await allowed("website");
   if ("error" in me) return me;
   const parsed = CafeDetailsSchema.safeParse({
     ...Object.fromEntries(formData),
@@ -60,7 +60,7 @@ export async function saveCafeDetails(_prev: FormState, formData: FormData): Pro
 
 /** Settings → Editing: guests can pick and order on the QR menu (off = view-only menu). */
 export async function setOrderingEnabled(enabled: boolean): Promise<Result> {
-  const me = await owner();
+  const me = await allowed("website");
   if ("error" in me) return me;
   await db.cafeSettings.update({ where: { id: 1 }, data: { orderingEnabled: enabled === true } });
   updateTag(SETTINGS_TAG);
@@ -70,7 +70,7 @@ export async function setOrderingEnabled(enabled: boolean): Promise<Result> {
 
 /** Settings → Editing: show the Blog pages and links to guests. */
 export async function setBlogEnabled(enabled: boolean): Promise<Result> {
-  const me = await owner();
+  const me = await allowed("website");
   if ("error" in me) return me;
   await db.cafeSettings.update({ where: { id: 1 }, data: { blogEnabled: enabled === true } });
   updateTag(SETTINGS_TAG);
@@ -80,7 +80,7 @@ export async function setBlogEnabled(enabled: boolean): Promise<Result> {
 
 /** Settings → Editing: allow adding and changing orders in Order history. */
 export async function setOrderEdits(enabled: boolean): Promise<Result> {
-  const me = await owner();
+  const me = await allowed("OWNER");
   if ("error" in me) return me;
   await db.cafeSettings.update({ where: { id: 1 }, data: { orderEditsEnabled: enabled === true } });
   revalidatePath("/admin/settings");
@@ -90,7 +90,7 @@ export async function setOrderEdits(enabled: boolean): Promise<Result> {
 
 /** Settings → Editing: allow adding customers and changing their name, phone and email. */
 export async function setCustomerEdits(enabled: boolean): Promise<Result> {
-  const me = await owner();
+  const me = await allowed("OWNER");
   if ("error" in me) return me;
   await db.cafeSettings.update({ where: { id: 1 }, data: { customerEditsEnabled: enabled === true } });
   revalidatePath("/admin/settings");
@@ -103,7 +103,7 @@ export async function setCustomerEdits(enabled: boolean): Promise<Result> {
 export type StaffFormState = (FormState & { password?: string; username?: string }) | undefined;
 
 export async function createStaff(_prev: StaffFormState, formData: FormData): Promise<StaffFormState> {
-  const me = await owner();
+  const me = await allowed("OWNER");
   if ("error" in me) return me;
   const parsed = StaffSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
@@ -128,7 +128,7 @@ export async function createStaff(_prev: StaffFormState, formData: FormData): Pr
 
 /** New random password; bumping sessionVersion logs them out everywhere. */
 export async function resetStaffPassword(id: string): Promise<{ password: string } | { error: string }> {
-  const me = await owner();
+  const me = await allowed("OWNER");
   if ("error" in me) return me;
   if (id === me.id) return { error: "Change your own password under “My password”." };
   const password = newPassword();
@@ -141,7 +141,7 @@ export async function resetStaffPassword(id: string): Promise<{ password: string
 }
 
 export async function setStaffActive(id: string, active: boolean): Promise<Result> {
-  const me = await owner();
+  const me = await allowed("OWNER");
   if ("error" in me) return me;
   if (id === me.id) return { error: "You can't switch off your own login." };
   if (!active) {
@@ -154,10 +154,26 @@ export async function setStaffActive(id: string, active: boolean): Promise<Resul
   return { ok: true };
 }
 
+/** Removes a login for good. Past orders, bills and expenses stay; they just no longer name who did them. */
+export async function deleteStaff(id: string): Promise<Result> {
+  const me = await allowed("OWNER");
+  if ("error" in me) return me;
+  if (id === me.id) return { error: "You can't delete your own login." };
+  const target = await db.staffUser.findUnique({ where: { id }, select: { role: true, active: true } });
+  if (!target) return { error: "This login was already deleted." };
+  if (target.role === "OWNER" && target.active) {
+    const owners = await db.staffUser.count({ where: { role: "OWNER", active: true } });
+    if (owners <= 1) return { error: "Keep at least one active owner." };
+  }
+  await db.staffUser.delete({ where: { id } });
+  revalidatePath("/admin/settings");
+  return { ok: true };
+}
+
 /* ---------------------------- my password ---------------------------- */
 
 export async function changeMyPassword(_prev: FormState, formData: FormData): Promise<FormState> {
-  const me = await owner();
+  const me = await allowed("website");
   if ("error" in me) return me;
   const parsed = PasswordChangeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
