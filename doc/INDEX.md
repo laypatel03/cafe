@@ -11,7 +11,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 
 | URL | File | Who | Notes |
 |---|---|---|---|
-| `/` | `src/app/page.tsx` → `components/landing/{hero,sections,site-header,site-footer,cafe-json-ld}.tsx` | public | Hero = stack of dish cards from live menu |
+| `/` | `src/app/page.tsx` → `components/landing/{hero,sections,google-reviews,site-header,site-footer,cafe-json-ld}.tsx` | public | Hero = stack of dish cards from live menu |
 | `/menu` | `src/app/menu/page.tsx` → `components/menu/menu-browser.tsx` | public | QR menu; ordering gated by `orderingEnabled` + opening hours |
 | `/menu/pdf` | `src/app/menu/pdf/route.ts` → `lib/menu-pdf/{document.tsx,layout.ts}` | public | A4 PDF from live menu (`@react-pdf/renderer`) |
 | `/t/[table]` | `src/app/t/[table]/page.tsx` | public | Legacy – redirects to `/menu` |
@@ -82,6 +82,7 @@ Every action: `assertUser(role?)` (throws) → Zod parse (`lib/validators/*`) �
 | Module | Reads |
 |---|---|
 | `menu.ts` | `getPublicMenu`, `getCafeDetails` (cached, tags `menu`/`settings`), `mediaUrl` |
+| `google-reviews.ts` | `getGoogleReviews(placeId)` – Places API (New), cached 3 h (tag `google-reviews`); parsing in `lib/google-reviews.ts` → `landing/google-reviews.tsx` |
 | `admin-menu.ts` | Menu manager lists, `getMenuItemForEdit` |
 | `menu-prices.ts` | `loadMenuPrices` – DB prices for `pricing.ts` |
 | `live.ts` | `getLiveBoard` – selections, active orders, bills to make/pay |
@@ -110,7 +111,7 @@ Every action: `assertUser(role?)` (throws) → Zod parse (`lib/validators/*`) �
 | `Customer` | Keyed by 10-digit `phone`; consent, notes, counters |
 | `Selection` | Guest's live pick list per device (12 h TTL); staff watch it |
 | `StaffUser` | `role` STAFF/OWNER; `sessionVersion` bump = logout everywhere |
-| `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
+| `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `googlePlaceId` (home page reviews), `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
 | `Expense`, `CashDay`, `ExtraSale` | Money book / cash drawer; `CashDay.day` = `yyyy-mm-dd` IST |
 | `RateLimit` | Fixed window counters |
 

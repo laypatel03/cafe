@@ -22,7 +22,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Pick dishes and add-ons, then order with their name and number. Their phone remembers the details for next time.
 - Add an optional note for the kitchen and choose whether to receive offers.
 - Follow their order live: Waiting for staff → Accepted → In the kitchen → Served or Ready to collect → Paid.
-- The home page shows the café, Today's pick, bestsellers, how to visit, and a privacy note.
+- The home page shows the café, Today's pick, bestsellers, how to visit, and a privacy note. Once set up, it also shows your Google star rating under the "Explore Menu" button, and the 4 and 5 star reviews among the 5 Google sends (Google picks which), refreshed every 3 hours, with buttons to read all reviews or write one.
 - A Blog with 5 short articles on vegetarian protein, sprouts, oats and how to read the menu, each with a photo and the dishes to try (protein and calories, no prices). The latest three show on the home page. New articles are added by the developer for now. The blog stays hidden from guests until the owner turns on Settings → Editing → "Show the blog" (staff who are logged in can preview it). "Guests can make lists" is in the same place now.
 
 ### Staff
@@ -55,4 +55,4 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Reports: sales by hour, day and month, dine-in vs takeaway, top dishes, how many guests are regulars, expenses by category, and sales minus expenses.
 - See every expense for any period, and change or delete one. See past days at the cash counter and reopen today if a count was wrong.
 - Print the café QR cards.
-- Settings: café details and hours, FSSAI licence number (shown in the website footer once added), Google Analytics ID (counts visits to the public pages, not the staff screens; the privacy note mentions it once it's on), Today's pick, switch ordering on or off, and staff logins.
+- Settings: café details and hours, FSSAI licence number (shown in the website footer once added), Google Analytics ID (counts visits to the public pages, not the staff screens; the privacy note mentions it once it's on), Google Place ID for the reviews, Today's pick, switch ordering on or off, and staff logins.

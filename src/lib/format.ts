@@ -19,3 +19,9 @@ const inr = new Intl.NumberFormat("en-IN", {
 export function formatINR(amount: number) {
   return inr.format(amount);
 }
+
+/** "Asha Mehta" → "AM", "asha" → "A". */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "G";
+}

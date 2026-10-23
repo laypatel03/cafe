@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { CafeJsonLd } from "@/components/landing/cafe-json-ld";
-import { Hero, type HeroDish } from "@/components/landing/hero";
+import { GoogleReviews } from "@/components/landing/google-reviews";
+import { Hero, type HeroDish, type HeroReviews } from "@/components/landing/hero";
 import {
   Bestsellers,
   FromOurKitchen,
@@ -13,12 +14,14 @@ import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
 import { ARTICLES } from "@/lib/articles";
 import { isWithinWorkingHours } from "@/lib/cafe-hours";
+import { getGoogleReviews } from "@/lib/data/google-reviews";
 import { getCafeDetails, getPublicMenu } from "@/lib/data/menu";
 
 export default async function HomePage() {
   // Rendered per request (cheap – the data below is cached) so builds don't need the database.
   await connection();
   const [{ items, categories }, cafe] = await Promise.all([getPublicMenu(), getCafeDetails()]);
+  const reviews = await getGoogleReviews(cafe.googlePlaceId);
   const pick = items.find((m) => m.id === cafe.todaysPickId) ?? items[0];
   const isOrderingAllowed = cafe.orderingEnabled && isWithinWorkingHours(cafe.hours);
 
@@ -43,12 +46,18 @@ export default async function HomePage() {
     bestseller: m.tags.includes("bestseller"),
   }));
 
+  const heroReviews: HeroReviews | null = reviews && {
+    rating: reviews.rating,
+    count: reviews.count,
+    faces: reviews.reviews.map((r) => ({ name: r.author, photo: r.photo })),
+  };
+
   return (
     <>
       <CafeJsonLd cafe={cafe} />
       <SiteHeader showBlog={cafe.blogEnabled} />
       <main>
-        <Hero dishes={heroDishes} />
+        <Hero dishes={heroDishes} reviews={heroReviews} />
         {pick && <TodaysPick item={pick} />}
         <OurPromise />
         {items.length > 0 && <Bestsellers items={items} orderingEnabled={isOrderingAllowed} />}
@@ -58,6 +67,7 @@ export default async function HomePage() {
             articles={[...ARTICLES].sort((a, b) => b.published.localeCompare(a.published)).slice(0, 3)}
           />
         )}
+        {reviews && <GoogleReviews data={reviews} />}
         <VisitUs cafe={cafe} />
       </main>
       <SiteFooter cafe={cafe} />

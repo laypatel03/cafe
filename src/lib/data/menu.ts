@@ -75,6 +75,8 @@ export type CafeDetails = {
   fssaiLicence: string;
   /** Google Analytics 4 Measurement ID, or "" for none */
   gaMeasurementId: string;
+  /** Google Places ID for the home page reviews, or "" for none */
+  googlePlaceId: string;
   hours: { days: string; time: string }[];
   orderingEnabled: boolean;
   /** the public Blog; off = guests get "not found" and no blog links */
@@ -97,6 +99,7 @@ export const getCafeDetails = unstable_cache(
       instagram: s.instagram,
       fssaiLicence: s.fssaiLicence,
       gaMeasurementId: s.gaMeasurementId,
+      googlePlaceId: s.googlePlaceId,
       hours: (s.hours as CafeDetails["hours"]) ?? [],
       orderingEnabled: s.orderingEnabled,
       blogEnabled: s.blogEnabled,

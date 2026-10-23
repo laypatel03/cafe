@@ -73,6 +73,12 @@ export default async function PrivacyPage() {
               advertising or tracking cookies.
             </p>
           )}
+          {cafe.googlePlaceId && (
+            <p className="mt-2">
+              The home page shows our reviews from Google. The reviewers&apos; photos load from Google, so
+              Google sees your IP address when you view them.
+            </p>
+          )}
         </section>
 
         <section>

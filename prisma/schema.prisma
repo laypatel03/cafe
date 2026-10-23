@@ -267,6 +267,8 @@ model CafeSettings {
   instagram        String   @default("")
   fssaiLicence     String   @default("") // 14 digits; shown with the FSSAI mark in the site footer
   gaMeasurementId  String   @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
+  // Google Places ID ("ChIJ…") for the reviews section on the home page; the API key is in .env
+  googlePlaceId    String   @default("")
   hours            Json     @default("[]") // [{ days, time }]
   orderingEnabled  Boolean  @default(true)
   // the public Blog pages and links; off = hidden from guests (staff who are logged in can still preview)

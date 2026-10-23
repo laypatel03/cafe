@@ -45,6 +45,15 @@ export const CafeDetailsSchema = z.object({
         z.string().regex(/^G-[A-Z0-9]{4,15}$/, "The Measurement ID from Google Analytics, like G-AB12CD34EF"),
       ),
   ).default(""),
+  // goes into the Google Places request path
+  googlePlaceId: optional(
+    z
+      .string()
+      .trim()
+      .pipe(
+        z.string().regex(/^[\w-]{10,300}$/, "The Place ID from Google, like ChIJN1t_tDeuEmsRUsoyG83frY4"),
+      ),
+  ).default(""),
   hours: z
     .array(z.object({ days: z.string().trim().max(30), time: z.string().trim().max(40) }))
     .max(7)

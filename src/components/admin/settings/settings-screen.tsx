@@ -35,6 +35,9 @@ type Cafe = {
   instagram: string;
   fssaiLicence: string;
   gaMeasurementId: string;
+  googlePlaceId: string;
+  /** GOOGLE_MAPS_API_KEY is set on the server */
+  reviewsKeySet: boolean;
   hours: { days: string; time: string }[];
   todaysPickId: string;
 };
@@ -328,6 +331,28 @@ function CafeForm({ cafe, items }: { cafe: Cafe; items: { id: string; name: stri
           />
         </Field>
       </div>
+
+      <Field
+        id="googlePlaceId"
+        label="Google Place ID (reviews)"
+        hint={
+          cafe.reviewsKeySet
+            ? "Starts with ChIJ… The home page shows your Google rating and latest reviews, refreshed every 3 hours. Leave empty to hide."
+            : "Starts with ChIJ… Reviews also need GOOGLE_MAPS_API_KEY in the server's .env – it isn't set yet, so the section stays hidden."
+        }
+        error={err.googlePlaceId}
+      >
+        <Input
+          id="googlePlaceId"
+          name="googlePlaceId"
+          maxLength={300}
+          spellCheck={false}
+          autoCapitalize="none"
+          defaultValue={cafe.googlePlaceId}
+          className="h-10"
+          aria-invalid={!!err.googlePlaceId}
+        />
+      </Field>
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Opening hours</legend>

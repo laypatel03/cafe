@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowRight, Dumbbell, Flame, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Dumbbell, Flame, ShieldCheck, Star, Store } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LogoWordmark } from "@/components/brand/logo";
 import { ItemImage } from "@/components/menu/item-art";
-import { formatINR } from "@/lib/format";
+import { formatINR, initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type HeroDish = {
@@ -19,6 +19,13 @@ export type HeroDish = {
   kcal: number;
   photo?: string;
   bestseller: boolean;
+};
+
+/** Google rating summary shown under the buttons. */
+export type HeroReviews = {
+  rating: number;
+  count: number;
+  faces: { name: string; photo: string }[];
 };
 
 const ADVANCE_MS = 3800;
@@ -180,7 +187,69 @@ function DishStack({ dishes }: { dishes: HeroDish[] }) {
   );
 }
 
-export function Hero({ dishes }: { dishes: HeroDish[] }) {
+const compact = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
+
+function RatingSummary({ reviews }: { reviews: HeroReviews }) {
+  const faces = reviews.faces.slice(0, 3);
+  const more = reviews.count - faces.length;
+  return (
+    <a
+      href="#reviews"
+      className="group flex items-center gap-3 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-[#055c1b]/50"
+    >
+      {faces.length > 0 && (
+        <span aria-hidden className="flex -space-x-2.5">
+          {faces.map((f, i) =>
+            f.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={f.photo}
+                alt=""
+                width={36}
+                height={36}
+                referrerPolicy="no-referrer"
+                className="size-9 rounded-full border-2 border-white bg-[#e2efe5] object-cover dark:border-[#0e1a12]"
+              />
+            ) : (
+              <span
+                key={i}
+                className={cn(
+                  "flex size-9 items-center justify-center rounded-full border-2 border-white text-[11px] font-black text-white dark:border-[#0e1a12]",
+                  i % 2 ? "bg-[#c2410c]" : "bg-[#055c1b]",
+                )}
+              >
+                {initials(f.name)}
+              </span>
+            ),
+          )}
+          {more > 0 && (
+            <span className="flex size-9 items-center justify-center rounded-full border-2 border-white bg-[#0f1f15] text-[10px] font-black text-white dark:border-[#0e1a12] dark:bg-[#eef5ef] dark:text-[#0f1f15]">
+              +{compact.format(more)}
+            </span>
+          )}
+        </span>
+      )}
+      <span className="flex flex-col">
+        <span className="flex items-center gap-1.5 text-sm font-bold text-[#0f1f15] dark:text-[#eef5ef]">
+          <Star className="size-4 fill-[#FF8A00] text-[#FF8A00]" aria-hidden />
+          <span>
+            {reviews.rating.toFixed(1)} / 5.0
+            <span className="font-medium text-[#334b3c] dark:text-[#a7b8ac]">
+              {" "}
+              ({reviews.count.toLocaleString("en-IN")} {reviews.count === 1 ? "review" : "reviews"})
+            </span>
+          </span>
+        </span>
+        <span className="text-xs font-medium text-[#5a6f61] group-hover:underline dark:text-[#a7b8ac]">
+          Rated by our guests on Google
+        </span>
+      </span>
+    </a>
+  );
+}
+
+export function Hero({ dishes, reviews }: { dishes: HeroDish[]; reviews?: HeroReviews | null }) {
   return (
     <section className="relative w-full overflow-hidden border-b border-[#d7eadb] bg-gradient-to-b from-[#eaf6ee] via-[#f2faf3] to-[#fbf9f1] px-4 pt-28 pb-16 sm:px-6 sm:pb-24 lg:px-8 dark:border-[#24392b] dark:from-[#09150d] dark:via-[#0e1a12] dark:to-[#0e1a12]">
       {/* Ambient background glows */}
@@ -228,6 +297,8 @@ export function Hero({ dishes }: { dishes: HeroDish[] }) {
               <span>Visit Café</span>
             </a>
           </div>
+
+          {reviews && <RatingSummary reviews={reviews} />}
         </div>
 
         {/* Right Column: Layered Interactive Showcase */}

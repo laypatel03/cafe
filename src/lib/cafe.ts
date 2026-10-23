@@ -1,3 +1,6 @@
+/** Google's "write a review" page for the café (thank-you SMS, home page reviews). */
+export const REVIEW_URL = "https://g.page/r/Cb44MqB8wgCAEBM/review";
+
 export const PHOTO_NOTE = "Photos are for reference only – the dish you get may look a little different.";
 
 export const NUTRITION_NOTE =

@@ -39,6 +39,8 @@ export default async function SettingsPage() {
         instagram: settings.instagram,
         fssaiLicence: settings.fssaiLicence,
         gaMeasurementId: settings.gaMeasurementId,
+        googlePlaceId: settings.googlePlaceId,
+        reviewsKeySet: Boolean(process.env.GOOGLE_MAPS_API_KEY),
         hours: (settings.hours as { days: string; time: string }[]) ?? [],
         todaysPickId: settings.todaysPickId ?? "",
       }}
