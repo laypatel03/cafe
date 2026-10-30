@@ -109,7 +109,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 ## Developer (role DEVELOPER – website only)
 
-- Can: Menu (everything the owner can: dishes, prices, photos, add-ons, categories, order, sold out), QR code, Settings → Café (details, hours, FSSAI, Analytics, Place ID, Today's pick), Settings → Editing → "Website and QR menu" switches, My password.
+- Can: Menu (everything the owner can: dishes, prices, photos, add-ons, categories, order, sold out), Today's offer, QR code, Settings → Café (details, hours, FSSAI, Analytics, Place ID, Today's pick), Settings → Editing → "Website and QR menu" switches, My password.
 - Can't: Live orders, Order history, counter orders, bills, Cash counter, Expenses, Money book, Customers, Reports, Staff logins, the "Fixing past records" switches, CSV exports. Those pages redirect to `/admin/menu`; the actions and APIs refuse.
 - Created by an owner in Settings → Staff logins.
 
@@ -151,6 +151,11 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 *As the owner I want to set café details, hours, Today's pick, switches and staff logins so that the app fits how we work.*
 - Rules: hours rejected if they can't be parsed; FSSAI licence is 14 digits (spaces stripped) or empty, footer badge shows only when set; GA ID must be `G-` + 4–15 letters/digits (it's put in an inline script), loaded only off `/admin` and the privacy note switches its cookie sentence when set; switches: ordering, blog, order edits, customer edits; resetting a password/deactivating bumps `sessionVersion` (logs out); owner can delete a login (`deleteStaff`, after a confirm) – not their own, not the last active owner; history rows keep their data with the staff link set to null (no name shown); `updateTag(SETTINGS_TAG)` after writes.
 - Code: `(dashboard)/settings/*`, `admin/settings/settings-screen.tsx`, `lib/validators/settings.ts`, `lib/cafe-hours.ts`.
+
+**O-09 – Today's offer** (owner + developer)
+*As the owner I want to put a lower price on a dish for a day or a few days so that guests notice it and order it.*
+- Rules: one dish, offer price below the menu price, optional short line (≤60), first and last day (IST, inclusive, last day not past); `/` shows a "Today's offer" section under the hero and `/menu` a strip at the top (hidden while searching/filtering), cards show the offer price in orange with the regular price struck through and an "Offer" tag; no offer → nothing shows. Orders (guest, counter, live-board edits) are charged the offer price via `loadMenuPrices`; owner past-order edits start from regular prices; PDF menu and blog keep regular prices. Ending an offer doesn't change orders already placed. Offer ignored if the menu price drops to or below it, or the dish is hidden.
+- Code: `lib/offers.ts`, `lib/data/offers.ts`, `(dashboard)/offers/*`, `components/landing/todays-offers.tsx`, `components/menu/{price,offers-strip}.tsx`.
 
 **O-08 – QR cards**
 *As the owner I want to print the café QR so that guests can scan it at every table.*

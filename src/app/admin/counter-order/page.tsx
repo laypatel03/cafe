@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { MenuBrowser } from "@/components/menu/menu-browser";
 import { requireUser } from "@/lib/auth/dal";
 import { db } from "@/lib/db";
-import { getPublicMenu } from "@/lib/data/menu";
+import { getMenuWithOffers } from "@/lib/data/offers";
 
 export const metadata: Metadata = { title: "Counter order", robots: { index: false } };
 
@@ -15,7 +15,7 @@ export default async function CounterOrderPage({ searchParams }: PageProps<"/adm
   const me = await requireUser();
   const { customer: customerId } = await searchParams;
   const [menu, guest] = await Promise.all([
-    getPublicMenu(),
+    getMenuWithOffers(),
     // owner only: staff see masked numbers everywhere else
     me.role === "OWNER" && typeof customerId === "string"
       ? db.customer.findUnique({ where: { id: customerId }, select: { name: true, phone: true } })

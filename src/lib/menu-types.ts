@@ -32,6 +32,9 @@ export type MenuItem = {
   /** URL of the uploaded photo, if any */
   photo?: string;
   addOnIds: string[];
+  /** regular price, set only while an offer makes `price` lower */
+  wasPrice?: number;
+  offer?: { title: string; endsOn: string };
 };
 
 export const HIGH_PROTEIN_MIN_G = 15;

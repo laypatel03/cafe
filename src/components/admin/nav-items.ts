@@ -6,6 +6,7 @@ export type NavItem = {
   icon:
     | "orders"
     | "menu"
+    | "offers"
     | "history"
     | "cash"
     | "expenses"
@@ -24,6 +25,7 @@ export const ROLE_LABEL: Record<Role, string> = { STAFF: "Staff", OWNER: "Owner"
 export const NAV: NavItem[] = [
   { href: "/admin", label: "Live orders", icon: "orders", roles: ["STAFF", "OWNER"] },
   { href: "/admin/menu", label: "Menu", icon: "menu", roles: ["STAFF", "OWNER", "DEVELOPER"] },
+  { href: "/admin/offers", label: "Today's offer", icon: "offers", roles: ["OWNER", "DEVELOPER"] },
   { href: "/admin/orders", label: "Order history", icon: "history", roles: ["STAFF", "OWNER"] },
   { href: "/admin/cash", label: "Cash counter", icon: "cash", roles: ["STAFF", "OWNER"] },
   { href: "/admin/expenses", label: "Expenses", icon: "expenses", roles: ["STAFF", "OWNER"] },

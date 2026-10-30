@@ -3,10 +3,10 @@
 import { Flame, Plus, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { VegMark } from "@/components/brand/veg-mark";
-import { formatINR } from "@/lib/format";
 import { hasNutrition, isHighProtein, type MenuItem } from "@/lib/menu-types";
 import { cn } from "@/lib/utils";
 import { ItemImage } from "./item-art";
+import { OfferTag, Price } from "./price";
 
 type Props = {
   item: MenuItem;
@@ -53,13 +53,19 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
           <VegMark className="size-4.5 shadow-sm" />
         </div>
 
-        {/* Top-Right: Bestseller Tag */}
-        {isBestseller && (
+        {/* Top-Right: Offer, else Bestseller Tag */}
+        {item.wasPrice !== undefined ? (
           <div className="absolute top-2.5 right-2.5 z-10">
-            <span className="inline-flex items-center rounded-full bg-[#ea580c] px-2.5 py-0.5 text-[10px] font-black tracking-wider text-white uppercase shadow-sm">
-              Bestseller
-            </span>
+            <OfferTag />
           </div>
+        ) : (
+          isBestseller && (
+            <div className="absolute top-2.5 right-2.5 z-10">
+              <span className="inline-flex items-center rounded-full bg-[#ea580c] px-2.5 py-0.5 text-[10px] font-black tracking-wider text-white uppercase shadow-sm">
+                Bestseller
+              </span>
+            </div>
+          )
         )}
 
         {/* Bottom-left: protein tag (non-overlapping with top tags) */}
@@ -126,9 +132,7 @@ export function MenuItemCard({ item, orderingEnabled, onOpen }: Props) {
         {/* Price & Action Row */}
         <div className="mt-auto flex items-center justify-between border-t border-[#e8f1ea] pt-2.5 dark:border-[#24392b]">
           <div className="flex items-baseline gap-1.5">
-            <span className="tabular text-xl font-black text-[#0f1f15] dark:text-[#eef5ef]">
-              {formatINR(item.price)}
-            </span>
+            <Price item={item} className="text-xl" />
           </div>
 
           <div className="z-20">

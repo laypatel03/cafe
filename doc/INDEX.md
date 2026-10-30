@@ -21,6 +21,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `/admin/login` | `src/app/admin/login/{page,login-form}.tsx`, `actions.ts` | – | Rate-limited login |
 | `/admin` | `(dashboard)/page.tsx` → `components/admin/live-board.tsx` (`orders-panel`, `billing-panel`) | staff | Live orders + billing |
 | `/admin/menu` | `(dashboard)/menu/{page,actions}.ts(x)`, `menu/items/{new,[id]}`, `components/admin/menu/*` | staff (sold-out only) / owner | |
+| `/admin/offers` | `(dashboard)/offers/{page,actions}.ts(x)`, `components/admin/offers/offer-form.tsx` | owner / developer | Today's offer: dish, offer price, days |
 | `/admin/orders` | `(dashboard)/orders/{page,actions}.ts(x)`, `components/admin/orders/*` | staff / owner | History, filters, pay-later, edit (owner switch) |
 | `/admin/counter-order` | `src/app/admin/counter-order/page.tsx` (reuses `menu-browser` + `useCounterCart`) | staff | Walk-in orders; `?customer=` owner only |
 | `/admin/cash` | `(dashboard)/cash/{page,actions}.ts(x)`, `components/admin/cash/cash-forms.tsx` | staff | Drawer open/close |
@@ -47,6 +48,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `(dashboard)/orders/actions.ts` | `addPastOrder`, `editOrder`, `deleteOrder` (soft), `changeBillPayment` |
 | `(dashboard)/menu/actions.ts` | items / categories / add-ons CRUD, move, `setMenuItemOrder` (drag), `setItemAvailable` (staff) |
 | `(dashboard)/cash/actions.ts` | `setOpeningCash`, `closeDay`, `reopenDay`, `saveExpense`, `deleteExpense` |
+| `(dashboard)/offers/actions.ts` | `saveOffer`, `deleteOffer` (owner + developer; `updateTag(MENU_TAG)`) |
 | `(dashboard)/money/actions.ts` | `addExtraSale`, `deleteExtraSale`, `saveCardFees` |
 | `(dashboard)/customers/actions.ts` | notes, `withdrawConsent`, `deleteCustomer`, `addCustomer`, `updateCustomer` |
 | `(dashboard)/settings/actions.ts` | `saveCafeDetails`, switches (`setOrderingEnabled`, `setBlogEnabled`, `setOrderEdits`, `setCustomerEdits`), staff accounts, `changeMyPassword` |
@@ -70,6 +72,7 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `reports.ts` | Ranges (`resolveRange`, presets), hour/day/month buckets |
 | `cafe-hours.ts` | Parse owner-typed hours, `isWithinWorkingHours` (IST) |
 | `customer-stats.ts` | `favouriteItems` |
+| `offers.ts` | `offersOn(rows, day)`, `offerPrice` (never above menu price), `applyOffers` (sets `price`/`wasPrice`), `offerEndsLabel` |
 | `paging.ts` | Admin list pages (10/25/50) |
 | `receipt.ts` | Thank-you SMS text + `sms:` link (`RECEIPT_SMS_ENABLED`) |
 | `csv.ts` | Spreadsheet-safe CSV |
@@ -84,7 +87,8 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `menu.ts` | `getPublicMenu`, `getCafeDetails` (cached, tags `menu`/`settings`), `mediaUrl` |
 | `google-reviews.ts` | `getGoogleReviews(placeId)` – Places API (New), cached 3 h (tag `google-reviews`); parsing in `lib/google-reviews.ts` → `landing/google-reviews.tsx` |
 | `admin-menu.ts` | Menu manager lists, `getMenuItemForEdit` |
-| `menu-prices.ts` | `loadMenuPrices` – DB prices for `pricing.ts` |
+| `menu-prices.ts` | `loadMenuPrices` – DB prices for `pricing.ts`, today's offers applied (`{ offers: false }` for owner past-order edits) |
+| `offers.ts` | `getTodaysOffers` (cached per IST day, tag `menu`), `getMenuWithOffers` – used by `/`, `/menu`, counter order, live board (not the PDF menu or blog) |
 | `live.ts` | `getLiveBoard` – selections, active orders, bills to make/pay |
 | `cash.ts` | `today`, `dayBounds`, `moneyBetween`, drawer day + history |
 | `money-book.ts` | `getMoneyBook` |
@@ -112,6 +116,7 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `Selection` | Guest's live pick list per device (12 h TTL); staff watch it |
 | `StaffUser` | `role` STAFF/OWNER/DEVELOPER; `sessionVersion` bump = logout everywhere |
 | `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `googlePlaceId` (home page reviews), `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
+| `Offer` | `menuItemId`, `pricePaise`, `title`, `startsOn`/`endsOn` (`yyyy-mm-dd` IST, inclusive); lowest wins if two overlap |
 | `Expense`, `CashDay`, `ExtraSale` | Money book / cash drawer; `CashDay.day` = `yyyy-mm-dd` IST |
 | `RateLimit` | Fixed window counters |
 
@@ -147,6 +152,7 @@ Enum labels for UI: `PaymentMethod` → `lib/payments.ts` (legacy `CARD` = credi
 | Order history filters / owed | `(dashboard)/orders/page.tsx`, `lib/data/owed.ts`, `lib/paging.ts` |
 | Opening hours | `lib/cafe-hours.ts`, `hooks/use-open-now.ts`, `validators/settings.ts#hoursFromForm` |
 | Login / sessions / staff accounts | `lib/auth/*`, `admin/login/*`, `settings/actions.ts` |
+| Today's offer | `lib/offers.ts`, `lib/data/offers.ts`, `(dashboard)/offers/*`, `components/landing/todays-offers.tsx`, `components/menu/{price,offers-strip}.tsx` |
 | Photos | `lib/uploads.ts`, `media/[...path]/route.ts`, `components/menu/item-art.tsx` |
 | Brand / theme tokens | `src/app/globals.css`, `components/brand/*`, `components/theme/*` |
 | Landing content | `components/landing/sections.tsx`, `components/landing/hero.tsx` |

@@ -58,7 +58,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${jakarta.variable} ${baloo.variable} ${figtree.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        {/* new storageKey: choices saved under the old "theme" key could pin a device to one mode for good */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          storageKey="hh-theme"
+          disableTransitionOnChange
+        >
           {children}
           <Toaster position="top-center" />
         </ThemeProvider>

@@ -12,16 +12,18 @@ import {
 } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
+import { TodaysOffers } from "@/components/landing/todays-offers";
 import { ARTICLES } from "@/lib/articles";
 import { isWithinWorkingHours } from "@/lib/cafe-hours";
 import { getGoogleReviews } from "@/lib/data/google-reviews";
-import { getCafeDetails, getPublicMenu } from "@/lib/data/menu";
+import { getCafeDetails } from "@/lib/data/menu";
+import { getMenuWithOffers } from "@/lib/data/offers";
 import { markDishes } from "@/lib/google-reviews";
 
 export default async function HomePage() {
   // Rendered per request (cheap – the data below is cached) so builds don't need the database.
   await connection();
-  const [{ items, categories }, cafe] = await Promise.all([getPublicMenu(), getCafeDetails()]);
+  const [{ items, categories, today }, cafe] = await Promise.all([getMenuWithOffers(), getCafeDetails()]);
   const reviews = await getGoogleReviews(cafe.googlePlaceId);
   const pick = items.find((m) => m.id === cafe.todaysPickId) ?? items[0];
   const isOrderingAllowed = cafe.orderingEnabled && isWithinWorkingHours(cafe.hours);
@@ -41,6 +43,7 @@ export default async function HomePage() {
     category: m.category,
     categoryName: categoryName.get(m.category) ?? "",
     price: m.price,
+    wasPrice: m.wasPrice,
     protein: m.protein,
     kcal: m.kcal,
     photo: m.photo,
@@ -67,6 +70,7 @@ export default async function HomePage() {
       <SiteHeader showBlog={cafe.blogEnabled} />
       <main>
         <Hero dishes={heroDishes} reviews={heroReviews} />
+        <TodaysOffers items={items} today={today} orderingEnabled={isOrderingAllowed} />
         {pick && <TodaysPick item={pick} />}
         <OurPromise />
         {items.length > 0 && <Bestsellers items={items} orderingEnabled={isOrderingAllowed} />}

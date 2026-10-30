@@ -48,7 +48,14 @@ async function priceItems(
   kept?: Map<string, KeptLine>,
 ): Promise<{ ok: true; rows: OrderItemRow[]; subtotalPaise: number } | Fail> {
   const priced = items.length
-    ? priceEditedLines(items, await loadMenuPrices(items.map((i) => i.itemId)), kept)
+    ? priceEditedLines(
+        items,
+        await loadMenuPrices(
+          items.map((i) => i.itemId),
+          { offers: false },
+        ),
+        kept,
+      )
     : { ok: true as const, lines: [], subtotalPaise: 0 };
   if (!priced.ok) return { ok: false, error: "Fix these first:", problems: priced.problems };
   return orderRows(priced.lines, customRows(others));

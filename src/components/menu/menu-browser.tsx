@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { CartBar } from "./cart-bar";
 import { ItemSheet } from "./item-sheet";
 import { MenuItemCard } from "./menu-item-card";
+import { OffersStrip } from "./offers-strip";
 
 type Filter = "high-protein" | "light" | "bestseller";
 
@@ -318,6 +319,7 @@ export function MenuBrowser({
 
         {/* Main Content Area */}
         <main className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+          {!query && filters.length === 0 && <OffersStrip items={items} onOpen={setOpenItem} />}
           {!orderingEnabled && (
             <div className="mb-8 flex flex-col justify-between gap-3 rounded-2xl border border-amber-300/80 bg-amber-50 p-4 text-amber-900 shadow-xs sm:flex-row sm:items-center dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
               <div className="flex items-center gap-3">

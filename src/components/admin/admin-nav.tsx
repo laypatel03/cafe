@@ -4,6 +4,7 @@ import {
   Banknote,
   BarChart3,
   BookOpen,
+  BadgePercent,
   ClipboardList,
   History,
   IndianRupee,
@@ -29,6 +30,7 @@ import { NAV, type NavItem, ROLE_LABEL } from "./nav-items";
 const ICONS = {
   orders: ClipboardList,
   menu: BookOpen,
+  offers: BadgePercent,
   history: History,
   cash: Banknote,
   expenses: Receipt,

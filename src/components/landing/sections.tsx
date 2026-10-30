@@ -23,10 +23,10 @@ import { Reveal } from "@/components/brand/reveal";
 import { VegMark } from "@/components/brand/veg-mark";
 import { ArticleCard } from "@/components/blog/article-card";
 import { ItemImage } from "@/components/menu/item-art";
+import { Price } from "@/components/menu/price";
 import { Button } from "@/components/ui/button";
 import type { Article } from "@/lib/articles";
 import type { CafeDetails } from "@/lib/data/menu";
-import { formatINR } from "@/lib/format";
 import type { MenuItem } from "@/lib/menu-types";
 import { cn } from "@/lib/utils";
 
@@ -87,9 +87,7 @@ export function TodaysPick({ item }: { item: MenuItem }) {
               )}
 
               <div className="mt-4 flex flex-wrap items-center gap-4 pt-2">
-                <span className="tabular text-3xl font-black text-[#0f1f15] dark:text-[#eef5ef]">
-                  {formatINR(item.price)}
-                </span>
+                <Price item={item} className="text-3xl" />
                 <Link
                   href={`/menu?item=${encodeURIComponent(item.id)}`}
                   className="inline-flex items-center gap-2 rounded-full bg-[#ea580c] px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-[#c2410c] hover:shadow-lg active:scale-95"
@@ -297,9 +295,7 @@ export function Bestsellers({
 
               {/* Price & Add */}
               <div className="mt-4 flex items-center justify-between border-t border-[#e8f1ea] px-1 pt-3 dark:border-[#24392b]">
-                <span className="tabular text-xl font-black text-[#0f1f15] dark:text-[#eef5ef]">
-                  {formatINR(item.price)}
-                </span>
+                <Price item={item} className="text-xl" />
                 <Link
                   href={`/menu?item=${encodeURIComponent(item.id)}`}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#ea580c] px-4 py-2 text-xs font-extrabold text-white shadow-sm transition-all hover:bg-[#c2410c] hover:shadow active:scale-95"
@@ -458,7 +454,7 @@ export function VisitUs({ cafe }: { cafe: CafeDetails }) {
                         <span className="block text-[11px] font-black tracking-wider text-[#334b3c] uppercase dark:text-[#a7b8ac]">
                           {h.days}
                         </span>
-                        <p className="mt-1 text-base font-extrabold tracking-tight text-[#055c1b] tabular sm:text-lg dark:text-[#7ddc78]">
+                        <p className="mt-1 tabular text-base font-extrabold tracking-tight text-[#055c1b] sm:text-lg dark:text-[#7ddc78]">
                           {h.time}
                         </p>
                       </div>

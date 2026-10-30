@@ -103,6 +103,7 @@ model MenuItem {
   sortOrder    Int         @default(0)
   addOns       AddOn[]
   orderItems   OrderItem[]
+  offers       Offer[]
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -257,33 +258,50 @@ model StaffUser {
   updatedAt      DateTime         @updatedAt
 }
 
+/// A lower price on one dish for a run of café days (IST, inclusive). Orders placed on those
+/// days are charged the offer price; the regular price shows struck through beside it.
+model Offer {
+  id         String   @id @default(cuid())
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  pricePaise Int
+  /// optional short line shown with the offer, e.g. "Monday special"
+  title      String   @default("")
+  /// yyyy-mm-dd, IST
+  startsOn   String
+  endsOn     String
+  createdAt  DateTime @default(now())
+
+  @@index([endsOn])
+}
+
 /// Single row (id = 1) with the café's details and switches.
 model CafeSettings {
-  id               Int      @id @default(1)
-  name             String   @default("Healthy Hunger")
-  tagline          String   @default("Eat well, live well")
-  address          String   @default("")
-  mapUrl           String   @default("")
-  phone            String   @default("")
-  whatsapp         String   @default("")
-  instagram        String   @default("")
-  fssaiLicence     String   @default("") // 14 digits; shown with the FSSAI mark in the site footer
-  gaMeasurementId  String   @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
+  id                   Int      @id @default(1)
+  name                 String   @default("Healthy Hunger")
+  tagline              String   @default("Eat well, live well")
+  address              String   @default("")
+  mapUrl               String   @default("")
+  phone                String   @default("")
+  whatsapp             String   @default("")
+  instagram            String   @default("")
+  fssaiLicence         String   @default("") // 14 digits; shown with the FSSAI mark in the site footer
+  gaMeasurementId      String   @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
   // Google Places ID ("ChIJ…") for the reviews section on the home page; the API key is in .env
-  googlePlaceId    String   @default("")
-  hours            Json     @default("[]") // [{ days, time }]
-  orderingEnabled  Boolean  @default(true)
+  googlePlaceId        String   @default("")
+  hours                Json     @default("[]") // [{ days, time }]
+  orderingEnabled      Boolean  @default(true)
   // the public Blog pages and links; off = hidden from guests (staff who are logged in can still preview)
-  blogEnabled      Boolean  @default(false)
-  taxBasisPoints   Int      @default(0) // 500 = 5 %
-  todaysPickId     String?
+  blogEnabled          Boolean  @default(false)
+  taxBasisPoints       Int      @default(0) // 500 = 5 %
+  todaysPickId         String?
   // what the card machine provider keeps, in basis points (180 = 1.8 %); taken off profit in the money book
-  creditCardFeeBps Int      @default(0)
-  debitCardFeeBps  Int      @default(0)
+  creditCardFeeBps     Int      @default(0)
+  debitCardFeeBps      Int      @default(0)
   // owner switches: allow adding/editing orders in Order history, and adding/editing customers
   orderEditsEnabled    Boolean  @default(false)
   customerEditsEnabled Boolean  @default(false)
-  updatedAt        DateTime @updatedAt
+  updatedAt            DateTime @updatedAt
 }
 
 /// Fixed-window rate limiting for login and order forms.

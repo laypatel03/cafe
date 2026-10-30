@@ -11,6 +11,7 @@ import { useCartStore } from "@/lib/cart-store";
 import { formatINR } from "@/lib/format";
 import { hasNutrition, type AddOn, type MenuItem } from "@/lib/menu-types";
 import { ItemImage } from "./item-art";
+import { Price } from "./price";
 import { QuantityStepper } from "./quantity-stepper";
 
 type Props = {
@@ -91,12 +92,9 @@ function ItemSheetBody({
         >
           {[
             ...(hasNutrition(item)
-              ? [
-                  ["Protein*", `~${protein} g`],
-                  ["Energy*", `~${kcal} kcal`],
-                ]
+              ? [["Protein*", `~${protein} g`] as const, ["Energy*", `~${kcal} kcal`] as const]
               : []),
-            ["Price", formatINR(item.price)],
+            ["Price", <Price key="p" item={item} className="font-semibold" />] as const,
           ].map(([k, v]) => (
             <div key={k} className="rounded-2xl bg-secondary/60 px-2 py-3">
               <dt className="font-sans text-[11px] text-muted-foreground uppercase">{k}</dt>

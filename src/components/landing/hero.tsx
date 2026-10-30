@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LogoWordmark } from "@/components/brand/logo";
 import { ItemImage } from "@/components/menu/item-art";
-import { formatINR, initials } from "@/lib/format";
+import { Price } from "@/components/menu/price";
+import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type HeroDish = {
@@ -15,6 +16,8 @@ export type HeroDish = {
   category: string;
   categoryName: string;
   price: number;
+  /** regular price while an offer is on */
+  wasPrice?: number;
   protein: number;
   kcal: number;
   photo?: string;
@@ -60,7 +63,7 @@ function DishCard({ dish, front }: { dish: HeroDish; front: boolean }) {
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 rounded-full border border-[#055c1b]/20 bg-white/95 px-2.5 py-1 shadow-sm backdrop-blur-md dark:bg-[#0e1a12]/95">
           <span className="inline-block h-2 w-2 rounded-full bg-[#055c1b] dark:bg-[#7ddc78]" />
           <span className="text-[11px] font-extrabold tracking-wider text-[#055c1b] uppercase dark:text-[#7ddc78]">
-            {dish.bestseller ? "BESTSELLER" : "CHEF SPECIAL"}
+            {dish.wasPrice !== undefined ? "OFFER" : dish.bestseller ? "BESTSELLER" : "CHEF SPECIAL"}
           </span>
         </div>
 
@@ -82,9 +85,7 @@ function DishCard({ dish, front }: { dish: HeroDish; front: boolean }) {
         </h3>
 
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-[#e8f1ea] pt-2.5 dark:border-[#24392b]">
-          <span className="tabular text-xl font-black text-[#0f1f15] dark:text-[#eef5ef]">
-            {formatINR(dish.price)}
-          </span>
+          <Price item={dish} className="text-xl" />
           <div className="flex items-center gap-1.5">
             {hasNumbers && dish.protein > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[#055c1b] px-2.5 py-1 text-xs font-black text-white shadow-xs">
