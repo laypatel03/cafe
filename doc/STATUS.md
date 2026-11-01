@@ -32,7 +32,6 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Move orders along: send to the kitchen, then Served (dine-in) or Ready to collect and Picked up (takeaway).
 - See what guests are choosing before they order.
 - Make the bill – one bill for a guest's whole visit, even across several orders. Mark it paid by cash, UPI or card, and print a receipt.
-- After a guest pays, text them a thank-you from the counter phone: tap "Open messages" and the message app opens with their number and a thank-you with the link to leave a Google review and the menu address ready – just press Send. It goes from the café's own number, so it's free. Paid bills in Order history have a "Text receipt" button too.
 - Void a bill made by mistake, with a reason. Bill numbers never skip.
 - Find any order or bill by number, phone, name or date, and reprint it.
 - "Pay later" bills show on the live orders page only on the day they were marked. After that, find them in Order history (filter: pay later) and record the payment there.
@@ -45,16 +44,19 @@ Everything needed to take and bill orders is built and tested on a test computer
 - Record expenses – vegetables, groceries, gas, salaries and so on – and how they were paid. Cash paid from the drawer is taken off the cash counter automatically.
 - A clear warning shows if the internet drops, and the screen catches up when it's back.
 
+- Pay later on the live board: one card per guest with all their unpaid pay-later bills (today's, plus any from earlier days). Tick the ones they're paying now and tap how they paid – done in one go.
 ### Owner
 - Edit the menu: categories, dishes, prices, photos, add-ons, and hide or show items. Drag dishes by the grip (⋮⋮) to change their order within a category – the QR menu follows at once.
 - Add an "Other item" to an order – anything that isn't on the menu, with its own name and price. A minus price takes money off, so it works as a discount (the total never goes below ₹0). Owner only: on the live orders page (Edit items) and in Order history. Staff see these lines but can't change them. They don't count as dishes in reports or favourites.
 - Customers: search the list and open a profile with visits, spending, favourite dishes and staff notes.
 - See who still owes money: the Customers page shows the total still to pay at the top, highlights every customer who owes (with how much), and can list only them. A customer's page shows what they owe, with a button to their unpaid orders. Orders from earlier days that weren't paid and "pay later" bills count; today's orders still being served don't.
 - Start a new order straight from a customer's page – their name and number are already filled in.
+- At the counter, start typing a guest's number or name and pick them from a list of saved customers – no need to type the whole number. Only owner logins see this list (it shows full numbers); guests never see it.
 - Stop offers for a guest, delete a guest's data when they ask, and download the customer list for Excel.
 - Reports: sales by hour, day and month, dine-in vs takeaway, top dishes, how many guests are regulars, expenses by category, and sales minus expenses.
 - See every expense for any period, and change or delete one. See past days at the cash counter and reopen today if a count was wrong.
 - Print the café QR cards.
 - Settings: café details and hours, FSSAI licence number (shown in the website footer once added), Google Analytics ID (counts visits to the public pages, not the staff screens; the privacy note mentions it once it's on), Google Place ID for the reviews, Today's pick, switch ordering on or off, and staff logins (add, new password, switch off, or delete a login for good – past orders and bills stay, just without the name).
 - Today's offer: in the dashboard, pick a dish, type a lower price and the days it runs. The home page then shows a bright "Today's offer" section under the top banner, and the QR menu shows it at the top – with the new price and the old price crossed out. Guests and the counter are charged the offer price on those days. When there's no offer, nothing extra shows. The owner and developer logins can do this.
+- WhatsApp (built, not switched on yet – waiting for the café's WhatsApp Business setup with Meta): every bill goes to the guest as a PDF on WhatsApp as soon as it's paid or put on pay later. Guests who still owe money get a reminder every week (or every month – your choice in Settings → WhatsApp, with the day, time and a minimum amount) with a PDF listing what's unpaid. On a customer's page you can pause their reminders or send one now. A guest who replies STOP gets nothing more. The WhatsApp page shows every message sent, whether it arrived and was read, and lets you retry one that failed. Until it's switched on, the "WhatsApp bill" button opens WhatsApp on the counter phone with the message filled in.
 - A "Developer" login for whoever looks after the website: they can change the menu, today's offer, café details, website settings and QR code, but can't see orders, order history, bills, cash, expenses, the money book, customers or reports. Create one in Settings → Staff logins.

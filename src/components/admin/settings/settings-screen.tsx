@@ -15,6 +15,7 @@ import {
   setOrderingEnabled,
   setStaffActive,
 } from "@/app/admin/(dashboard)/settings/actions";
+import { saveReminderSettings, setWaBillsEnabled } from "@/app/admin/(dashboard)/whatsapp/actions";
 import { ActionSwitch } from "@/components/admin/action-switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
@@ -26,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormAction } from "@/hooks/use-form-action";
 import { useOpenNow } from "@/hooks/use-open-now";
 import { CAFE_TZ } from "@/lib/format";
+import { WEEKDAYS } from "@/lib/reminder-schedule";
 
 type Cafe = {
   name: string;
@@ -44,6 +46,20 @@ type Cafe = {
   todaysPickId: string;
 };
 type Switches = { orders: boolean; customers: boolean; ordering: boolean; blog: boolean };
+export type WaSettings = {
+  bills: boolean;
+  frequency: "OFF" | "WEEKLY" | "MONTHLY";
+  weekday: number;
+  monthDay: number;
+  hour: number;
+  minPaise: number;
+  /** what's set in .env on the server */
+  connected: boolean;
+  webhook: boolean;
+  schedule: boolean;
+  /** next scheduled reminders (ISO), or null when off */
+  next: string | null;
+};
 type Staff = {
   id: string;
   name: string;
@@ -59,6 +75,7 @@ export function SettingsScreen({
   isOwner,
   cafe,
   edits,
+  wa,
   staff,
   items,
 }: {
@@ -66,6 +83,7 @@ export function SettingsScreen({
   isOwner: boolean;
   cafe: Cafe;
   edits: Switches;
+  wa: WaSettings | null;
   staff: Staff[];
   items: { id: string; name: string }[];
 }) {
@@ -76,6 +94,7 @@ export function SettingsScreen({
         <TabsList>
           <TabsTrigger value="cafe">Café</TabsTrigger>
           <TabsTrigger value="editing">Editing</TabsTrigger>
+          {wa && <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>}
           {isOwner && <TabsTrigger value="staff">Staff logins</TabsTrigger>}
           <TabsTrigger value="password">My password</TabsTrigger>
         </TabsList>
@@ -85,6 +104,11 @@ export function SettingsScreen({
         <TabsContent value="editing" className="mt-4">
           <EditingPanel edits={edits} isOwner={isOwner} />
         </TabsContent>
+        {wa && (
+          <TabsContent value="whatsapp" className="mt-4">
+            <WhatsAppPanel wa={wa} />
+          </TabsContent>
+        )}
         {isOwner && (
           <TabsContent value="staff" className="mt-4">
             <StaffPanel staff={staff} meId={meId} />
@@ -215,6 +239,185 @@ function EditingPanel({ edits, isOwner }: { edits: Switches; isOwner: boolean })
           <SwitchRows rows={rows} />
         </section>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------ WhatsApp ------------------------------ */
+
+const hourLabel = (h: number) => `${h % 12 || 12}:00 ${h < 12 ? "am" : "pm"}`;
+
+function WhatsAppPanel({ wa }: { wa: WaSettings }) {
+  const [state, onSubmit, pending] = useFormAction(saveReminderSettings, undefined);
+  const [frequency, setFrequency] = useState(wa.frequency);
+  const err = state?.fieldErrors ?? {};
+  useEffect(() => {
+    if (state?.ok) toast.success("Reminder settings saved");
+    else if (state?.error) toast.error(state.error);
+  }, [state]);
+  const checks = [
+    {
+      ok: wa.connected,
+      text: "Café number connected",
+      fix: "Add WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID to .env",
+    },
+    {
+      ok: wa.webhook,
+      text: "Delivery status and STOP replies",
+      fix: "Add WHATSAPP_VERIFY_TOKEN and WHATSAPP_APP_SECRET to .env",
+    },
+    {
+      ok: wa.schedule,
+      text: "Reminder timer (every 5 minutes)",
+      fix: "Add CRON_SECRET to .env and install the timer",
+    },
+  ];
+  const next = wa.next
+    ? new Date(wa.next).toLocaleString("en-IN", { timeZone: CAFE_TZ, dateStyle: "full", timeStyle: "short" })
+    : null;
+
+  return (
+    <div className="space-y-4">
+      <section
+        aria-labelledby="wa-setup-h"
+        className="space-y-2 rounded-3xl border border-border bg-card p-5"
+      >
+        <h2 id="wa-setup-h" className="font-semibold">
+          Connection
+        </h2>
+        <ul className="space-y-1 text-sm">
+          {checks.map((c) => (
+            <li key={c.text}>
+              <span className={c.ok ? "font-semibold text-hh-green" : "font-semibold text-destructive"}>
+                {c.ok ? "Ready" : "Not set up"}
+              </span>{" "}
+              · {c.text}
+              {!c.ok && <span className="block text-xs text-muted-foreground">{c.fix}</span>}
+            </li>
+          ))}
+        </ul>
+        {!wa.connected && (
+          <p className="text-xs text-muted-foreground">
+            Until the number is connected, &quot;WhatsApp bill&quot; and &quot;Send reminder now&quot; open
+            WhatsApp on this phone with the message filled in (no PDF), and nothing is sent by itself.
+          </p>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="wa-bills-h"
+        className="space-y-3 rounded-3xl border border-border bg-card p-5"
+      >
+        <h2 id="wa-bills-h" className="font-semibold">
+          Bills
+        </h2>
+        <SwitchRows
+          rows={[
+            {
+              id: "wa-bills",
+              title: "Send bills on WhatsApp",
+              hint: 'A bill paid straight away goes to the guest as a PDF. Bills put on pay later get one short thank-you 30 minutes after closing (no PDF); paying them off later sends one "payment received" with a receipt. What they owe goes in the due reminder. Bills without a phone number are skipped.',
+              checked: wa.bills,
+              action: setWaBillsEnabled,
+              done: (on) => (on ? "Bills will be sent on WhatsApp" : "Bills won't be sent by themselves"),
+            },
+          ]}
+        />
+      </section>
+
+      <form
+        onSubmit={onSubmit}
+        aria-labelledby="wa-due-h"
+        className="space-y-4 rounded-3xl border border-border bg-card p-5"
+      >
+        <div>
+          <h2 id="wa-due-h" className="font-semibold">
+            Due reminders
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Guests who still owe money get the amount and a PDF of their unpaid bills. Each guest gets one per
+            week or month; you can pause anyone on their customer page.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field id="wa-frequency" label="How often" error={err.frequency}>
+            <NativeSelect
+              id="wa-frequency"
+              name="frequency"
+              value={frequency}
+              onChange={(e) => setFrequency(e.target.value as WaSettings["frequency"])}
+              className="h-10"
+            >
+              <option value="WEEKLY">Every week</option>
+              <option value="MONTHLY">Every month</option>
+              <option value="OFF">Off</option>
+            </NativeSelect>
+          </Field>
+          {/* both are always sent, so switching back keeps the other day */}
+          <div className={frequency === "WEEKLY" ? "" : "hidden"}>
+            <Field id="wa-weekday" label="On" error={err.weekday}>
+              <NativeSelect id="wa-weekday" name="weekday" defaultValue={String(wa.weekday)} className="h-10">
+                {WEEKDAYS.map((d, i) => (
+                  <option key={d} value={i}>
+                    {d}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          </div>
+          <div className={frequency === "MONTHLY" ? "" : "hidden"}>
+            <Field id="wa-monthday" label="On day" error={err.monthDay}>
+              <NativeSelect
+                id="wa-monthday"
+                name="monthDay"
+                defaultValue={String(wa.monthDay)}
+                className="h-10"
+              >
+                {Array.from({ length: 28 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {i + 1}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          </div>
+          <div className={frequency === "OFF" ? "hidden" : ""}>
+            <Field id="wa-hour" label="At" error={err.hour}>
+              <NativeSelect id="wa-hour" name="hour" defaultValue={String(wa.hour)} className="h-10">
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {hourLabel(h)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          </div>
+          <div className={frequency === "OFF" ? "hidden" : ""}>
+            <Field
+              id="wa-min"
+              label="Only if they owe at least (₹)"
+              hint="0 = any amount"
+              error={err.minAmount}
+            >
+              <Input
+                id="wa-min"
+                name="minAmount"
+                inputMode="decimal"
+                defaultValue={String(wa.minPaise / 100)}
+                className="h-10"
+                aria-invalid={!!err.minAmount}
+              />
+            </Field>
+          </div>
+        </div>
+        {next && frequency === wa.frequency && (
+          <p className="text-sm text-muted-foreground">Next reminders: {next} (India time).</p>
+        )}
+        <Button type="submit" disabled={pending} className="rounded-full">
+          {pending && <LoaderCircle className="animate-spin" aria-hidden />}
+          Save reminders
+        </Button>
+      </form>
     </div>
   );
 }

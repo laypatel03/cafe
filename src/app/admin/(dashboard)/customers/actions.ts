@@ -85,6 +85,10 @@ export async function deleteCustomer(id: string): Promise<{ ok: true } | { error
       data: { customerName: DELETED_NAME, customerPhone: null, customerId: null },
     }),
     db.rateLimit.deleteMany({ where: { key: `order-phone:${customer.phone}` } }),
+    // WhatsApp messages keep the phone and the text, so they go too
+    db.whatsAppMessage.deleteMany({
+      where: { OR: [{ customerId: customer.id }, { phone: customer.phone }] },
+    }),
     db.customer.delete({ where: { id: customer.id } }),
   ]);
   revalidatePath("/admin/customers");

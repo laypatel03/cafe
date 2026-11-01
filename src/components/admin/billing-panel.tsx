@@ -14,15 +14,20 @@ import {
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { generateBill, markBillPaid, markBillPayLater, voidBill } from "@/app/admin/(dashboard)/actions";
+import {
+  generateBill,
+  markBillPaid,
+  markBillPayLater,
+  markBillsPaid,
+  voidBill,
+} from "@/app/admin/(dashboard)/actions";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import type { LiveBill, LiveOrder } from "@/lib/data/live";
 import { CAFE_TZ, formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
-import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
-import { ReceiptSmsDialog } from "./receipt-sms";
 import { cn } from "@/lib/utils";
 import { undoStep } from "./undo-step";
 
@@ -80,8 +85,6 @@ export function BillingPanel({
   onChanged: () => void;
 }) {
   const pending = toBill(orders);
-  // kept here, not on the bill card: the card disappears once the bill is paid
-  const [receipt, setReceipt] = useState<{ id: string; number: number } | null>(null);
   return (
     <>
       {pending.length > 0 && (
@@ -104,7 +107,7 @@ export function BillingPanel({
           </h2>
           <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {bills.map((b) => (
-              <BillCard key={b.id} bill={b} onChanged={onChanged} onPaid={setReceipt} />
+              <BillCard key={b.id} bill={b} onChanged={onChanged} />
             ))}
           </ul>
         </section>
@@ -120,18 +123,18 @@ export function BillingPanel({
               </span>
             </summary>
             <p className="mt-1 text-sm text-muted-foreground">
-              Today&apos;s orders completed without payment. When the guest pays, tap how they paid – it
-              counts as a sale on that day. Earlier days are in Order history.
+              Orders completed without payment today, one card per guest (with their earlier unpaid ones).
+              Tick the bills they&apos;re paying now and tap how they paid – it counts as a sale today. Other
+              earlier days are in Order history.
             </p>
             <ul className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {payLater.map((b) => (
-                <BillCard key={b.id} bill={b} onChanged={onChanged} onPaid={setReceipt} />
+              {groupByGuest(payLater).map((g) => (
+                <PayLaterGuestCard key={g[0].guestKey} bills={g} onChanged={onChanged} />
               ))}
             </ul>
           </details>
         </section>
       )}
-      {RECEIPT_SMS_ENABLED && <ReceiptSmsDialog bill={receipt} onClose={() => setReceipt(null)} />}
     </>
   );
 }
@@ -217,15 +220,7 @@ const METHODS = [
   { id: "DEBIT_CARD", label: "Debit card", icon: CreditCard },
 ] as const;
 
-function BillCard({
-  bill,
-  onChanged,
-  onPaid,
-}: {
-  bill: LiveBill;
-  onChanged: () => void;
-  onPaid: (bill: { id: string; number: number }) => void;
-}) {
+function BillCard({ bill, onChanged }: { bill: LiveBill; onChanged: () => void }) {
   const [pending, start] = useTransition();
   const [voiding, setVoiding] = useState(false);
   const run = (
@@ -284,13 +279,7 @@ function BillCard({
             key={m.id}
             disabled={pending}
             className="rounded-full"
-            onClick={() =>
-              run(
-                () => markBillPaid(bill.id, m.id),
-                `Bill #${bill.number} paid by ${m.label}`,
-                RECEIPT_SMS_ENABLED ? () => onPaid({ id: bill.id, number: bill.number }) : undefined,
-              )
-            }
+            onClick={() => run(() => markBillPaid(bill.id, m.id), `Bill #${bill.number} paid by ${m.label}`)}
           >
             <m.icon data-icon="inline-start" /> {m.label}
           </Button>
@@ -316,6 +305,129 @@ function BillCard({
         <Ban data-icon="inline-start" /> Void bill…
       </Button>
       <VoidDialog bill={voiding ? bill : null} onClose={() => setVoiding(false)} onDone={onChanged} />
+    </li>
+  );
+}
+
+/** One guest's pay-later bills together, oldest first, guests in the order they first appear. */
+function groupByGuest(bills: LiveBill[]): LiveBill[][] {
+  const groups = new Map<string, LiveBill[]>();
+  for (const b of bills) groups.set(b.guestKey, [...(groups.get(b.guestKey) ?? []), b]);
+  return [...groups.values()].map((g) =>
+    [...g].sort((a, b) => (a.payLaterAt ?? a.createdAt).localeCompare(b.payLaterAt ?? b.createdAt)),
+  );
+}
+
+const shortWhen = (iso: string) =>
+  new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: CAFE_TZ,
+  });
+
+/** A guest's pay-later bills on one card: tick the ones they're paying now, then how they paid. */
+function PayLaterGuestCard({ bills, onChanged }: { bills: LiveBill[]; onChanged: () => void }) {
+  const [pending, start] = useTransition();
+  // ticked by default; bills that leave the card (paid, voided) drop out of the choice by themselves
+  const [unticked, setUnticked] = useState<Set<string>>(new Set());
+  const [voiding, setVoiding] = useState<LiveBill | null>(null);
+  const chosen = bills.filter((b) => !unticked.has(b.id));
+  const totalPaise = chosen.reduce((s, b) => s + b.totalPaise, 0);
+  const several = bills.length > 1;
+  const toggle = (id: string, on: boolean) =>
+    setUnticked((prev) => {
+      const next = new Set(prev);
+      if (on) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const pay = (method: (typeof METHODS)[number]) =>
+    start(async () => {
+      const names = chosen.map((b) => `#${b.number}`).join(", ");
+      const res = await markBillsPaid(
+        chosen.map((b) => b.id),
+        method.id,
+      );
+      if (res.ok) {
+        toast.success(`Bill${chosen.length > 1 ? "s" : ""} ${names} paid by ${method.label}`);
+        setUnticked(new Set());
+      } else toast.error(res.error);
+      onChanged();
+    });
+
+  return (
+    <li className="flex flex-col rounded-3xl border-2 border-hh-orange/40 bg-card p-4">
+      <p className="text-lg font-bold">{bills[0].customerName}</p>
+      <p className="text-xs text-muted-foreground">
+        {bills.length} pay-later {bills.length === 1 ? "bill" : "bills"} ·{" "}
+        {formatINR(toRupees(bills.reduce((s, b) => s + b.totalPaise, 0)))} in all
+      </p>
+      <ul className="mt-3 divide-y divide-border rounded-2xl border border-border">
+        {bills.map((b) => {
+          const on = !unticked.has(b.id);
+          return (
+            <li key={b.id} className="flex items-center gap-2 px-3 py-2">
+              {several && (
+                <Checkbox
+                  id={`pl-${b.id}`}
+                  checked={on}
+                  disabled={pending}
+                  onCheckedChange={(c) => toggle(b.id, c === true)}
+                  aria-label={`Paying bill #${b.number} now`}
+                />
+              )}
+              <label htmlFor={several ? `pl-${b.id}` : undefined} className="min-w-0 flex-1 text-sm">
+                <span className="font-semibold">Bill #{b.number}</span>{" "}
+                <span className="text-muted-foreground">
+                  · {b.type === "PARCEL" ? "Takeaway" : "Dine-in"} · {shortWhen(b.payLaterAt ?? b.createdAt)}
+                </span>
+              </label>
+              <span className="tabular text-sm font-semibold">{formatINR(toRupees(b.totalPaise))}</span>
+              <Button asChild size="icon-sm" variant="ghost" aria-label={`Print bill #${b.number}`}>
+                <Link href={`/admin/print/bill/${b.id}`} target="_blank">
+                  <Printer />
+                </Link>
+              </Button>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                disabled={pending}
+                aria-label={`Void bill #${b.number}`}
+                onClick={() => setVoiding(b)}
+              >
+                <Ban />
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 flex items-baseline justify-between gap-2">
+        <span className="text-sm text-muted-foreground">
+          {several ? `Paying ${chosen.length} of ${bills.length}` : "To pay"}
+        </span>
+        <span className="tabular text-2xl font-bold">{formatINR(toRupees(totalPaise))}</span>
+      </p>
+      <p className="mt-3 text-xs font-semibold text-muted-foreground">Paid by</p>
+      <div className="mt-1 grid grid-cols-2 gap-2">
+        {METHODS.map((m) => (
+          <Button
+            key={m.id}
+            disabled={pending || chosen.length === 0}
+            className="rounded-full"
+            onClick={() => pay(m)}
+          >
+            {pending ? (
+              <LoaderCircle className="animate-spin" aria-hidden />
+            ) : (
+              <m.icon data-icon="inline-start" />
+            )}{" "}
+            {m.label}
+          </Button>
+        ))}
+      </div>
+      <VoidDialog bill={voiding} onClose={() => setVoiding(null)} onDone={onChanged} />
     </li>
   );
 }

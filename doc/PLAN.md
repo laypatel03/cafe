@@ -161,6 +161,9 @@ Phase 0 is added in front of the doc's five phases so the look and the 3D are ag
 - Tables & QR: add/rename tables, print-ready QR cards. Settings page (café details, ordering on/off, tax %, staff accounts).
 - **Done when:** owner can see yesterday's sales and repeat customers.
 
+### WhatsApp bills & due reminders (1 Nov 2026)
+Owner's choices: **Meta WhatsApp Cloud API** directly (official; automatic sending and PDFs need it – unofficial WhatsApp Web tools risk a ban), behind `src/lib/whatsapp/` so a reseller can replace it later; not configured → staff get a `wa.me` link (text only), like the receipt SMS. Café-started messages are Meta-approved **Utility templates** with a document header (small charge per message). **Bills:** sent automatically by default when a bill is paid or put on pay later (owner can switch it off in Settings); "Send on WhatsApp" in the receipt dialog and Order history to send again. **Reminders:** café-wide, **Weekly by default** (Monthly or Off in Settings), day, hour and minimum due; a guest can be paused, and a STOP reply opts them out. One **dues statement PDF** per reminder (all unpaid bills + unbilled earlier-day orders, from `owed.ts`), not one PDF per bill. PDFs are uploaded to WhatsApp as media – never a public link. Scheduling: hourly systemd timer → `/api/cron/due-reminders` (secret), at most one reminder per customer per period (unique key in `WhatsAppMessage`). Reminders need the server (P5-01) to run on their own.
+
 ### Phase 5 – Launch
 - VPS (Mumbai) with Docker Compose: Next.js + Postgres + Caddy (auto HTTPS); domain DNS.
 - Daily `pg_dump` backup with 30-day retention + a tested restore.

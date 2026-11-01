@@ -9,7 +9,6 @@ import {
 } from "@/components/admin/orders/order-record-dialog";
 import { ChangePaymentButton, RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
 import { Pager } from "@/components/admin/pager";
-import { TextReceiptButton } from "@/components/admin/receipt-sms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -24,7 +23,6 @@ import { toRupees } from "@/lib/money";
 import { toCafeInput } from "@/lib/order-edit";
 import { maskPhone } from "@/lib/phone-mask";
 import { clampPage, resolvePerPage } from "@/lib/paging";
-import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
 import { cn } from "@/lib/utils";
 import { PAYMENT_SHORT } from "@/lib/payments";
 
@@ -414,9 +412,6 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                     method: o.bill.paymentMethod,
                   }}
                 />
-              )}
-              {RECEIPT_SMS_ENABLED && o.bill?.paidAt && o.bill.customerPhone && (
-                <TextReceiptButton bill={{ id: o.bill.id, number: o.bill.number }} />
               )}
               {menu && !o.deletedAt && (
                 <EditOrderButton

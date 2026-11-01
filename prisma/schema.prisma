@@ -69,6 +69,27 @@ enum ExpensePayment {
 }
 
 /// Where a day's opening cash came from.
+enum ReminderFrequency {
+  OFF
+  WEEKLY
+  MONTHLY
+}
+
+enum WaKind {
+  BILL
+  DUE_REMINDER
+  PAY_LATER // short thank-you when a bill goes on pay later (no PDF – the weekly reminder carries it)
+  PAYMENT_RECEIVED // pay-later bills paid off: one message for the payment, with a receipt PDF
+}
+
+enum WaStatus {
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
 enum CashOpening {
   ENTERED // counted by staff in the morning
   CARRIED // nobody entered it – taken from the last day's closing
@@ -124,20 +145,24 @@ model AddOn {
 }
 
 model Customer {
-  id               String    @id @default(cuid())
+  id               String            @id @default(cuid())
   name             String
-  phone            String    @unique // 10-digit Indian mobile – the customer's ID
+  phone            String            @unique // 10-digit Indian mobile – the customer's ID
   email            String?
-  marketingConsent Boolean   @default(false)
+  marketingConsent Boolean           @default(false)
   consentAt        DateTime?
   notes            String?
-  firstVisitAt     DateTime  @default(now())
-  lastVisitAt      DateTime  @default(now())
-  orderCount       Int       @default(0)
-  totalSpendPaise  Int       @default(0)
+  firstVisitAt     DateTime          @default(now())
+  lastVisitAt      DateTime          @default(now())
+  orderCount       Int               @default(0)
+  totalSpendPaise  Int               @default(0)
+  // WhatsApp: the owner paused due reminders for this guest / the guest replied STOP (no messages at all)
+  remindersPaused  Boolean           @default(false)
+  whatsappOptOutAt DateTime?
   orders           Order[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  waMessages       WhatsAppMessage[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }
 
 model Order {
@@ -176,30 +201,31 @@ model Order {
 
 /// Dine-in: one bill per guest visit (all their served rounds). Takeaway: one bill per order.
 model Bill {
-  id                 String         @id @default(cuid())
-  number             Int            @unique @default(autoincrement())
+  id                 String            @id @default(cuid())
+  number             Int               @unique @default(autoincrement())
   type               OrderType
   customerName       String
   customerPhone      String?
   subtotalPaise      Int
-  taxBasisPoints     Int            @default(0)
-  taxPaise           Int            @default(0)
+  taxBasisPoints     Int               @default(0)
+  taxPaise           Int               @default(0)
   totalPaise         Int
   paymentMethod      PaymentMethod?
   paidAt             DateTime?
   // order completed without payment ("pay later"); paidAt is set when the guest pays
   payLaterAt         DateTime?
   createdById        String?
-  createdBy          StaffUser?     @relation("BillsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy          StaffUser?        @relation("BillsCreated", fields: [createdById], references: [id], onDelete: SetNull)
   orders             Order[]
+  waMessages         WhatsAppMessage[]
   // a bill made by mistake is voided, never deleted, so bill numbers stay continuous;
   // its orders are unlinked (to be billed again) and their numbers kept here
   voidedAt           DateTime?
   voidReason         String?
-  voidedOrderNumbers Int[]          @default([])
+  voidedOrderNumbers Int[]             @default([])
   voidedById         String?
-  voidedBy           StaffUser?     @relation("BillsVoided", fields: [voidedById], references: [id], onDelete: SetNull)
-  createdAt          DateTime       @default(now())
+  voidedBy           StaffUser?        @relation("BillsVoided", fields: [voidedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now())
 
   @@index([createdAt])
   @@index([paidAt])
@@ -236,26 +262,27 @@ model OrderStatusLog {
 }
 
 model StaffUser {
-  id             String           @id @default(cuid())
+  id             String            @id @default(cuid())
   name           String
-  username       String           @unique
-  phone          String?          @unique
+  username       String            @unique
+  phone          String?           @unique
   passwordHash   String
-  role           Role             @default(STAFF)
-  active         Boolean          @default(true)
+  role           Role              @default(STAFF)
+  active         Boolean           @default(true)
   // bumped on password change / deactivation to invalidate existing sessions
-  sessionVersion Int              @default(1)
+  sessionVersion Int               @default(1)
   lastLoginAt    DateTime?
   statusChanges  OrderStatusLog[]
-  counterOrders  Order[]          @relation("CounterOrders")
-  billsCreated   Bill[]           @relation("BillsCreated")
-  billsVoided    Bill[]           @relation("BillsVoided")
-  expenses       Expense[]        @relation("ExpensesAdded")
-  cashDaysOpened CashDay[]        @relation("CashDaysOpened")
-  cashDaysClosed CashDay[]        @relation("CashDaysClosed")
-  extraSales     ExtraSale[]      @relation("ExtraSalesAdded")
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  counterOrders  Order[]           @relation("CounterOrders")
+  billsCreated   Bill[]            @relation("BillsCreated")
+  billsVoided    Bill[]            @relation("BillsVoided")
+  expenses       Expense[]         @relation("ExpensesAdded")
+  cashDaysOpened CashDay[]         @relation("CashDaysOpened")
+  cashDaysClosed CashDay[]         @relation("CashDaysClosed")
+  extraSales     ExtraSale[]       @relation("ExtraSalesAdded")
+  waMessages     WhatsAppMessage[] @relation("WaSentBy")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 }
 
 /// A lower price on one dish for a run of café days (IST, inclusive). Orders placed on those
@@ -277,31 +304,39 @@ model Offer {
 
 /// Single row (id = 1) with the café's details and switches.
 model CafeSettings {
-  id                   Int      @id @default(1)
-  name                 String   @default("Healthy Hunger")
-  tagline              String   @default("Eat well, live well")
-  address              String   @default("")
-  mapUrl               String   @default("")
-  phone                String   @default("")
-  whatsapp             String   @default("")
-  instagram            String   @default("")
-  fssaiLicence         String   @default("") // 14 digits; shown with the FSSAI mark in the site footer
-  gaMeasurementId      String   @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
+  id                   Int               @id @default(1)
+  name                 String            @default("Healthy Hunger")
+  tagline              String            @default("Eat well, live well")
+  address              String            @default("")
+  mapUrl               String            @default("")
+  phone                String            @default("")
+  whatsapp             String            @default("")
+  instagram            String            @default("")
+  fssaiLicence         String            @default("") // 14 digits; shown with the FSSAI mark in the site footer
+  gaMeasurementId      String            @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
   // Google Places ID ("ChIJ…") for the reviews section on the home page; the API key is in .env
-  googlePlaceId        String   @default("")
-  hours                Json     @default("[]") // [{ days, time }]
-  orderingEnabled      Boolean  @default(true)
+  googlePlaceId        String            @default("")
+  hours                Json              @default("[]") // [{ days, time }]
+  orderingEnabled      Boolean           @default(true)
   // the public Blog pages and links; off = hidden from guests (staff who are logged in can still preview)
-  blogEnabled          Boolean  @default(false)
-  taxBasisPoints       Int      @default(0) // 500 = 5 %
+  blogEnabled          Boolean           @default(false)
+  taxBasisPoints       Int               @default(0) // 500 = 5 %
   todaysPickId         String?
   // what the card machine provider keeps, in basis points (180 = 1.8 %); taken off profit in the money book
-  creditCardFeeBps     Int      @default(0)
-  debitCardFeeBps      Int      @default(0)
+  creditCardFeeBps     Int               @default(0)
+  debitCardFeeBps      Int               @default(0)
   // owner switches: allow adding/editing orders in Order history, and adding/editing customers
-  orderEditsEnabled    Boolean  @default(false)
-  customerEditsEnabled Boolean  @default(false)
-  updatedAt            DateTime @updatedAt
+  orderEditsEnabled    Boolean           @default(false)
+  customerEditsEnabled Boolean           @default(false)
+  // WhatsApp (API keys in .env): send each bill when it's paid or put on pay later
+  waBillsEnabled       Boolean           @default(true)
+  // reminders to guests who owe money, at reminderHour café time; weekday 0 = Sunday, month day 1–28
+  dueReminders         ReminderFrequency @default(WEEKLY)
+  reminderWeekday      Int               @default(1)
+  reminderMonthDay     Int               @default(1)
+  reminderHour         Int               @default(11)
+  reminderMinPaise     Int               @default(0) // owes less than this → no reminder
+  updatedAt            DateTime          @updatedAt
 }
 
 /// Fixed-window rate limiting for login and order forms.
@@ -376,4 +411,34 @@ model ExtraSale {
   createdAt   DateTime      @default(now())
 
   @@index([soldAt])
+}
+
+/// Every WhatsApp message the café sent: bills and due reminders, with what WhatsApp reported back.
+model WhatsAppMessage {
+  id          String     @id @default(cuid())
+  kind        WaKind
+  status      WaStatus   @default(SENDING)
+  customerId  String?
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  billId      String?
+  bill        Bill?      @relation(fields: [billId], references: [id], onDelete: SetNull)
+  billIds     String[]   @default([]) // PAYMENT_RECEIVED: every bill paid in that payment
+  phone       String // 10 digits, as sent
+  guestName   String
+  text        String // the message as the guest reads it
+  amountPaise Int // bill total, or the amount due
+  waId        String?    @unique // WhatsApp's message id, matched by the webhook
+  error       String?
+  // scheduled reminders: the week/month they belong to ("2026-11-02"), so each goes once per period
+  periodKey   String?
+  attempts    Int        @default(1)
+  auto        Boolean    @default(false) // sent by itself (bill on payment, scheduled reminder)
+  sentById    String?
+  sentBy      StaffUser? @relation("WaSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([customerId, kind, periodKey])
+  @@index([createdAt])
+  @@index([billId])
 }

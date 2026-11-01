@@ -1,4 +1,4 @@
-import { ArrowLeft, CircleAlert, Plus, ReceiptText } from "lucide-react";
+import { ArrowLeft, CircleAlert, MessageCircle, Plus, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -8,6 +8,7 @@ import {
 } from "@/components/admin/customer-profile-actions";
 import { EditCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
+import { RemindersSwitch, SendReminderButton } from "@/components/admin/whatsapp/wa-buttons";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { favouriteItems } from "@/lib/customer-stats";
@@ -16,8 +17,17 @@ import { owedByCustomer } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
+import { nextScheduled } from "@/lib/reminder-schedule";
+import { cn } from "@/lib/utils";
+import { getReminderSettings } from "@/lib/whatsapp/reminders";
 
 export const metadata = { title: "Customer" };
+
+const WA_FREQUENCY = {
+  WEEKLY: "On · every week",
+  MONTHLY: "On · every month",
+  OFF: "Scheduled reminders off",
+};
 
 const RECENT = 20;
 const date = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -30,7 +40,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const customer = await db.customer.findUnique({ where: { id } });
   if (!customer) notFound();
 
-  const [orders, lines, orderTotal, switches, owedMap] = await Promise.all([
+  const [orders, lines, orderTotal, switches, owedMap, lastReminder] = await Promise.all([
     db.order.findMany({
       where: { customerId: id },
       orderBy: { createdAt: "desc" },
@@ -45,8 +55,16 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
     db.order.count({ where: { customerId: id } }),
     getEditSwitches(),
     owedByCustomer([id]),
+    db.whatsAppMessage.findFirst({
+      where: { customerId: id, kind: "DUE_REMINDER", status: { not: "FAILED" } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, auto: true },
+    }),
   ]);
   const owes = owedMap.get(id);
+  const reminderSettings = await getReminderSettings();
+  const waState = customer.whatsappOptOutAt ? "stopped" : customer.remindersPaused ? "paused" : "on";
+  const nextReminder = nextScheduled(reminderSettings, new Date());
   const favourites = favouriteItems(lines.map((l) => ({ ...l, status: l.order.status })));
   const average = customer.orderCount > 0 ? Math.round(customer.totalSpendPaise / customer.orderCount) : 0;
 
@@ -117,6 +135,74 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           </Button>
         </div>
       )}
+
+      <section
+        aria-labelledby="wa-h"
+        className={cn(
+          "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-3xl border-2 px-4 py-4 shadow-sm",
+          waState === "on" &&
+            "border-hh-green/60 bg-hh-green/10 dark:border-hh-green-light dark:bg-hh-green/30 dark:shadow-hh-green/20",
+          waState === "paused" && "border-hh-orange/50 bg-hh-orange/10",
+          waState === "stopped" && "border-border bg-muted",
+        )}
+      >
+        <span
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-full text-white",
+            waState === "stopped" ? "bg-muted-foreground" : "bg-hh-green",
+          )}
+          aria-hidden
+        >
+          <MessageCircle className="size-6" />
+        </span>
+        <div className="min-w-0 flex-1 space-y-1 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="wa-h" className="text-base font-bold">
+              WhatsApp reminders
+            </h2>
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                waState === "on" && "bg-hh-green text-white",
+                waState === "paused" && "bg-hh-orange text-black",
+                waState === "stopped" && "bg-destructive/10 text-destructive",
+              )}
+            >
+              {waState === "on"
+                ? WA_FREQUENCY[reminderSettings.frequency]
+                : waState === "paused"
+                  ? "Paused"
+                  : "Replied STOP"}
+            </span>
+          </div>
+          <p>
+            {waState === "stopped"
+              ? `Replied STOP on ${date(customer.whatsappOptOutAt!)} – no bills or reminders on WhatsApp until they send START.`
+              : waState === "paused"
+                ? "Due reminders are paused for this guest. Bills are still sent."
+                : owes
+                  ? nextReminder
+                    ? `${formatINR(toRupees(owes.paise))} still to pay goes in the next reminder: ${dateTime(nextReminder)}.`
+                    : `${formatINR(toRupees(owes.paise))} still to pay. Scheduled reminders are off in Settings – send one now.`
+                  : "All paid up – nothing to remind them about."}
+          </p>
+          {lastReminder && (
+            <p className="text-xs text-muted-foreground">
+              Last reminder: {dateTime(lastReminder.createdAt)}
+              {lastReminder.auto ? " (scheduled)" : ""}
+            </p>
+          )}
+        </div>
+        {waState !== "stopped" && (
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <RemindersSwitch customer={{ id: customer.id, on: !customer.remindersPaused }} />
+              Reminders
+            </label>
+            {owes && <SendReminderButton customer={{ id: customer.id, name: customer.name }} prominent />}
+          </div>
+        )}
+      </section>
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[

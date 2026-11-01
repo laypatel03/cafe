@@ -19,6 +19,7 @@
     "menu:load": "tsx scripts/load-menu.ts",
     "db:demo": "tsx scripts/demo-data.ts",
     "test": "vitest run",
+    "reminders:run": "bash scripts/whatsapp/run-reminders.sh",
     "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "prepare": "husky"
