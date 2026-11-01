@@ -2,7 +2,7 @@
 
 import { Bell, BellOff, Eye, Phone, Plus, Trash2, Utensils } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { toast } from "sonner";
 import { removeSelection } from "@/app/admin/(dashboard)/actions";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,38 @@ function ago(iso: string, now: number) {
   if (s < 45) return "just now";
   const m = Math.round(s / 60);
   return m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+}
+
+const SOUND_KEY = "hh-order-sound";
+const SOUND_EVENT = "hh-order-sound";
+
+// used when the browser blocks storage, so the switch still works for this visit
+let soundPrefInMemory = true;
+
+/** The order sound is on unless this device turned it off. */
+function readSoundPref() {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== "off";
+  } catch {
+    return soundPrefInMemory;
+  }
+}
+function writeSoundPref(on: boolean) {
+  soundPrefInMemory = on;
+  try {
+    localStorage.setItem(SOUND_KEY, on ? "on" : "off");
+  } catch {
+    // not remembered past this page
+  }
+  window.dispatchEvent(new Event(SOUND_EVENT));
+}
+function onSoundPref(change: () => void) {
+  window.addEventListener(SOUND_EVENT, change);
+  window.addEventListener("storage", change);
+  return () => {
+    window.removeEventListener(SOUND_EVENT, change);
+    window.removeEventListener("storage", change);
+  };
 }
 
 /** Short two-tone chime for "a new order came in" (Web Audio, no file to load). */
@@ -50,7 +82,10 @@ export function LiveBoard({
   const [connection, setConnection] = useState<Connection>("live");
   const [skew, setSkew] = useState(() => Date.now() - new Date(initial.serverTime).getTime());
   const [now, setNow] = useState(() => Date.now());
-  const [soundOn, setSoundOn] = useState(false);
+  // on by default; a "turn it off" is remembered on this device
+  const soundOn = useSyncExternalStore(onSoundPref, readSoundPref, () => true);
+  // browsers keep sound blocked until the first tap or key press on the page
+  const [soundAllowed, setSoundAllowed] = useState(false);
   const audio = useRef<AudioContext | null>(null);
   const knownNew = useRef(new Set(initial.orders.filter((o) => o.status === "NEW").map((o) => o.id)));
 
@@ -95,20 +130,39 @@ export function LiveBoard({
     };
   }, [refresh]);
 
+  // The first tap or key press anywhere unlocks sound for the rest of the visit.
+  useEffect(() => {
+    const unlock = () => {
+      audio.current ??= new AudioContext();
+      void audio.current.resume().then(() => {
+        if (audio.current?.state !== "running") return;
+        setSoundAllowed(true);
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("keydown", unlock);
+      });
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
   // Chime when a guest places an order.
   useEffect(() => {
     const placed = data.orders.filter((o) => o.status === "NEW").map((o) => o.id);
     const fresh = placed.filter((id) => !knownNew.current.has(id));
     knownNew.current = new Set(placed);
-    if (fresh.length > 0 && soundOn && audio.current) chime(audio.current);
+    if (fresh.length > 0 && soundOn && audio.current?.state === "running") chime(audio.current);
   }, [data, soundOn]);
 
   const toggleSound = () => {
-    // browsers only allow sound after a tap, so the first tap creates the audio context
+    const next = !soundOn;
     audio.current ??= new AudioContext();
     void audio.current.resume();
-    if (!soundOn) chime(audio.current);
-    setSoundOn((on) => !on);
+    if (next) chime(audio.current);
+    writeSoundPref(next);
   };
 
   const serverNow = now - skew;
@@ -139,6 +193,9 @@ export function LiveBoard({
             {soundOn ? <Bell data-icon="inline-start" /> : <BellOff data-icon="inline-start" />}
             Sound {soundOn ? "on" : "off"}
           </Button>
+          {soundOn && !soundAllowed && (
+            <span className="text-xs text-muted-foreground">Tap anywhere once to allow sound</span>
+          )}
           <span
             role="status"
             className={cn(

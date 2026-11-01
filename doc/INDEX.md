@@ -147,7 +147,7 @@ Enum labels for UI: `PaymentMethod` → `lib/payments.ts` (legacy `CARD` = credi
 
 ## 6. Scripts & ops
 
-`scripts/load-menu.ts` (`pnpm menu:load [--yes]`, source `prisma/seed-data.ts`) · `scripts/add-staff.ts` · `scripts/demo-data.ts` (`pnpm db:demo [--clear]`) · `scripts/setup-local-db.sh` · `scripts/backup/*` (systemd timer / macOS launchd, 03:00 IST, see PLAN.md Phase 5) · `scripts/whatsapp/*` (hourly reminders timer, `pnpm reminders:run`; setup: `doc/whatsapp-setup.md`) · `scripts/status-board.mjs` (team board from TASKS/STATUS). Env vars: `.env.example`.
+`scripts/load-menu.ts` (`pnpm menu:load [--yes]`, source `prisma/seed-data.ts`) · `scripts/add-staff.ts` · `scripts/demo-data.ts` (`pnpm db:demo [--clear]`) · `scripts/setup-local-db.sh` · `scripts/backup/*` (systemd timer / macOS launchd, 03:00 IST, see PLAN.md Phase 5) · `scripts/whatsapp/*` (5-minute timer for pay-later notes + reminders, `pnpm reminders:run`; Meta setup: `doc/whatsapp-setup.md`, deploying: `doc/whatsapp-deploy.md`) · `scripts/status-board.mjs` (team board from TASKS/STATUS). Env vars: `.env.example`.
 
 ## 7. Topic → files (quick lookup)
 

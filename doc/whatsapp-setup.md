@@ -6,6 +6,8 @@ reminder with a PDF of their unpaid bills every week (or month – Settings → 
 nothing is sent by itself; "WhatsApp bill" and "Send reminder now" open WhatsApp on the counter phone
 with the text filled in (no PDF).
 
+**Deploying the branch to the server: [`whatsapp-deploy.md`](./whatsapp-deploy.md).**
+
 Code: `src/lib/whatsapp/` (sender, messages, webhook), `src/lib/bill-pdf/` (PDFs),
 `/api/whatsapp/webhook`, `/api/cron/due-reminders`, `scripts/whatsapp/`. Decisions: `PLAN.md`.
 

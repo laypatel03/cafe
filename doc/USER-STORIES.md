@@ -62,7 +62,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **S-02 – See new orders and live picks**
 *As staff I want new orders to appear instantly with a chime so that no guest waits.*
-- Rules: SSE from Postgres NOTIFY; chime + highlight until accepted; guests' live pick lists visible; offline banner and catch-up (`resync`) when the connection returns.
+- Rules: SSE from Postgres NOTIFY; chime + highlight until accepted (sound on by default, unlocked by the first tap/key press – browser rule; "off" remembered per device in localStorage `hh-order-sound`); guests' live pick lists visible; offline banner and catch-up (`resync`) when the connection returns.
 - Code: `admin/live-board.tsx`, `lib/data/live.ts`, `app/api/admin/live/*`, `lib/realtime.ts`, `admin/offline-banner.tsx`.
 
 **S-03 – Move an order through its steps**

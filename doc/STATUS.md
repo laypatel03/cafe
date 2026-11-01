@@ -26,7 +26,7 @@ Everything needed to take and bill orders is built and tested on a test computer
 - A Blog with 5 short articles on vegetarian protein, sprouts, oats and how to read the menu, each with a photo and the dishes to try (protein and calories, no prices). The latest three show on the home page. New articles are added by the developer for now. The blog stays hidden from guests until the owner turns on Settings → Editing → "Show the blog" (staff who are logged in can preview it). "Guests can make lists" is in the same place now.
 
 ### Staff
-- New orders appear instantly with a chime. Accept them, change items, or cancel with a reason.
+- New orders appear instantly with a chime – the sound is on by default (tap the page once after opening it, as browsers ask); staff can turn it off on that device. Accept them, change items, or cancel with a reason.
 - Take an order at the counter for a walk-in guest, using the same menu guests see on their phones – name needed, phone optional.
 - Returning guests don't have to give their details again: type their mobile number first and their name fills in by itself, with how many times they've visited.
 - Move orders along: send to the kitchen, then Served (dine-in) or Ready to collect and Picked up (takeaway).
