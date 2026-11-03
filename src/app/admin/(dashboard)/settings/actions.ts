@@ -88,6 +88,16 @@ export async function setOrderEdits(enabled: boolean): Promise<Result> {
   return { ok: true };
 }
 
+/** Settings → Editing: allow refunding meal passes (Meal passes page). */
+export async function setMealPassRefunds(enabled: boolean): Promise<Result> {
+  const me = await allowed("OWNER");
+  if ("error" in me) return me;
+  await db.cafeSettings.update({ where: { id: 1 }, data: { mealPassRefundsEnabled: enabled === true } });
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/passes");
+  return { ok: true };
+}
+
 /** Settings → Editing: allow adding customers and changing their name, phone and email. */
 export async function setCustomerEdits(enabled: boolean): Promise<Result> {
   const me = await allowed("OWNER");

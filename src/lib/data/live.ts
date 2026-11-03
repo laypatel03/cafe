@@ -2,6 +2,8 @@ import "server-only";
 import type { OrderStatus, OrderType, Role, SelectionStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { startOfCafeDay } from "@/lib/format";
+import { balancesFor } from "@/lib/data/customer-balance";
+import { type LivePass, livePasses } from "@/lib/data/meal-passes";
 import { type StatusLogEntry, stepToUndo } from "@/lib/order-flow";
 import { maskPhone } from "@/lib/phone-mask";
 import type { SelectionLine } from "@/lib/validators/selection";
@@ -27,6 +29,10 @@ export type LiveOrderItem = {
   lineTotalPaise: number;
   /** "Other item" the owner typed in; a minus price is a discount */
   custom: boolean;
+  /** discount line added by a meal pass */
+  pass: boolean;
+  /** line that settles the customer's balance */
+  balance: boolean;
 };
 
 export type LiveOrder = {
@@ -55,6 +61,8 @@ export type LiveOrder = {
 export type LiveBill = {
   id: string;
   number: number;
+  /** the guest the bill is for, if known – needed to keep extra or short money on account */
+  customerId: string | null;
   type: OrderType;
   customerName: string;
   totalPaise: number;
@@ -70,6 +78,10 @@ export type LiveBoard = {
   bills: LiveBill[];
   /** bills completed with "pay later" today, still not paid (earlier days are in Order history) */
   payLater: LiveBill[];
+  /** guests' meal passes usable today, by customer id (only for orders waiting to be billed) */
+  passes: Record<string, LivePass>;
+  /** guests' balances (plus = credit, minus = owed), by customer id, for orders waiting to be billed */
+  balances: Record<string, number>;
   serverTime: string;
 };
 
@@ -115,27 +127,42 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       where: { paidAt: null, voidedAt: null, payLaterAt: null },
       orderBy: { createdAt: "asc" },
       include: {
-        orders: { select: { number: true }, orderBy: { number: "asc" } },
+        orders: {
+          select: { number: true, customerId: true, customerPhone: true },
+          orderBy: { number: "asc" },
+        },
       },
     }),
     db.bill.findMany({
       where: { paidAt: null, voidedAt: null, payLaterAt: { gte: startOfDay } },
       orderBy: { payLaterAt: "asc" },
       include: {
-        orders: { select: { number: true }, orderBy: { number: "asc" } },
+        orders: {
+          select: { number: true, customerId: true, customerPhone: true },
+          orderBy: { number: "asc" },
+        },
       },
     }),
   ]);
-  const toLiveBill = (b: (typeof bills)[number]): LiveBill => ({
-    id: b.id,
-    number: b.number,
-    type: b.type,
-    customerName: b.customerName,
-    totalPaise: b.totalPaise,
-    orderNumbers: b.orders.map((o) => o.number),
-    createdAt: b.createdAt.toISOString(),
-    payLaterAt: b.payLaterAt?.toISOString() ?? null,
-  });
+  const toLiveBill = (b: (typeof bills)[number]): LiveBill => {
+    const guests = [...new Set(b.orders.map((o) => o.customerId).filter(Boolean))];
+    return {
+      id: b.id,
+      number: b.number,
+      customerId:
+        b.orders.find((o) => o.customerId && o.customerPhone === b.customerPhone)?.customerId ??
+        (guests.length === 1 ? guests[0] : null),
+      type: b.type,
+      customerName: b.customerName,
+      totalPaise: b.totalPaise,
+      orderNumbers: b.orders.map((o) => o.number),
+      createdAt: b.createdAt.toISOString(),
+      payLaterAt: b.payLaterAt?.toISOString() ?? null,
+    };
+  };
+  const toBillGuests = orders
+    .filter((o) => !o.billId && o.customerId && o.status !== "CANCELLED")
+    .map((o) => o.customerId!);
   return {
     selections: selections.map((s) => ({
       id: s.id,
@@ -170,10 +197,14 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
         unitPricePaise: i.unitPricePaise,
         lineTotalPaise: i.lineTotalPaise,
         custom: i.custom,
+        pass: !!i.mealPassUseId,
+        balance: !!i.balanceEntryId,
       })),
     })),
     bills: bills.map(toLiveBill),
     payLater: payLater.map(toLiveBill),
+    passes: await livePasses(toBillGuests),
+    balances: await balancesFor(toBillGuests),
     serverTime: new Date().toISOString(),
   };
 }

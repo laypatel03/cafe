@@ -11,6 +11,7 @@ import {
   saveCafeDetails,
   setBlogEnabled,
   setCustomerEdits,
+  setMealPassRefunds,
   setOrderEdits,
   setOrderingEnabled,
   setStaffActive,
@@ -43,7 +44,13 @@ type Cafe = {
   hours: { days: string; time: string }[];
   todaysPickId: string;
 };
-type Switches = { orders: boolean; customers: boolean; ordering: boolean; blog: boolean };
+type Switches = {
+  orders: boolean;
+  customers: boolean;
+  passRefunds: boolean;
+  ordering: boolean;
+  blog: boolean;
+};
 type Staff = {
   id: string;
   name: string;
@@ -182,6 +189,14 @@ function EditingPanel({ edits, isOwner }: { edits: Switches; isOwner: boolean })
       checked: edits.customers,
       action: setCustomerEdits,
       done: (on: boolean) => (on ? "Customer editing is on" : "Customer editing is off"),
+    },
+    {
+      id: "pass-refunds",
+      title: "Refund meal passes",
+      hint: "Shows “Refund” on passes in Meal passes. The refund comes off that day's sales, and the pass stops working.",
+      checked: edits.passRefunds,
+      action: setMealPassRefunds,
+      done: (on: boolean) => (on ? "Meal pass refunds are on" : "Meal pass refunds are off"),
     },
   ];
   return (

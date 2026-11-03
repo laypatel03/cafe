@@ -126,7 +126,7 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
         )}
         {!isCurrent && (
           <Button asChild size="sm" variant="ghost" className="rounded-full">
-            <Link href="/admin/money">This month</Link>
+            <Link href="/admin/money">Current month: {monthLabel(monthKey(new Date()))}</Link>
           </Button>
         )}
       </nav>
@@ -151,6 +151,14 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
           <Link href="/admin/orders?pay=PAY_LATER" className="font-semibold underline">
             See them
           </Link>
+        </p>
+      )}
+
+      {book.shortPaid.guests > 0 && (
+        <p className="rounded-2xl bg-accent px-4 py-3 text-sm">
+          <span className="font-semibold">Paid less: {rupees(book.shortPaid.paise)} still owed</span> by{" "}
+          {book.shortPaid.guests} guest{book.shortPaid.guests === 1 ? "" : "s"}. A bill paid short counts only
+          what was received that day; the rest counts on the day the guest pays it (customer page → Balance).
         </p>
       )}
 
@@ -186,7 +194,9 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
             </ul>
           </>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">No sales this month yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isCurrent ? "No sales this month yet." : `No sales in ${monthLabel(month)}.`}
+          </p>
         )}
       </section>
 
@@ -280,7 +290,13 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
                       {s.by && ` · added by ${s.by}`}
                     </p>
                   </div>
-                  <DeleteExtraSaleButton id={s.id} label={`the ${rupees(s.amountPaise)} sale`} />
+                  {s.linked ? (
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                      {s.linked === "balance" ? "Customer balance" : "Meal pass"}
+                    </span>
+                  ) : (
+                    <DeleteExtraSaleButton id={s.id} label={`the ${rupees(s.amountPaise)} sale`} />
+                  )}
                 </li>
               ))}
             </ul>
@@ -325,7 +341,9 @@ export default async function MoneyBookPage({ searchParams }: PageProps<"/admin/
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">No expenses this month yet.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {isCurrent ? "No expenses this month yet." : `No expenses in ${monthLabel(month)}.`}
+              </p>
             )}
           </section>
 

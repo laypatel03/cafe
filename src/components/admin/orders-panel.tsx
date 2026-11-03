@@ -14,6 +14,7 @@ import { CAFE_TZ, formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { ACTION_LABEL, availableActions, canCancel, canEditItems } from "@/lib/order-flow";
 import { cn } from "@/lib/utils";
+import type { LivePass } from "@/lib/data/meal-passes";
 import { BillingPanel } from "./billing-panel";
 import { type EditableLine, ItemLinesEditor, otherItems, toEditableLines } from "./item-lines-editor";
 import { OrderStatusBadge } from "./order-status-badge";
@@ -42,6 +43,8 @@ export function OrdersPanel({
   orders,
   bills,
   payLater,
+  passes,
+  balances,
   menu,
   isOwner,
   onChanged,
@@ -49,6 +52,8 @@ export function OrdersPanel({
   orders: LiveOrder[];
   bills: LiveBill[];
   payLater: LiveBill[];
+  passes: Record<string, LivePass>;
+  balances: Record<string, number>;
   menu: PublicMenu;
   isOwner: boolean;
   onChanged: () => void;
@@ -99,7 +104,14 @@ export function OrdersPanel({
         );
       })}
 
-      <BillingPanel orders={orders} bills={bills} payLater={payLater} onChanged={onChanged} />
+      <BillingPanel
+        orders={orders}
+        bills={bills}
+        payLater={payLater}
+        passes={passes}
+        balances={balances}
+        onChanged={onChanged}
+      />
 
       {served.length + cancelled.length > 0 && (
         <section className="space-y-3" aria-label="Done today">

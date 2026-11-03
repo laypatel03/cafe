@@ -13,6 +13,7 @@ import {
   QrCode,
   Receipt,
   Settings,
+  Ticket,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -37,6 +38,7 @@ const ICONS = {
   money: IndianRupee,
   qr: QrCode,
   customers: Users,
+  passes: Ticket,
   reports: BarChart3,
   settings: Settings,
 } satisfies Record<NavItem["icon"], typeof ClipboardList>;

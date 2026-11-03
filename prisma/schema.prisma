@@ -124,49 +124,53 @@ model AddOn {
 }
 
 model Customer {
-  id               String    @id @default(cuid())
+  id               String                 @id @default(cuid())
   name             String
-  phone            String    @unique // 10-digit Indian mobile – the customer's ID
+  phone            String                 @unique // 10-digit Indian mobile – the customer's ID
   email            String?
-  marketingConsent Boolean   @default(false)
+  marketingConsent Boolean                @default(false)
   consentAt        DateTime?
   notes            String?
-  firstVisitAt     DateTime  @default(now())
-  lastVisitAt      DateTime  @default(now())
-  orderCount       Int       @default(0)
-  totalSpendPaise  Int       @default(0)
+  firstVisitAt     DateTime               @default(now())
+  lastVisitAt      DateTime               @default(now())
+  orderCount       Int                    @default(0)
+  totalSpendPaise  Int                    @default(0)
   orders           Order[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  mealPasses       MealPass[]
+  balanceEntries   CustomerBalanceEntry[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 }
 
 model Order {
-  id            String           @id @default(cuid())
-  number        Int              @unique @default(autoincrement())
-  type          OrderType
-  status        OrderStatus      @default(NEW)
-  customerId    String?
-  customer      Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  id             String                 @id @default(cuid())
+  number         Int                    @unique @default(autoincrement())
+  type           OrderType
+  status         OrderStatus            @default(NEW)
+  customerId     String?
+  customer       Customer?              @relation(fields: [customerId], references: [id], onDelete: SetNull)
   // snapshot of who ordered, kept even if the customer record is deleted on request
-  customerName  String
-  customerPhone String?
-  pickupAt      DateTime? // parcel: null = ASAP
-  note          String?
-  subtotalPaise Int
-  taxPaise      Int              @default(0)
-  totalPaise    Int
-  cancelReason  String?
+  customerName   String
+  customerPhone  String?
+  pickupAt       DateTime? // parcel: null = ASAP
+  note           String?
+  subtotalPaise  Int
+  taxPaise       Int                    @default(0)
+  totalPaise     Int
+  cancelReason   String?
   // deleted by the owner from Order history: kept and shown in red, but left out of the money book and reports
-  deletedAt     DateTime?
+  deletedAt      DateTime?
   // set when the cashier generates the bill for this visit
-  billId        String?
-  bill          Bill?            @relation(fields: [billId], references: [id], onDelete: SetNull)
-  createdById   String? // staff member who confirmed the order with the guest
-  createdBy     StaffUser?       @relation("CounterOrders", fields: [createdById], references: [id], onDelete: SetNull)
-  items         OrderItem[]
-  statusLogs    OrderStatusLog[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  billId         String?
+  bill           Bill?                  @relation(fields: [billId], references: [id], onDelete: SetNull)
+  createdById    String? // staff member who confirmed the order with the guest
+  createdBy      StaffUser?             @relation("CounterOrders", fields: [createdById], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  statusLogs     OrderStatusLog[]
+  mealPassUses   MealPassUse[]
+  balanceEntries CustomerBalanceEntry[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   @@index([status, createdAt])
   @@index([createdAt])
@@ -176,49 +180,58 @@ model Order {
 
 /// Dine-in: one bill per guest visit (all their served rounds). Takeaway: one bill per order.
 model Bill {
-  id                 String         @id @default(cuid())
-  number             Int            @unique @default(autoincrement())
+  id                 String                 @id @default(cuid())
+  number             Int                    @unique @default(autoincrement())
   type               OrderType
   customerName       String
   customerPhone      String?
   subtotalPaise      Int
-  taxBasisPoints     Int            @default(0)
-  taxPaise           Int            @default(0)
+  taxBasisPoints     Int                    @default(0)
+  taxPaise           Int                    @default(0)
   totalPaise         Int
+  /// paid over (+) or under (−) the total, kept on the customer's balance; money taken = total + this
+  differencePaise    Int                    @default(0)
   paymentMethod      PaymentMethod?
   paidAt             DateTime?
   // order completed without payment ("pay later"); paidAt is set when the guest pays
   payLaterAt         DateTime?
   createdById        String?
-  createdBy          StaffUser?     @relation("BillsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy          StaffUser?             @relation("BillsCreated", fields: [createdById], references: [id], onDelete: SetNull)
   orders             Order[]
+  balanceEntries     CustomerBalanceEntry[]
   // a bill made by mistake is voided, never deleted, so bill numbers stay continuous;
   // its orders are unlinked (to be billed again) and their numbers kept here
   voidedAt           DateTime?
   voidReason         String?
-  voidedOrderNumbers Int[]          @default([])
+  voidedOrderNumbers Int[]                  @default([])
   voidedById         String?
-  voidedBy           StaffUser?     @relation("BillsVoided", fields: [voidedById], references: [id], onDelete: SetNull)
-  createdAt          DateTime       @default(now())
+  voidedBy           StaffUser?             @relation("BillsVoided", fields: [voidedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime               @default(now())
 
   @@index([createdAt])
   @@index([paidAt])
 }
 
 model OrderItem {
-  id             String    @id @default(cuid())
+  id             String                @id @default(cuid())
   orderId        String
-  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order          Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
   menuItemId     String?
-  menuItem       MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  menuItem       MenuItem?             @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
   // copied at order time so old bills never change when the menu does
   itemName       String
   unitPricePaise Int // item + chosen add-ons
   quantity       Int
-  addOns         Json      @default("[]") // [{ id, name, pricePaise }]
+  addOns         Json                  @default("[]") // [{ id, name, pricePaise }]
   lineTotalPaise Int
   // "Other item" the owner typed in instead of a dish – a negative price is a discount
-  custom         Boolean   @default(false)
+  custom         Boolean               @default(false)
+  // set on the discount line a meal pass adds; undoing the use removes the line
+  mealPassUseId  String?               @unique
+  mealPassUse    MealPassUse?          @relation(fields: [mealPassUseId], references: [id], onDelete: Cascade)
+  // set on the line that settles a customer's balance on this order; undoing removes the line
+  balanceEntryId String?               @unique
+  balanceEntry   CustomerBalanceEntry? @relation(fields: [balanceEntryId], references: [id], onDelete: Cascade)
 }
 
 model OrderStatusLog {
@@ -236,26 +249,29 @@ model OrderStatusLog {
 }
 
 model StaffUser {
-  id             String           @id @default(cuid())
+  id             String                 @id @default(cuid())
   name           String
-  username       String           @unique
-  phone          String?          @unique
+  username       String                 @unique
+  phone          String?                @unique
   passwordHash   String
-  role           Role             @default(STAFF)
-  active         Boolean          @default(true)
+  role           Role                   @default(STAFF)
+  active         Boolean                @default(true)
   // bumped on password change / deactivation to invalidate existing sessions
-  sessionVersion Int              @default(1)
+  sessionVersion Int                    @default(1)
   lastLoginAt    DateTime?
   statusChanges  OrderStatusLog[]
-  counterOrders  Order[]          @relation("CounterOrders")
-  billsCreated   Bill[]           @relation("BillsCreated")
-  billsVoided    Bill[]           @relation("BillsVoided")
-  expenses       Expense[]        @relation("ExpensesAdded")
-  cashDaysOpened CashDay[]        @relation("CashDaysOpened")
-  cashDaysClosed CashDay[]        @relation("CashDaysClosed")
-  extraSales     ExtraSale[]      @relation("ExtraSalesAdded")
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  counterOrders  Order[]                @relation("CounterOrders")
+  billsCreated   Bill[]                 @relation("BillsCreated")
+  billsVoided    Bill[]                 @relation("BillsVoided")
+  expenses       Expense[]              @relation("ExpensesAdded")
+  cashDaysOpened CashDay[]              @relation("CashDaysOpened")
+  cashDaysClosed CashDay[]              @relation("CashDaysClosed")
+  extraSales     ExtraSale[]            @relation("ExtraSalesAdded")
+  passesSold     MealPass[]             @relation("PassesSold")
+  mealPassUses   MealPassUse[]          @relation("MealPassUses")
+  balanceEntries CustomerBalanceEntry[] @relation("BalanceEntries")
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 }
 
 /// A lower price on one dish for a run of café days (IST, inclusive). Orders placed on those
@@ -277,31 +293,32 @@ model Offer {
 
 /// Single row (id = 1) with the café's details and switches.
 model CafeSettings {
-  id                   Int      @id @default(1)
-  name                 String   @default("Healthy Hunger")
-  tagline              String   @default("Eat well, live well")
-  address              String   @default("")
-  mapUrl               String   @default("")
-  phone                String   @default("")
-  whatsapp             String   @default("")
-  instagram            String   @default("")
-  fssaiLicence         String   @default("") // 14 digits; shown with the FSSAI mark in the site footer
-  gaMeasurementId      String   @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
+  id                     Int      @id @default(1)
+  name                   String   @default("Healthy Hunger")
+  tagline                String   @default("Eat well, live well")
+  address                String   @default("")
+  mapUrl                 String   @default("")
+  phone                  String   @default("")
+  whatsapp               String   @default("")
+  instagram              String   @default("")
+  fssaiLicence           String   @default("") // 14 digits; shown with the FSSAI mark in the site footer
+  gaMeasurementId        String   @default("") // Google Analytics 4, "G-XXXXXXX"; empty = no analytics
   // Google Places ID ("ChIJ…") for the reviews section on the home page; the API key is in .env
-  googlePlaceId        String   @default("")
-  hours                Json     @default("[]") // [{ days, time }]
-  orderingEnabled      Boolean  @default(true)
+  googlePlaceId          String   @default("")
+  hours                  Json     @default("[]") // [{ days, time }]
+  orderingEnabled        Boolean  @default(true)
   // the public Blog pages and links; off = hidden from guests (staff who are logged in can still preview)
-  blogEnabled          Boolean  @default(false)
-  taxBasisPoints       Int      @default(0) // 500 = 5 %
-  todaysPickId         String?
+  blogEnabled            Boolean  @default(false)
+  taxBasisPoints         Int      @default(0) // 500 = 5 %
+  todaysPickId           String?
   // what the card machine provider keeps, in basis points (180 = 1.8 %); taken off profit in the money book
-  creditCardFeeBps     Int      @default(0)
-  debitCardFeeBps      Int      @default(0)
+  creditCardFeeBps       Int      @default(0)
+  debitCardFeeBps        Int      @default(0)
   // owner switches: allow adding/editing orders in Order history, and adding/editing customers
-  orderEditsEnabled    Boolean  @default(false)
-  customerEditsEnabled Boolean  @default(false)
-  updatedAt            DateTime @updatedAt
+  orderEditsEnabled      Boolean  @default(false)
+  mealPassRefundsEnabled Boolean  @default(false)
+  customerEditsEnabled   Boolean  @default(false)
+  updatedAt              DateTime @updatedAt
 }
 
 /// Fixed-window rate limiting for login and order forms.
@@ -366,14 +383,137 @@ model CashDay {
 
 /// Sales that never went through a bill (e.g. a counter sale written on paper), added in the money book.
 model ExtraSale {
-  id          String        @id @default(cuid())
-  soldAt      DateTime // noon of the day it belongs to (café time), like back-dated expenses
-  method      PaymentMethod
-  amountPaise Int
-  note        String?
-  createdById String?
-  createdBy   StaffUser?    @relation("ExtraSalesAdded", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime      @default(now())
+  id           String                @id @default(cuid())
+  soldAt       DateTime // noon of the day it belongs to (café time), like back-dated expenses
+  method       PaymentMethod
+  amountPaise  Int
+  note         String?
+  createdById  String?
+  createdBy    StaffUser?            @relation("ExtraSalesAdded", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime              @default(now())
+  passSale     MealPass?             @relation("PassSale")
+  passRefund   MealPass?             @relation("PassRefund")
+  balanceEntry CustomerBalanceEntry? @relation("BalanceSale")
 
   @@index([soldAt])
+}
+
+/// A kind of meal pass the owner sells, e.g. "Bowl + smoothie": 26 bowls and 26 smoothies in 30 days.
+/// A dish counts if it is in a meal type's categories and costs up to its cap; dearer ones pay the difference.
+model MealPlan {
+  id         String     @id @default(cuid())
+  name       String
+  pricePaise Int
+  /// meal types: [{ name, meals, categoryIds, capPaise }] (see lib/meal-pass.ts MealPart)
+  parts      Json       @default("[]")
+  days       Int        @default(30)
+  active     Boolean    @default(true)
+  passes     MealPass[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+/// One customer's pass. The plan's rules are copied in, so editing a plan never changes passes sold.
+/// Meals left = plan counts minus uses on orders that aren't cancelled or deleted.
+model MealPass {
+  id            String         @id @default(cuid())
+  number        Int            @unique @default(autoincrement())
+  customerId    String?
+  customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  // snapshot, kept if the customer record is deleted on request
+  customerName  String
+  customerPhone String?
+  planId        String?
+  plan          MealPlan?      @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planName      String
+  pricePaise    Int
+  /// the plan's meal types when sold
+  parts         Json           @default("[]")
+  /// yyyy-mm-dd, IST, inclusive; unused meals lapse after endsOn
+  startsOn      String
+  endsOn        String
+  method        PaymentMethod
+  /// the money in: an ExtraSale, so it shows in the money book and cash drawer
+  saleId        String?        @unique
+  sale          ExtraSale?     @relation("PassSale", fields: [saleId], references: [id], onDelete: SetNull)
+  soldById      String?
+  soldBy        StaffUser?     @relation("PassesSold", fields: [soldById], references: [id], onDelete: SetNull)
+  refundedAt    DateTime?
+  refundPaise   Int?
+  refundMethod  PaymentMethod?
+  refundNote    String?
+  /// the money back: a minus ExtraSale
+  refundSaleId  String?        @unique
+  refundSale    ExtraSale?     @relation("PassRefund", fields: [refundSaleId], references: [id], onDelete: SetNull)
+  uses          MealPassUse[]
+  createdAt     DateTime       @default(now())
+
+  @@index([customerId])
+  @@index([endsOn])
+}
+
+/// One meal taken from a pass on an order; its discount line is the OrderItem pointing here.
+model MealPassUse {
+  id           String     @id @default(cuid())
+  passId       String
+  pass         MealPass   @relation(fields: [passId], references: [id], onDelete: Cascade)
+  orderId      String
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// index into the pass's parts; partName kept for history
+  part         Int
+  partName     String
+  menuItemId   String?
+  coveredPaise Int
+  /// a dish from outside the plan\'s categories, counted as a meal at the counter
+  swap         Boolean    @default(false)
+  usedById     String?
+  usedBy       StaffUser? @relation("MealPassUses", fields: [usedById], references: [id], onDelete: SetNull)
+  line         OrderItem?
+  createdAt    DateTime   @default(now())
+
+  @@index([passId])
+  @@index([orderId])
+}
+
+/// Why a customer's balance changed.
+enum BalanceKind {
+  /// paid more than the bill (or left an advance) – we owe them
+  PAID_EXTRA
+  /// paid less than the bill – they owe us
+  PAID_LESS
+  /// paid back money they owed
+  PAID_BACK
+  /// we gave back money they had paid extra
+  RETURNED
+  /// used on a later order: a line on that order takes it off (credit) or adds it (owed)
+  SETTLED
+}
+
+/// Money a customer paid over or under, and how it was settled.
+/// Balance = sum of amountPaise (plus = credit, the café owes them; minus = they owe the café),
+/// leaving out SETTLED entries on cancelled or deleted orders.
+model CustomerBalanceEntry {
+  id          String         @id @default(cuid())
+  customerId  String
+  customer    Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  kind        BalanceKind
+  amountPaise Int
+  method      PaymentMethod?
+  /// the bill that was paid over or under
+  billId      String?
+  bill        Bill?          @relation(fields: [billId], references: [id], onDelete: SetNull)
+  /// SETTLED: the order it went on (its line is the OrderItem pointing here)
+  orderId     String?
+  order       Order?         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// the money that changed hands, so the money book and cash drawer match (none for SETTLED)
+  saleId      String?        @unique
+  sale        ExtraSale?     @relation("BalanceSale", fields: [saleId], references: [id], onDelete: SetNull)
+  note        String?
+  createdById String?
+  createdBy   StaffUser?     @relation("BalanceEntries", fields: [createdById], references: [id], onDelete: SetNull)
+  line        OrderItem?
+  createdAt   DateTime       @default(now())
+
+  @@index([customerId])
+  @@index([orderId])
 }

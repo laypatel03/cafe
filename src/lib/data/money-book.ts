@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { ExpenseCategory, PaymentMethod } from "@/generated/prisma/enums";
+import { COUNTED_BALANCE } from "@/lib/data/customer-balance";
 import { db } from "@/lib/db";
 import {
   buildDays,
@@ -15,7 +16,8 @@ import {
   twelveMonths,
 } from "@/lib/money-book";
 
-// Sales = paid, non-void bills (counted on the day they were paid) plus sales added by hand.
+// Sales = paid, non-void bills at what was received (counted on the day they were paid) plus
+// sales added by hand.
 // Timestamps are stored in UTC, so days are taken in café time (IST), as in Reports.
 const local = (column: string) => Prisma.raw(`(${column} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata'`);
 
@@ -26,6 +28,8 @@ export type ExtraSaleRow = {
   amountPaise: number;
   note: string | null;
   by: string | null;
+  /** made by a customer balance or a meal pass: changed there, not deleted here */
+  linked: "balance" | "pass" | null;
 };
 
 export type MoneyBook = {
@@ -38,6 +42,8 @@ export type MoneyBook = {
   extraSales: ExtraSaleRow[];
   /** bills completed with "pay later" and not paid yet (any date): not in sales until paid */
   payLater: { bills: number; paise: number };
+  /** guests who paid less than their bill and still owe it (any date): not in sales until paid */
+  shortPaid: { guests: number; paise: number };
 };
 
 const monthStart = (month: string) => {
@@ -51,13 +57,13 @@ export async function getMoneyBook(month: string): Promise<MoneyBook> {
   const end = monthStart(shiftMonth(month, 1));
   const monthFrom = monthStart(month);
 
-  const [settings, billSales, extraSales, spend, byCategory, extraList, due] = await Promise.all([
+  const [settings, billSales, extraSales, spend, byCategory, extraList, due, balances] = await Promise.all([
     db.cafeSettings.findUnique({
       where: { id: 1 },
       select: { creditCardFeeBps: true, debitCardFeeBps: true },
     }),
     db.$queryRaw<{ key: string; method: PaymentMethod; paise: bigint | null }[]>`
-      SELECT to_char(${local('b."paidAt"')}, 'YYYY-MM-DD') AS key, b."paymentMethod" AS method, SUM(b."totalPaise") AS paise
+      SELECT to_char(${local('b."paidAt"')}, 'YYYY-MM-DD') AS key, b."paymentMethod" AS method, SUM(b."totalPaise" + b."differencePaise") AS paise
       FROM "Bill" b
       WHERE b."paidAt" IS NOT NULL AND b."voidedAt" IS NULL AND b."paymentMethod" IS NOT NULL
         AND b."paidAt" >= ${from} AND b."paidAt" < ${end}
@@ -79,14 +85,25 @@ export async function getMoneyBook(month: string): Promise<MoneyBook> {
     db.extraSale.findMany({
       where: { soldAt: { gte: monthFrom, lt: end } },
       orderBy: [{ soldAt: "desc" }, { createdAt: "desc" }],
-      include: { createdBy: { select: { name: true } } },
+      include: {
+        createdBy: { select: { name: true } },
+        balanceEntry: { select: { id: true } },
+        passSale: { select: { id: true } },
+        passRefund: { select: { id: true } },
+      },
     }),
     db.bill.aggregate({
       where: { payLaterAt: { not: null }, paidAt: null, voidedAt: null },
       _count: true,
       _sum: { totalPaise: true },
     }),
+    db.customerBalanceEntry.groupBy({
+      by: ["customerId"],
+      where: COUNTED_BALANCE,
+      _sum: { amountPaise: true },
+    }),
   ]);
+  const owing = balances.map((b) => b._sum.amountPaise ?? 0).filter((p) => p < 0);
 
   const fees: CardFees = {
     creditBps: settings?.creditCardFeeBps ?? 0,
@@ -126,6 +143,7 @@ export async function getMoneyBook(month: string): Promise<MoneyBook> {
       .filter((c) => c.paise > 0)
       .sort((a, b) => b.paise - a.paise),
     payLater: { bills: due._count, paise: due._sum.totalPaise ?? 0 },
+    shortPaid: { guests: owing.length, paise: -owing.reduce((s, p) => s + p, 0) },
     extraSales: extraList.map((s) => ({
       id: s.id,
       day: `${s.soldAt.getFullYear()}-${String(s.soldAt.getMonth() + 1).padStart(2, "0")}-${String(s.soldAt.getDate()).padStart(2, "0")}`,
@@ -133,6 +151,7 @@ export async function getMoneyBook(month: string): Promise<MoneyBook> {
       amountPaise: s.amountPaise,
       note: s.note,
       by: s.createdBy?.name ?? null,
+      linked: s.balanceEntry ? "balance" : s.passSale || s.passRefund ? "pass" : null,
     })),
   };
 }

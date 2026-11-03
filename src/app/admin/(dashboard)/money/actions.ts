@@ -51,7 +51,13 @@ export async function deleteExtraSale(id: string): Promise<{ ok: true } | { erro
   if ("error" in me) return { error: me.error };
   const parsed = z.string().min(1).max(40).safeParse(id);
   if (!parsed.success) return { error: "Sale not found." };
-  const gone = await db.extraSale.deleteMany({ where: { id: parsed.data } });
+  // money from a customer balance or a meal pass belongs to that record; removing it here would
+  // leave the record and the money book disagreeing
+  const gone = await db.extraSale.deleteMany({
+    where: { id: parsed.data, balanceEntry: { is: null }, passSale: { is: null }, passRefund: { is: null } },
+  });
+  if (gone.count === 0 && (await db.extraSale.count({ where: { id: parsed.data } })))
+    return { error: "This one comes from a customer balance or a meal pass – change it there." };
   if (gone.count === 0) return { error: "That sale was already removed." };
   refresh();
   return { ok: true };
