@@ -10,16 +10,29 @@ import { EditCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
+import { BalanceEntryForm, ClearBalanceButton } from "@/components/admin/balance-entry-form";
+import { SellPassForm } from "@/components/admin/passes/pass-forms";
+import { BALANCE_KIND_LABEL, balanceState } from "@/lib/customer-balance";
 import { favouriteItems } from "@/lib/customer-stats";
+import { COUNTED_BALANCE } from "@/lib/data/customer-balance";
+import { today as todayKey } from "@/lib/data/cash";
+import { getPasses } from "@/lib/data/meal-passes";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { owedByCustomer } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
+import { type MealPart, mealsSummary, readParts } from "@/lib/meal-pass";
 import { toRupees } from "@/lib/money";
+import { PAYMENT_LABEL } from "@/lib/payments";
 
 export const metadata = { title: "Customer" };
 
 const RECENT = 20;
+const planMeals = (parts: MealPart[]) =>
+  mealsSummary(
+    parts,
+    parts.map((p) => p.meals),
+  );
 const date = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 const dateTime = (d: Date) => d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
@@ -30,22 +43,45 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const customer = await db.customer.findUnique({ where: { id } });
   if (!customer) notFound();
 
-  const [orders, lines, orderTotal, switches, owedMap] = await Promise.all([
-    db.order.findMany({
-      where: { customerId: id },
-      orderBy: { createdAt: "desc" },
-      take: RECENT,
-      include: { items: { select: { itemName: true, quantity: true } }, bill: { select: { number: true } } },
-    }),
-    db.orderItem.findMany({
-      // other items (discounts and such) aren't dishes, so they're never a favourite
-      where: { order: { customerId: id }, custom: false },
-      select: { itemName: true, quantity: true, order: { select: { status: true } } },
-    }),
-    db.order.count({ where: { customerId: id } }),
-    getEditSwitches(),
-    owedByCustomer([id]),
-  ]);
+  const [orders, lines, orderTotal, switches, owedMap, passes, plans, balanceEntries, balanceSum] =
+    await Promise.all([
+      db.order.findMany({
+        where: { customerId: id },
+        orderBy: { createdAt: "desc" },
+        take: RECENT,
+        include: {
+          items: { select: { itemName: true, quantity: true } },
+          bill: { select: { number: true } },
+        },
+      }),
+      db.orderItem.findMany({
+        // other items (discounts and such) aren't dishes, so they're never a favourite
+        where: { order: { customerId: id }, custom: false },
+        select: { itemName: true, quantity: true, order: { select: { status: true } } },
+      }),
+      db.order.count({ where: { customerId: id } }),
+      getEditSwitches(),
+      owedByCustomer([id]),
+      getPasses({ customerId: id }),
+      db.mealPlan.findMany({ where: { active: true }, orderBy: { pricePaise: "asc" } }),
+      db.customerBalanceEntry.findMany({
+        where: { customerId: id },
+        orderBy: { createdAt: "desc" },
+        take: RECENT,
+        include: {
+          bill: { select: { number: true } },
+          order: { select: { number: true, status: true, deletedAt: true } },
+        },
+      }),
+      db.customerBalanceEntry.aggregate({
+        where: { customerId: id, ...COUNTED_BALANCE },
+        _sum: { amountPaise: true },
+      }),
+    ]);
+  const balance = balanceSum._sum.amountPaise ?? 0;
+  const today = todayKey();
+  const shortDay = (d: string) =>
+    new Date(`${d}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   const owes = owedMap.get(id);
   const favourites = favouriteItems(lines.map((l) => ({ ...l, status: l.order.status })));
   const average = customer.orderCount > 0 ? Math.round(customer.totalSpendPaise / customer.orderCount) : 0;
@@ -158,6 +194,114 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           <CustomerNotesForm id={customer.id} notes={customer.notes} />
         </section>
       </div>
+
+      <section className="rounded-3xl border border-border bg-card p-4" aria-labelledby="balance-h">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="balance-h" className="font-bold">
+            Balance
+          </h2>
+          <p
+            className={
+              balanceState(balance) === "credit"
+                ? "text-lg font-bold text-hh-green dark:text-hh-green-light"
+                : balanceState(balance) === "owes"
+                  ? "text-lg font-bold text-brand-text"
+                  : "text-lg font-bold text-muted-foreground"
+            }
+          >
+            {balanceState(balance) === "credit"
+              ? `Credit ${formatINR(toRupees(balance))} – paid extra`
+              : balanceState(balance) === "owes"
+                ? `Owes ${formatINR(toRupees(-balance))} – paid less`
+                : "Settled – ₹0"}
+          </p>
+        </div>
+        <div className="mb-3">
+          <ClearBalanceButton customerId={customer.id} balance={balance} />
+        </div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Money paid more or less than a bill. Paid it all? Tap the button above. Or on their next visit, the
+          bill shows &ldquo;Add owed&rdquo; / &ldquo;Use credit&rdquo;. For part payments or advances, use the
+          form below.
+        </p>
+        {balanceEntries.length > 0 && (
+          <ul className="mb-4 divide-y divide-border rounded-2xl border border-border">
+            {balanceEntries.map((e) => {
+              const notCounted = e.order && (e.order.deletedAt || e.order.status === "CANCELLED");
+              return (
+                <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">{date(e.createdAt)}</span>
+                  <span className="font-semibold">{BALANCE_KIND_LABEL[e.kind]}</span>
+                  <span className="order-last min-w-0 basis-full text-muted-foreground sm:order-none sm:flex-1 sm:basis-0">
+                    {[
+                      e.bill && `bill #${e.bill.number}`,
+                      e.order && `order #${e.order.number}`,
+                      e.method && PAYMENT_LABEL[e.method],
+                      e.note,
+                      notCounted && "order cancelled – not counted",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  <span
+                    className={
+                      notCounted
+                        ? "ml-auto tabular text-muted-foreground line-through"
+                        : e.amountPaise > 0
+                          ? "ml-auto tabular font-semibold text-hh-green dark:text-hh-green-light"
+                          : "ml-auto tabular font-semibold text-brand-text"
+                    }
+                  >
+                    {e.amountPaise > 0 ? "+" : "−"}
+                    {formatINR(toRupees(Math.abs(e.amountPaise)))}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <BalanceEntryForm customerId={customer.id} />
+      </section>
+
+      <section className="rounded-3xl border border-border bg-card p-4" aria-labelledby="pass-h">
+        <h2 id="pass-h" className="mb-2 font-bold">
+          Meal pass
+        </h2>
+        {passes.length > 0 && (
+          <ul className="mb-4 divide-y divide-border rounded-2xl border border-border">
+            {passes.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                <span className="font-semibold">
+                  #{p.number} {p.planName}
+                </span>
+                <span
+                  className={
+                    p.status === "active"
+                      ? "rounded-full bg-hh-green/15 px-2 py-0.5 text-xs font-bold text-hh-green capitalize dark:text-hh-green-light"
+                      : "rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground capitalize"
+                  }
+                >
+                  {p.status}
+                </span>
+                <span className="order-last min-w-0 basis-full text-muted-foreground sm:order-none sm:flex-1 sm:basis-0">
+                  {mealsSummary(p.parts, p.left)} left · {shortDay(p.startsOn)} – {shortDay(p.endsOn)}
+                </span>
+                <span className="ml-auto tabular">{formatINR(toRupees(p.pricePaise))}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <SellPassForm
+          customerId={customer.id}
+          today={today}
+          plans={plans.map((p) => ({
+            id: p.id,
+            name: p.name,
+            pricePaise: p.pricePaise,
+            summary: `${planMeals(readParts(p.parts))} in ${p.days} days`,
+          }))}
+        />
+      </section>
 
       <section className="space-y-3" aria-labelledby="orders-h">
         <div className="flex items-center justify-between gap-3">

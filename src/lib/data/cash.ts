@@ -18,7 +18,8 @@ export async function moneyBetween(start: Date, end: Date) {
     db.bill.groupBy({
       by: ["paymentMethod"],
       where: { paidAt: { gte: start, lt: end }, voidedAt: null },
-      _sum: { totalPaise: true },
+      // what was received: the total plus anything paid over or under it
+      _sum: { totalPaise: true, differencePaise: true },
       _count: true,
     }),
     // sales added by hand in the money book (no bill)
@@ -37,7 +38,7 @@ export async function moneyBetween(start: Date, end: Date) {
   const sales = (...methods: PaymentMethod[]) =>
     bills
       .filter((b) => b.paymentMethod && methods.includes(b.paymentMethod))
-      .reduce((s, b) => s + (b._sum.totalPaise ?? 0), 0) +
+      .reduce((s, b) => s + (b._sum.totalPaise ?? 0) + (b._sum.differencePaise ?? 0), 0) +
     extra.filter((x) => methods.includes(x.method)).reduce((s, x) => s + (x._sum.amountPaise ?? 0), 0);
   const spent = expenses.reduce((s, e) => s + (e._sum.amountPaise ?? 0), 0);
   return {

@@ -27,7 +27,7 @@ export default async function QrPage() {
         </div>
         <Button asChild className="rounded-full">
           <Link href="/admin/print/qr" target="_blank">
-            <Printer data-icon="inline-start" /> Print cards
+            <Printer data-icon="inline-start" /> Print card
           </Link>
         </Button>
       </div>
@@ -62,7 +62,7 @@ export default async function QrPage() {
           </Button>
           <Button asChild className="rounded-full">
             <Link href="/admin/print/qr?for=pdf" target="_blank">
-              <Printer data-icon="inline-start" /> Print cards
+              <Printer data-icon="inline-start" /> Print card
             </Link>
           </Button>
         </div>

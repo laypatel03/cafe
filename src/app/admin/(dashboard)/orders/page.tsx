@@ -162,6 +162,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             paymentMethod: true,
             paidAt: true,
             totalPaise: true,
+            differencePaise: true,
             customerPhone: true,
             voidedAt: true,
             payLaterAt: true,
@@ -226,10 +227,10 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
 
       <form
         method="get"
-        className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_9rem_11rem_auto]"
+        className="grid grid-cols-6 gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_9rem_11rem_auto]"
       >
         {perPage !== 10 && <input type="hidden" name="per" value={perPage} />}
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-6 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Search
           <span className="relative">
             <Search
@@ -244,15 +245,15 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             />
           </span>
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-3 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           From
           <Input type="date" name="from" defaultValue={from} max={today} className="h-10 text-foreground" />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-3 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           To
           <Input type="date" name="to" defaultValue={to} max={today} className="h-10 text-foreground" />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Type
           <NativeSelect name="type" defaultValue={f.type ?? ""} className="h-10 text-foreground">
             <option value="">All</option>
@@ -260,7 +261,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             <option value="PARCEL">Takeaway</option>
           </NativeSelect>
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Status
           <NativeSelect name="status" defaultValue={f.status ?? ""} className="h-10 text-foreground">
             <option value="">All</option>
@@ -271,7 +272,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             ))}
           </NativeSelect>
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Payment
           <NativeSelect name="pay" defaultValue={f.pay ?? ""} className="h-10 text-foreground">
             <option value="">All</option>
@@ -282,7 +283,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
             ))}
           </NativeSelect>
         </label>
-        <div className="flex gap-2">
+        <div className="col-span-6 flex gap-2 sm:col-span-1">
           <Button type="submit" className="h-10 rounded-full px-5">
             Find
           </Button>
@@ -337,7 +338,13 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                     {o.bill.voidedAt
                       ? " · bill voided"
                       : o.bill.paidAt
-                        ? ` · paid by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}`
+                        ? ` · paid by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}${
+                            o.bill.differencePaise < 0
+                              ? ` · paid ${formatINR(toRupees(o.bill.totalPaise + o.bill.differencePaise))}, ${formatINR(toRupees(-o.bill.differencePaise))} still to pay`
+                              : o.bill.differencePaise > 0
+                                ? ` · paid ${formatINR(toRupees(o.bill.totalPaise + o.bill.differencePaise))}, ${formatINR(toRupees(o.bill.differencePaise))} extra as credit`
+                                : ""
+                          }`
                         : o.bill.payLaterAt
                           ? " · pay later – not paid yet"
                           : " · not paid yet"}

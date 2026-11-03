@@ -52,6 +52,7 @@ export default async function SettingsPage() {
       edits={{
         orders: settings.orderEditsEnabled,
         customers: settings.customerEditsEnabled,
+        passRefunds: settings.mealPassRefundsEnabled,
         ordering: settings.orderingEnabled,
         blog: settings.blogEnabled,
       }}

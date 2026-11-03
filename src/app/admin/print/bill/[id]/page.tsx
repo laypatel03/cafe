@@ -128,6 +128,17 @@ export default async function BillPage({ params }: PageProps<"/admin/print/bill/
           )}
           <dt className="font-sans text-sm font-extrabold">Total</dt>
           <dd className="font-sans text-sm font-extrabold">{rupees(bill.totalPaise)}</dd>
+          {/* paid more or less than the total: the difference is on the guest's balance */}
+          {bill.paidAt && bill.differencePaise !== 0 && (
+            <>
+              <dt>Paid</dt>
+              <dd className="text-right">{rupees(bill.totalPaise + bill.differencePaise)}</dd>
+              <dt className="font-bold">
+                {bill.differencePaise < 0 ? "Still to pay" : "Paid extra (credit)"}
+              </dt>
+              <dd className="text-right font-bold">{rupees(Math.abs(bill.differencePaise))}</dd>
+            </>
+          )}
         </dl>
 
         <div className="my-2 border-t border-dashed border-black" />

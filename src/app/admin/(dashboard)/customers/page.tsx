@@ -1,4 +1,4 @@
-import { CircleAlert, Download, ReceiptText, Search } from "lucide-react";
+import { CircleAlert, Download, ReceiptText, Search, Wallet } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { AddCustomerButton } from "@/components/admin/customer-edit-dialog";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
+import { allBalances } from "@/lib/data/customer-balance";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { owedByCustomer } from "@/lib/data/owed";
 import { db } from "@/lib/db";
@@ -45,8 +46,12 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
   );
 
   // who still owes money (earlier days' unpaid orders and pay-later bills)
-  const owed = await owedByCustomer();
-  const owedTotal = [...owed.values()].reduce((sum, o) => sum + o.paise, 0);
+  // plus paid less than a bill (minus balance); credit = paid extra
+  const [owed, balances] = await Promise.all([owedByCustomer(), allBalances()]);
+  const shortPaid = [...balances].filter(([, b]) => b < 0);
+  const owingIds = new Set([...owed.keys(), ...shortPaid.map(([id]) => id)]);
+  const owedTotal =
+    [...owed.values()].reduce((sum, o) => sum + o.paise, 0) - shortPaid.reduce((sum, [, b]) => sum + b, 0);
 
   // digits search the phone number, anything else the name
   const digits = f.q?.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
@@ -56,7 +61,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         ? { phone: { contains: digits } }
         : { name: { contains: f.q, mode: "insensitive" } })),
     ...(f.offers && { marketingConsent: true }),
-    ...(f.owes && { id: { in: [...owed.keys()] } }),
+    ...(f.owes && { id: { in: [...owingIds] } }),
   };
 
   const perPage = resolvePerPage(f.per, 25);
@@ -121,18 +126,18 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         <div
           className={cn(
             "relative rounded-2xl border px-4 py-3",
-            owed.size > 0 ? "border-hh-orange/40 bg-hh-orange/10" : "border-border bg-card",
+            owingIds.size > 0 ? "border-hh-orange/40 bg-hh-orange/10" : "border-border bg-card",
           )}
         >
           <dt className="text-xs text-muted-foreground">Still to pay</dt>
           <dd className="tabular text-xl font-bold">{formatINR(toRupees(owedTotal))}</dd>
           <dd className="text-xs">
-            {owed.size === 0 ? (
+            {owingIds.size === 0 ? (
               "Nobody owes anything"
             ) : (
               // the whole card opens the list of who owes
               <Link href="/admin/customers?owes=1" className="font-semibold after:absolute after:inset-0">
-                {owed.size} {owed.size === 1 ? "customer" : "customers"} – show them
+                {owingIds.size} {owingIds.size === 1 ? "customer" : "customers"} – show them
               </Link>
             )}
           </dd>
@@ -141,10 +146,10 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
 
       <form
         method="get"
-        className="grid gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-[1.6fr_1fr_auto_auto_auto] sm:items-end"
+        className="grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-[1.6fr_1fr_auto_auto_auto] sm:items-end"
       >
         {perPage !== 25 && <input type="hidden" name="per" value={perPage} />}
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Search
           <span className="relative">
             <Search
@@ -159,7 +164,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
             />
           </span>
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Sort by
           <NativeSelect name="sort" defaultValue={f.sort} className="h-10 text-foreground">
             {Object.entries(SORTS).map(([k, v]) => (
@@ -177,7 +182,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
           <input type="checkbox" name="owes" value="1" defaultChecked={!!f.owes} className="size-4" />
           Owes money
         </label>
-        <div className="flex gap-2">
+        <div className="col-span-2 flex gap-2 sm:col-span-1">
           <Button type="submit" className="h-10 rounded-full px-5">
             Find
           </Button>
@@ -196,13 +201,14 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
       <ul className="divide-y divide-border rounded-3xl border border-border bg-card">
         {customers.map((c) => {
           const owes = owed.get(c.id);
+          const balance = balances.get(c.id) ?? 0;
           return (
             <li
               key={c.id}
               className={cn(
                 "flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3",
                 // highlighted, always with the amount in words beside it
-                owes &&
+                (owes || balance < 0) &&
                   "border-l-4 border-l-hh-orange bg-hh-orange/10 first:rounded-t-3xl last:rounded-b-3xl",
               )}
             >
@@ -225,6 +231,18 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
                     <CircleAlert className="size-4 shrink-0" aria-hidden />
                     Owes <span className="tabular">{formatINR(toRupees(owes.paise))}</span> · {owes.orders}{" "}
                     unpaid {owes.orders === 1 ? "order" : "orders"}
+                  </p>
+                )}
+                {balance < 0 && (
+                  <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-brand-text">
+                    <Wallet className="size-4 shrink-0" aria-hidden />
+                    Owes <span className="tabular">{formatINR(toRupees(-balance))}</span> · paid less
+                  </p>
+                )}
+                {balance > 0 && (
+                  <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-hh-green dark:text-hh-green-light">
+                    <Wallet className="size-4 shrink-0" aria-hidden />
+                    Credit <span className="tabular">{formatINR(toRupees(balance))}</span> · paid extra
                   </p>
                 )}
               </div>

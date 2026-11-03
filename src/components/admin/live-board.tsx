@@ -163,6 +163,8 @@ export function LiveBoard({
         orders={data.orders}
         bills={data.bills}
         payLater={data.payLater}
+        passes={data.passes}
+        balances={data.balances}
         menu={menu}
         isOwner={isOwner}
         onChanged={refresh}

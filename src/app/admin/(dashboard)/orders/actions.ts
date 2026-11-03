@@ -224,6 +224,14 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
   if (!order) return { ok: false, error: "Order not found." };
   if (order.deletedAt)
     return { ok: false, error: `Order #${order.number} was deleted and can't be changed.` };
+  // the pass discount lines are tied to meals taken off a pass; editing would copy or lose them
+  if (order.items.some((i) => i.mealPassUseId))
+    return { ok: false, error: `A meal pass is used on order #${order.number}, so it can't be edited here.` };
+  if (order.items.some((i) => i.balanceEntryId))
+    return {
+      ok: false,
+      error: `A customer balance is settled on order #${order.number}, so it can't be edited here.`,
+    };
   const bill = order.bill;
   const type = takeaway ? "PARCEL" : "DINE_IN";
   const shared = !!bill && bill.orders.length > 1;

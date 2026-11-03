@@ -15,10 +15,14 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { generateBill, markBillPaid, markBillPayLater, voidBill } from "@/app/admin/(dashboard)/actions";
+import { BalanceBox } from "@/components/admin/balance-box";
+import { MealPassBox } from "@/components/admin/passes/pass-forms";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { LiveBill, LiveOrder } from "@/lib/data/live";
+import type { LivePass } from "@/lib/data/meal-passes";
 import { CAFE_TZ, formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { RECEIPT_SMS_ENABLED } from "@/lib/receipt";
@@ -72,11 +76,15 @@ export function BillingPanel({
   orders,
   bills,
   payLater,
+  passes,
+  balances,
   onChanged,
 }: {
   orders: LiveOrder[];
   bills: LiveBill[];
   payLater: LiveBill[];
+  passes: Record<string, LivePass>;
+  balances: Record<string, number>;
   onChanged: () => void;
 }) {
   const pending = toBill(orders);
@@ -92,7 +100,13 @@ export function BillingPanel({
           </h2>
           <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {pending.map((b) => (
-              <ToBillCard key={b.key} entry={b} onChanged={onChanged} />
+              <ToBillCard
+                key={b.key}
+                entry={b}
+                pass={b.orders[0].customerId ? passes[b.orders[0].customerId] : undefined}
+                balance={b.orders[0].customerId ? balances[b.orders[0].customerId] : undefined}
+                onChanged={onChanged}
+              />
             ))}
           </ul>
         </section>
@@ -136,7 +150,17 @@ export function BillingPanel({
   );
 }
 
-function ToBillCard({ entry, onChanged }: { entry: ToBill; onChanged: () => void }) {
+function ToBillCard({
+  entry,
+  pass,
+  balance,
+  onChanged,
+}: {
+  entry: ToBill;
+  pass: LivePass | undefined;
+  balance: number | undefined;
+  onChanged: () => void;
+}) {
   const [pending, start] = useTransition();
   const total = entry.orders.reduce((s, o) => s + o.totalPaise, 0);
   const items = entry.orders.reduce((n, o) => n + o.items.reduce((m, i) => m + i.quantity, 0), 0);
@@ -168,6 +192,19 @@ function ToBillCard({ entry, onChanged }: { entry: ToBill; onChanged: () => void
             <Undo2 data-icon="inline-start" /> Undo “{o.undo}” on #{o.number}
           </Button>
         ))}
+      <MealPassBox
+        pass={pass}
+        orderIds={entry.orders.map((o) => o.id)}
+        passUsed={entry.orders.some((o) => o.items.some((i) => i.pass))}
+        onChanged={onChanged}
+      />
+      <BalanceBox
+        balance={balance}
+        orderIds={entry.orders.map((o) => o.id)}
+        ordersTotalPaise={total}
+        used={entry.orders.some((o) => o.items.some((i) => i.balance))}
+        onChanged={onChanged}
+      />
       <p className="mt-3 text-right tabular text-2xl font-bold">{formatINR(toRupees(total))}</p>
       <Button
         className="mt-3 rounded-full bg-cta font-bold text-cta-foreground hover:bg-hh-orange-light"
@@ -228,6 +265,12 @@ function BillCard({
 }) {
   const [pending, start] = useTransition();
   const [voiding, setVoiding] = useState(false);
+  // what the guest actually paid, when it isn't the bill total (only for a known customer)
+  const [received, setReceived] = useState("");
+  const typed = received.replace(/[₹,\s]/g, "");
+  const receivedPaise = typed === "" ? undefined : Math.round(Number(typed) * 100);
+  const badReceived = receivedPaise !== undefined && !(Number.isFinite(receivedPaise) && receivedPaise >= 0);
+  const difference = receivedPaise === undefined || badReceived ? 0 : receivedPaise - bill.totalPaise;
   const run = (
     fn: () => Promise<{ ok: true } | { ok: false; error: string }>,
     success: string,
@@ -277,17 +320,50 @@ function BillCard({
         </Button>
       </div>
       <p className="mt-3 text-right tabular text-2xl font-bold">{formatINR(toRupees(bill.totalPaise))}</p>
+      {bill.customerId && (
+        <div className="mt-3">
+          <label htmlFor={`received-${bill.id}`} className="text-xs font-semibold text-muted-foreground">
+            Received (₹) – only if more or less than the bill
+          </label>
+          <Input
+            id={`received-${bill.id}`}
+            inputMode="decimal"
+            placeholder={String(toRupees(bill.totalPaise))}
+            value={received}
+            onChange={(e) => setReceived(e.target.value)}
+            aria-invalid={badReceived}
+            className="mt-1 h-10"
+          />
+          {badReceived ? (
+            <p className="mt-1 text-xs text-destructive">Type an amount in rupees.</p>
+          ) : difference > 0 ? (
+            <p className="mt-1 text-xs font-semibold text-hh-green dark:text-hh-green-light">
+              {formatINR(toRupees(difference))} extra – kept as the guest&apos;s credit for next time
+            </p>
+          ) : difference < 0 ? (
+            <p className="mt-1 text-xs font-semibold text-brand-text">
+              {formatINR(toRupees(-difference))} short – the guest owes this next time
+            </p>
+          ) : null}
+        </div>
+      )}
       <p className="mt-3 text-xs font-semibold text-muted-foreground">Paid by</p>
       <div className="mt-1 grid grid-cols-2 gap-2">
         {METHODS.map((m) => (
           <Button
             key={m.id}
-            disabled={pending}
+            disabled={pending || badReceived}
             className="rounded-full"
             onClick={() =>
               run(
-                () => markBillPaid(bill.id, m.id),
-                `Bill #${bill.number} paid by ${m.label}`,
+                () => markBillPaid(bill.id, m.id, difference === 0 ? undefined : receivedPaise),
+                `Bill #${bill.number} paid by ${m.label}${
+                  difference > 0
+                    ? ` · ${formatINR(toRupees(difference))} kept as credit`
+                    : difference < 0
+                      ? ` · ${formatINR(toRupees(-difference))} owed`
+                      : ""
+                }`,
                 RECEIPT_SMS_ENABLED ? () => onPaid({ id: bill.id, number: bill.number }) : undefined,
               )
             }

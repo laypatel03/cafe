@@ -22,12 +22,13 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `/admin` | `(dashboard)/page.tsx` → `components/admin/live-board.tsx` (`orders-panel`, `billing-panel`) | staff | Live orders + billing |
 | `/admin/menu` | `(dashboard)/menu/{page,actions}.ts(x)`, `menu/items/{new,[id]}`, `components/admin/menu/*` | staff (sold-out only) / owner | |
 | `/admin/offers` | `(dashboard)/offers/{page,actions}.ts(x)`, `components/admin/offers/offer-form.tsx` | owner / developer | Today's offer: dish, offer price, days |
+| `/admin/passes` | `(dashboard)/passes/{page,actions}.ts(x)`, `components/admin/passes/pass-forms.tsx` | owner (use at billing: staff) | Meal pass plans, passes, refunds |
 | `/admin/orders` | `(dashboard)/orders/{page,actions}.ts(x)`, `components/admin/orders/*` | staff / owner | History, filters, pay-later, edit (owner switch) |
 | `/admin/counter-order` | `src/app/admin/counter-order/page.tsx` (reuses `menu-browser` + `useCounterCart`) | staff | Walk-in orders; `?customer=` owner only |
 | `/admin/cash` | `(dashboard)/cash/{page,actions}.ts(x)`, `components/admin/cash/cash-forms.tsx` | staff | Drawer open/close |
 | `/admin/expenses` | `(dashboard)/expenses/page.tsx` (actions in `cash/actions.ts`) | staff (today) / owner (any period) | |
 | `/admin/money` | `(dashboard)/money/{page,actions}.ts(x)`, `components/admin/money/*` | owner | Money book |
-| `/admin/customers`, `/[id]` | `(dashboard)/customers/…`, `components/admin/customer-*.tsx` | owner | Owed money, notes, delete, CSV |
+| `/admin/customers`, `/[id]` | `(dashboard)/customers/…`, `components/admin/customer-*.tsx` | owner | Owed money, balance (paid extra/less), notes, delete, CSV |
 | `/admin/reports` | `(dashboard)/reports/page.tsx`, `components/admin/reports/bar-chart.tsx` | owner | |
 | `/admin/qr`, `/admin/print/qr` | `(dashboard)/qr/page.tsx`, `admin/print/qr/page.tsx`, `lib/qr.ts` | owner | |
 | `/admin/print/bill/[id]` | `src/app/admin/print/bill/[id]/page.tsx` | staff | 80 mm receipt |
@@ -49,6 +50,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `(dashboard)/menu/actions.ts` | items / categories / add-ons CRUD, move, `setMenuItemOrder` (drag), `setItemAvailable` (staff) |
 | `(dashboard)/cash/actions.ts` | `setOpeningCash`, `closeDay`, `reopenDay`, `saveExpense`, `deleteExpense` |
 | `(dashboard)/offers/actions.ts` | `saveOffer`, `deleteOffer` (owner + developer; `updateTag(MENU_TAG)`) |
+| `(dashboard)/passes/actions.ts` | owner: `saveMealPlan`, `setMealPlanActive`, `sellMealPass`, `refundMealPass` (switch); staff: `mealPassChoices`, `applyMealPass`, `undoMealPass` |
 | `(dashboard)/money/actions.ts` | `addExtraSale`, `deleteExtraSale`, `saveCardFees` |
 | `(dashboard)/customers/actions.ts` | notes, `withdrawConsent`, `deleteCustomer`, `addCustomer`, `updateCustomer` |
 | `(dashboard)/settings/actions.ts` | `saveCafeDetails`, switches (`setOrderingEnabled`, `setBlogEnabled`, `setOrderEdits`, `setCustomerEdits`), staff accounts, `changeMyPassword` |
@@ -72,6 +74,7 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `reports.ts` | Ranges (`resolveRange`, presets), hour/day/month buckets |
 | `cafe-hours.ts` | Parse owner-typed hours, `isWithinWorkingHours` (IST) |
 | `customer-stats.ts` | `favouriteItems` |
+| `meal-pass.ts` | `passEndsOn`, `mealsLeft`, `passStatus`, `mealOptions` (dishes a pass can cover, cap; `SwapRule` none / within cap (staff) / any (owner)), `checkPicks` |
 | `offers.ts` | `offersOn(rows, day)`, `offerPrice` (never above menu price), `applyOffers` (sets `price`/`wasPrice`), `offerEndsLabel` |
 | `paging.ts` | Admin list pages (10/25/50) |
 | `receipt.ts` | Thank-you SMS text + `sms:` link (`RECEIPT_SMS_ENABLED`) |
@@ -88,10 +91,13 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `google-reviews.ts` | `getGoogleReviews(placeId)` – Places API (New), cached 3 h (tag `google-reviews`); parsing in `lib/google-reviews.ts` → `landing/google-reviews.tsx` |
 | `admin-menu.ts` | Menu manager lists, `getMenuItemForEdit` |
 | `menu-prices.ts` | `loadMenuPrices` – DB prices for `pricing.ts`, today's offers applied (`{ offers: false }` for owner past-order edits) |
+| `meal-passes.ts` | `COUNTED_USES` (not cancelled/deleted), `getPasses` (+left/status), `activePassFor`, `livePasses` (live board) |
+| `customer-balance.ts` | `COUNTED_BALANCE`, `balancesFor` (live board), `balanceOf`, `allBalances` (customers list) |
+| `order-totals.ts` | `retotal(tx, orderId, tax)` after meal pass / balance lines change |
 | `offers.ts` | `getTodaysOffers` (cached per IST day, tag `menu`), `getMenuWithOffers` – used by `/`, `/menu`, counter order, live board (not the PDF menu or blog) |
-| `live.ts` | `getLiveBoard` – selections, active orders, bills to make/pay |
+| `live.ts` | `getLiveBoard` – selections, active orders, bills to make/pay (+ bill `customerId`), passes, balances |
 | `cash.ts` | `today`, `dayBounds`, `moneyBetween`, drawer day + history |
-| `money-book.ts` | `getMoneyBook` |
+| `money-book.ts` | `getMoneyBook` (+ pay later, short-paid balances, extra sales tagged `linked`) |
 | `reports.ts` | `getReport` |
 | `owed.ts` | `owedOrdersWhere`, `owedByCustomer` (unpaid earlier days + pay-later) |
 | `edit-switches.ts` | Owner switches for order/customer editing |
@@ -116,6 +122,8 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `Selection` | Guest's live pick list per device (12 h TTL); staff watch it |
 | `StaffUser` | `role` STAFF/OWNER/DEVELOPER; `sessionVersion` bump = logout everywhere |
 | `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `googlePlaceId` (home page reviews), `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
+| `CustomerBalanceEntry` | ± money a guest paid over/under (`kind`, `amountPaise`, `billId` – that bill's `differencePaise` holds it; `saleId` → `ExtraSale` for hand entries); SETTLED ↔ ± `OrderItem` (`balanceEntryId`, cascade). Balance = sum, minus SETTLED on cancelled/deleted orders (`COUNTED_BALANCE`) |
+| `MealPlan` / `MealPass` / `MealPassUse` | Plan = `parts` JSON (meal types `{name, meals, categoryIds, capPaise}`, read with `readParts`), days. Use = `part` index + `partName`; `swap` = counted at the counter from another category. Pass copies the plan, `saleId`/`refundSaleId` → `ExtraSale` (±). Use ↔ minus `OrderItem` (`mealPassUseId`, cascade) |
 | `Offer` | `menuItemId`, `pricePaise`, `title`, `startsOn`/`endsOn` (`yyyy-mm-dd` IST, inclusive); lowest wins if two overlap |
 | `Expense`, `CashDay`, `ExtraSale` | Money book / cash drawer; `CashDay.day` = `yyyy-mm-dd` IST |
 | `RateLimit` | Fixed window counters |
@@ -153,6 +161,9 @@ Enum labels for UI: `PaymentMethod` → `lib/payments.ts` (legacy `CARD` = credi
 | Opening hours | `lib/cafe-hours.ts`, `hooks/use-open-now.ts`, `validators/settings.ts#hoursFromForm` |
 | Login / sessions / staff accounts | `lib/auth/*`, `admin/login/*`, `settings/actions.ts` |
 | Today's offer | `lib/offers.ts`, `lib/data/offers.ts`, `(dashboard)/offers/*`, `components/landing/todays-offers.tsx`, `components/menu/{price,offers-strip}.tsx` |
+| Customer balance | `lib/customer-balance.ts`, `lib/data/customer-balance.ts`, `(dashboard)/customers/balance-actions.ts`, `components/admin/balance-{box,entry-form}.tsx`, `markBillPaid` |
+| Order totals after added lines | `lib/data/order-totals.ts` (`retotal`) |
+| Meal passes | `lib/meal-pass.ts`, `lib/data/meal-passes.ts`, `(dashboard)/passes/*`, `components/admin/passes/pass-forms.tsx`, `billing-panel.tsx` |
 | Photos | `lib/uploads.ts`, `media/[...path]/route.ts`, `components/menu/item-art.tsx` |
 | Brand / theme tokens | `src/app/globals.css`, `components/brand/*`, `components/theme/*` |
 | Landing content | `components/landing/sections.tsx`, `components/landing/hero.tsx` |

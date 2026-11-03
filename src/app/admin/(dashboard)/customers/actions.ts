@@ -84,6 +84,10 @@ export async function deleteCustomer(id: string): Promise<{ ok: true } | { error
       where: { OR: [{ customerId: customer.id }, { customerPhone: customer.phone }] },
       data: { customerName: DELETED_NAME, customerPhone: null, customerId: null },
     }),
+    db.mealPass.updateMany({
+      where: { OR: [{ customerId: customer.id }, { customerPhone: customer.phone }] },
+      data: { customerName: DELETED_NAME, customerPhone: null },
+    }),
     db.rateLimit.deleteMany({ where: { key: `order-phone:${customer.phone}` } }),
     db.customer.delete({ where: { id: customer.id } }),
   ]);

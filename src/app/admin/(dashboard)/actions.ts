@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
 import { getCafeDetails } from "@/lib/data/menu";
@@ -16,6 +17,7 @@ import {
   UNDO_NOTE,
 } from "@/lib/order-flow";
 import { billFromOrders } from "@/lib/billing";
+import { paymentDifference } from "@/lib/customer-balance";
 import {
   type CustomLineInput,
   CustomLinesSchema,
@@ -161,6 +163,7 @@ export async function updateOrderItems(
       id: true,
       number: true,
       status: true,
+      _count: { select: { mealPassUses: true, balanceEntries: true } },
       items: {
         where: { custom: true },
         select: {
@@ -178,6 +181,16 @@ export async function updateOrderItems(
   if (!order) return { ok: false, error: "Order not found." };
   if (!canEditItems(order.status))
     return { ok: false, error: "This order is already in the kitchen – items can't be changed." };
+  if (order._count.mealPassUses > 0)
+    return {
+      ok: false,
+      error: "A meal pass is used on this order – undo the meal pass first, then change items.",
+    };
+  if (order._count.balanceEntries > 0)
+    return {
+      ok: false,
+      error: "A customer balance is settled on this order – undo it first, then change items.",
+    };
 
   const priced = lines.data.length
     ? priceLines(lines.data, await loadMenuPrices(lines.data.map((i) => i.itemId)))
@@ -426,17 +439,24 @@ export async function generateBill(
 const PaymentSchema = z.object({
   billId: z.string().min(1).max(40),
   method: z.enum(PAY_CHOICES),
+  /** what the guest actually paid, when it isn't the bill total */
+  receivedPaise: z.number().int().min(0).max(10_000_000).optional(),
 });
 
 /**
  * Payment taken at the counter: orders become PAID (a takeaway not yet picked up stays READY),
- * customer stats update.
+ * customer stats update. If the guest paid more or less than the bill, the difference goes on
+ * their balance and is kept on the bill, so the money book and drawer count what was received.
  */
-export async function markBillPaid(billId: string, method: PayChoice): Promise<{ ok: true } | Fail> {
+export async function markBillPaid(
+  billId: string,
+  method: PayChoice,
+  receivedPaise?: number,
+): Promise<{ ok: true; difference: number } | Fail> {
   const me = await staff();
   if ("ok" in me) return me;
-  const parsed = PaymentSchema.safeParse({ billId, method });
-  if (!parsed.success) return { ok: false, error: "Choose cash, Google Pay, credit card or debit card." };
+  const parsed = PaymentSchema.safeParse({ billId, method, receivedPaise });
+  if (!parsed.success) return { ok: false, error: "Choose how they paid, and check the amount received." };
 
   const bill = await db.bill.findUnique({ where: { id: parsed.data.billId }, include: { orders: true } });
   if (!bill) return { ok: false, error: "Bill not found." };
@@ -445,10 +465,24 @@ export async function markBillPaid(billId: string, method: PayChoice): Promise<{
 
   const now = new Date();
   const label = PAYMENT_SHORT[parsed.data.method];
+  // the guest the bill is for: the order with the bill's phone, else the only guest on it
+  const guestIds = [...new Set(bill.orders.map((o) => o.customerId).filter((id): id is string => !!id))];
+  const billCustomer =
+    bill.orders.find((o) => o.customerId && o.customerPhone === bill.customerPhone)?.customerId ??
+    (guestIds.length === 1 ? guestIds[0] : undefined);
+  const difference =
+    parsed.data.receivedPaise === undefined
+      ? 0
+      : paymentDifference(bill.totalPaise, parsed.data.receivedPaise);
+  if (difference !== 0 && !billCustomer)
+    return {
+      ok: false,
+      error: "To keep extra or short money on account, the order needs the guest's phone number.",
+    };
   const done = await db.$transaction(async (tx) => {
     const paid = await tx.bill.updateMany({
       where: { id: bill.id, paidAt: null, voidedAt: null },
-      data: { paidAt: now, paymentMethod: parsed.data.method },
+      data: { paidAt: now, paymentMethod: parsed.data.method, differencePaise: difference },
     });
     if (paid.count === 0) return false;
     for (const o of bill.orders) {
@@ -465,9 +499,7 @@ export async function markBillPaid(billId: string, method: PayChoice): Promise<{
       })),
     });
     // one visit per customer on the bill; the spend goes to the guest the bill is for
-    const customerIds = [...new Set(bill.orders.map((o) => o.customerId).filter((id): id is string => !!id))];
-    const billCustomer = bill.orders.find((o) => o.customerPhone === bill.customerPhone)?.customerId;
-    for (const id of customerIds) {
+    for (const id of guestIds) {
       await tx.customer.update({
         where: { id },
         data: {
@@ -477,12 +509,24 @@ export async function markBillPaid(billId: string, method: PayChoice): Promise<{
         },
       });
     }
+    if (difference !== 0 && billCustomer)
+      await tx.customerBalanceEntry.create({
+        data: {
+          customerId: billCustomer,
+          kind: difference > 0 ? "PAID_EXTRA" : "PAID_LESS",
+          amountPaise: difference,
+          method: parsed.data.method,
+          billId: bill.id,
+          createdById: me.id,
+        },
+      });
     return true;
   });
   if (!done) return { ok: false, error: `Bill #${bill.number} was just paid or voided by someone else.` };
   for (const o of bill.orders)
     await publish({ type: "order", orderId: o.id, number: o.number, status: statusOnPayment(o.status) });
-  return { ok: true };
+  if (difference !== 0 && billCustomer) revalidatePath(`/admin/customers/${billCustomer}`);
+  return { ok: true, difference };
 }
 
 /**

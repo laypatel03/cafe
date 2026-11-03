@@ -232,7 +232,7 @@ function ItemRow({
           <GripVertical className="size-5" />
         </button>
       )}
-      <ItemImage item={item} sizes="48px" className="size-12 shrink-0 rounded-xl" />
+      <ItemImage item={item} sizes="48px" className="size-10 shrink-0 rounded-xl sm:size-12" />
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-x-2 font-medium">
           <span className={item.available ? "" : "text-muted-foreground line-through"}>{item.name}</span>
@@ -259,7 +259,15 @@ function ItemRow({
         />
       </div>
       {draggable && (
-        <MoveButtons label={item.name} first={first} last={last} move={(dir) => moveMenuItem(item.id, dir)} />
+        // phones reorder with the drag handle; the arrows would squeeze the dish name
+        <div className="hidden sm:contents">
+          <MoveButtons
+            label={item.name}
+            first={first}
+            last={last}
+            move={(dir) => moveMenuItem(item.id, dir)}
+          />
+        </div>
       )}
       {isOwner && (
         <Button asChild variant="ghost" size="icon-sm" aria-label={`Edit ${item.name}`}>
