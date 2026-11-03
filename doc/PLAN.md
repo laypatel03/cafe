@@ -162,6 +162,9 @@ Phase 0 is added in front of the doc's five phases so the look and the 3D are ag
 - Tables & QR: add/rename tables, print-ready QR cards. Settings page (café details, ordering on/off, tax %, staff accounts).
 - **Done when:** owner can see yesterday's sales and repeat customers.
 
+### WhatsApp bills & due reminders (1 Nov 2026)
+Owner's choices: **Meta WhatsApp Cloud API** directly (official; automatic sending and PDFs need it – unofficial WhatsApp Web tools risk a ban), behind `src/lib/whatsapp/` so a reseller can replace it later; not connected → staff get a `wa.me` link (text only). Café-started messages are Meta-approved **Utility templates** (template names/language in `.env`). **Bill paid at the counter:** its PDF goes by itself (Settings switch, on by default). **Pay later:** nothing at once (owner, 1 Nov: one PDF per pay-later bill was too much) – one short `pay_later_thanks` per guest **30 min after closing** (Settings hours; 11 pm if none), no PDF. **Pay-later bills paid off:** one `payment_received` with a receipt PDF and what's still due, never a PDF per bill. **Reminders:** café-wide, **weekly by default** (monthly or off), day, hour and minimum due; a guest can be paused, STOP opts them out; one **dues statement PDF** per reminder (from `owed.ts`). PDFs are uploaded to WhatsApp as media – never a public link. Scheduling: a systemd timer every 5 min → `/api/cron/due-reminders` (secret) – no worker or queue; each note/reminder goes once (unique key / bill ids in `WhatsAppMessage`). Delivery status and STOP only come through the webhook (Meta has no status lookup). The old thank-you SMS was removed. Deploying: `doc/whatsapp-deploy.md`.
+
 ### Phase 5 – Launch
 - VPS (Mumbai) with Docker Compose: Next.js + Postgres + Caddy (auto HTTPS); domain DNS.
 - Daily `pg_dump` backup with 30-day retention + a tested restore.

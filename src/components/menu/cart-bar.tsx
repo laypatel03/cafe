@@ -18,6 +18,7 @@ import { itemCount, lineKey, type OrderKind, useCartStore } from "@/lib/cart-sto
 import type { AddOn, MenuItem } from "@/lib/menu-types";
 import { cn } from "@/lib/utils";
 import { INDIAN_MOBILE } from "@/lib/validators/phone";
+import { GuestSuggestionList, useGuestSuggestions } from "./guest-suggestions";
 import { ListLine } from "./list-line";
 import { guestStatusLabel, isActive, OrderTracker } from "./order-tracker";
 
@@ -37,12 +38,15 @@ export function CartBar({
   addOns,
   counter = false,
   counterGuest,
+  suggestGuests = false,
 }: {
   /** menu items and add-ons, so guests can change add-ons from the list */
   items: MenuItem[];
   addOns: AddOn[];
   counter?: boolean;
   counterGuest?: { name: string; phone: string };
+  /** owner at the counter: saved customers to pick from while typing the number or name */
+  suggestGuests?: boolean;
 }) {
   const useCart = useCartStore();
   const router = useRouter();
@@ -216,6 +220,7 @@ export function CartBar({
               kind={kind}
               count={count}
               counter={counter}
+              suggestGuests={counter && suggestGuests}
               initial={counter ? (counterGuest ?? null) : guest}
               lines={lines}
               onBack={() => setStep("list")}
@@ -311,6 +316,7 @@ function DetailsStep({
   kind,
   count,
   counter,
+  suggestGuests,
   initial,
   lines,
   onBack,
@@ -321,6 +327,7 @@ function DetailsStep({
   count: number;
   /** staff entering a walk-in guest's order: phone optional, no offers question */
   counter: boolean;
+  suggestGuests: boolean;
   initial: { name: string; phone: string } | null;
   lines: { itemId: string; addOnIds: string[]; quantity: number }[];
   onBack: () => void;
@@ -357,6 +364,34 @@ function DetailsStep({
     };
   }, [counter, phone]);
   const returning = known && known.phone === phone ? known : null;
+  // owner: saved customers matching the field being typed in; picking one fills both
+  const [typingIn, setTypingIn] = useState<"phone" | "name" | null>(null);
+  const matches = useGuestSuggestions(
+    typingIn === "phone" ? phone : typingIn === "name" ? name : "",
+    suggestGuests && typingIn !== null,
+  ).filter((g) => !(g.phone === phone && g.name === name));
+  const pickGuest = (g: { name: string; phone: string }) => {
+    setPhone(g.phone);
+    setName(g.name);
+    autoName.current = g.name;
+    setTypingIn(null);
+  };
+  const suggestProps = (field: "phone" | "name") =>
+    suggestGuests
+      ? {
+          onFocus: () => setTypingIn(field),
+          onBlur: () => setTypingIn(null),
+          // Escape closes the pick list only, not the whole order sheet
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key !== "Escape" || typingIn !== field || matches.length === 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            setTypingIn(null);
+          },
+          "aria-controls": typingIn === field && matches.length ? `g-${field}-matches` : undefined,
+          "aria-autocomplete": "list" as const,
+        }
+      : {};
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -406,11 +441,18 @@ function DetailsStep({
         maxLength={10}
         placeholder="10-digit mobile"
         value={phone}
-        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+        onChange={(e) => {
+          setPhone(e.target.value.replace(/\D/g, ""));
+          if (suggestGuests) setTypingIn("phone");
+        }}
         aria-invalid={phone.length === 10 && !phoneOk}
         required={!counter}
         className="h-11"
+        {...suggestProps("phone")}
       />
+      {typingIn === "phone" && (
+        <GuestSuggestionList id="g-phone-matches" guests={matches} onPick={pickGuest} />
+      )}
       {returning && (
         <p className="text-sm text-brand-text">
           Returning guest · {returning.visits} {returning.visits === 1 ? "visit" : "visits"}
@@ -432,7 +474,9 @@ function DetailsStep({
           <SheetDescription>
             {KIND_LABEL[kind]} · {count} item{count === 1 ? "" : "s"}.{" "}
             {counter
-              ? "Enter the mobile number first – a returning guest's name fills in by itself. The number is optional."
+              ? suggestGuests
+                ? "Start typing the number or name – pick a saved customer from the list, or enter a new guest. The number is optional."
+                : "Enter the mobile number first – a returning guest's name fills in by itself. The number is optional."
               : "We use these to manage your order and call you when it's ready."}
           </SheetDescription>
         </div>
@@ -445,12 +489,19 @@ function DetailsStep({
           id="g-name"
           autoComplete={counter ? "off" : "name"}
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (suggestGuests) setTypingIn("name");
+          }}
           required
           minLength={2}
           maxLength={60}
           className="h-11"
+          {...suggestProps("name")}
         />
+        {typingIn === "name" && (
+          <GuestSuggestionList id="g-name-matches" guests={matches} onPick={pickGuest} />
+        )}
       </div>
       {!counter && phoneField}
       <div className="space-y-1.5">

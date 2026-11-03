@@ -155,3 +155,20 @@ export function isWithinWorkingHours(
     }),
   );
 }
+
+/**
+ * When the café closes on weekday `day` (0 = Sunday): the end of that day's last opening range, in
+ * minutes after its midnight – past 1440 for hours that run past midnight ("6 pm – 2 am" → 1560).
+ * null when that day is closed or there are no readable hours.
+ */
+export function closingMinutes(schedules: CafeHourSchedule[] | null | undefined, day: number): number | null {
+  let last: number | null = null;
+  for (const row of (schedules ?? []).map(parseRow)) {
+    if (!row || !row.days.includes(day)) continue;
+    for (const [open, close] of row.ranges) {
+      const end = close > open ? close : close + 24 * 60;
+      if (last === null || end > last) last = end;
+    }
+  }
+  return last;
+}

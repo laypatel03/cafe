@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
 import { getCafeDetails } from "@/lib/data/menu";
@@ -27,9 +28,8 @@ import {
 } from "@/lib/custom-lines";
 import { billTotals, priceLines } from "@/lib/pricing";
 import { publish } from "@/lib/realtime";
-import { maskPhone } from "@/lib/phone-mask";
 import { PAY_CHOICES, type PayChoice, PAYMENT_SHORT } from "@/lib/payments";
-import { RECEIPT_SMS_ENABLED, receiptMessage, smsLink } from "@/lib/receipt";
+import { autoSendPayment } from "@/lib/whatsapp/send";
 import { type CounterOrderInput, CounterOrderSchema } from "@/lib/validators/place-order";
 import { INDIAN_MOBILE } from "@/lib/validators/phone";
 import { SelectionLinesSchema } from "@/lib/validators/selection";
@@ -122,6 +122,32 @@ export async function findGuestByPhone(
     select: { name: true, orderCount: true },
   });
   return { ok: true, guest: customer && { name: customer.name, visits: customer.orderCount } };
+}
+
+export type GuestMatch = { name: string; phone: string; visits: number };
+
+/**
+ * Owner, counter order: saved customers matching what's typed so far – part of the number (3+ digits)
+ * or of the name (2+ letters) – most recent visit first. Owner only: it shows full numbers.
+ */
+export async function searchGuests(query: string): Promise<{ ok: true; guests: GuestMatch[] } | Fail> {
+  try {
+    await assertUser("OWNER");
+  } catch (e) {
+    if (e instanceof AuthError) return { ok: false, error: e.message };
+    throw e;
+  }
+  const q = z.string().trim().max(60).safeParse(query);
+  if (!q.success) return { ok: true, guests: [] };
+  const digits = /^\d+$/.test(q.data);
+  if (digits ? q.data.length < 3 : q.data.length < 2) return { ok: true, guests: [] };
+  const rows = await db.customer.findMany({
+    where: digits ? { phone: { contains: q.data } } : { name: { contains: q.data, mode: "insensitive" } },
+    orderBy: { lastVisitAt: "desc" },
+    take: 6,
+    select: { name: true, phone: true, orderCount: true },
+  });
+  return { ok: true, guests: rows.map((r) => ({ name: r.name, phone: r.phone, visits: r.orderCount })) };
 }
 
 /** Guest left without ordering – take their list off the board. */
@@ -455,6 +481,21 @@ export async function markBillPaid(
 ): Promise<{ ok: true; difference: number } | Fail> {
   const me = await staff();
   if ("ok" in me) return me;
+  const res = await payBill(me, billId, method, receivedPaise);
+  if (res.ok) after(() => autoSendPayment([billId], me.id));
+  return res;
+}
+
+/**
+ * Takes the payment for one bill (no WhatsApp – the caller sends one message for the whole payment).
+ * `receivedPaise` differing from the total goes on the guest's balance.
+ */
+async function payBill(
+  me: CurrentUser,
+  billId: string,
+  method: PayChoice,
+  receivedPaise?: number,
+): Promise<{ ok: true; difference: number } | Fail> {
   const parsed = PaymentSchema.safeParse({ billId, method, receivedPaise });
   if (!parsed.success) return { ok: false, error: "Choose how they paid, and check the amount received." };
 
@@ -527,6 +568,37 @@ export async function markBillPaid(
     await publish({ type: "order", orderId: o.id, number: o.number, status: statusOnPayment(o.status) });
   if (difference !== 0 && billCustomer) revalidatePath(`/admin/customers/${billCustomer}`);
   return { ok: true, difference };
+}
+
+const BillIds = z.array(z.string().min(1).max(40)).min(1, "Pick at least one bill").max(30);
+
+/**
+ * A guest pays some of their pay-later bills at once, all the same way. Each bill is paid as if
+ * tapped on its own (same checks, customer stats); then one WhatsApp "payment received" for all of
+ * them. Stops at the first that fails (the ones before it stay paid and are in the message).
+ */
+export async function markBillsPaid(
+  billIds: string[],
+  method: PayChoice,
+): Promise<{ ok: true; paid: number } | Fail> {
+  const me = await staff();
+  if ("ok" in me) return me;
+  const ids = BillIds.safeParse(billIds);
+  if (!ids.success) return { ok: false, error: ids.error.issues[0].message };
+  const paid: string[] = [];
+  let failed: Fail | null = null;
+  for (const id of [...new Set(ids.data)]) {
+    const res = await payBill(me, id, method);
+    if (!res.ok) {
+      failed = res;
+      break;
+    }
+    paid.push(id);
+  }
+  if (paid.length) after(() => autoSendPayment(paid, me.id));
+  if (failed)
+    return { ok: false, error: paid.length ? `${paid.length} paid, then: ${failed.error}` : failed.error };
+  return { ok: true, paid: paid.length };
 }
 
 /**
@@ -630,43 +702,4 @@ export async function voidBill(billId: string, reason: string): Promise<{ ok: tr
   for (const o of bill.orders)
     await publish({ type: "order", orderId: o.id, number: o.number, status: o.status });
   return { ok: true };
-}
-
-/* ------------------------------ receipt SMS ------------------------------ */
-
-export type ReceiptSms = { ok: true; to: string; text: string; href: string } | Fail;
-
-/**
- * The receipt text for a paid bill and an sms: link that opens the counter phone's messages app
- * with it filled in. Staff see the number masked; the full number is only inside the link.
- */
-export async function receiptSms(billId: string): Promise<ReceiptSms> {
-  if (!RECEIPT_SMS_ENABLED) return { ok: false, error: "Texting receipts is switched off." };
-  const me = await staff();
-  if ("ok" in me) return me;
-  const id = z.string().min(1).max(40).safeParse(billId);
-  if (!id.success) return { ok: false, error: "Bill not found." };
-  const bill = await db.bill.findUnique({
-    where: { id: id.data },
-    select: {
-      number: true,
-      totalPaise: true,
-      paymentMethod: true,
-      paidAt: true,
-      voidedAt: true,
-      customerPhone: true,
-    },
-  });
-  if (!bill) return { ok: false, error: "Bill not found." };
-  if (bill.voidedAt) return { ok: false, error: `Bill #${bill.number} is void.` };
-  if (!bill.paidAt) return { ok: false, error: `Bill #${bill.number} isn't paid yet.` };
-  if (!bill.customerPhone) return { ok: false, error: "There's no phone number on this bill." };
-
-  const text = receiptMessage({ cafeName: (await getCafeDetails()).name });
-  return {
-    ok: true,
-    to: me.role === "OWNER" ? bill.customerPhone : maskPhone(bill.customerPhone),
-    text,
-    href: smsLink(bill.customerPhone, text),
-  };
 }

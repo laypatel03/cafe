@@ -66,6 +66,8 @@ type Props = {
   counter?: boolean;
   /** counter order for a known guest (opened from their customer page): name and number filled in */
   counterGuest?: { name: string; phone: string };
+  /** owner at the counter: saved customers suggested while typing the guest's number or name */
+  suggestGuests?: boolean;
 };
 
 export function MenuBrowser({
@@ -78,6 +80,7 @@ export function MenuBrowser({
   initialItemId,
   counter = false,
   counterGuest,
+  suggestGuests = false,
 }: Props) {
   // opens and closes on time while the page stays open; staff counter orders ignore the hours
   const isWithinHours = useOpenNow(counter ? undefined : hours, withinHoursAtLoad ?? true);
@@ -438,7 +441,13 @@ export function MenuBrowser({
           onClose={() => setOpenItem(null)}
         />
         {orderingEnabled && (
-          <CartBar items={items} addOns={addOns} counter={counter} counterGuest={counterGuest} />
+          <CartBar
+            items={items}
+            addOns={addOns}
+            counter={counter}
+            counterGuest={counterGuest}
+            suggestGuests={suggestGuests}
+          />
         )}
       </div>
     </CartStoreContext.Provider>

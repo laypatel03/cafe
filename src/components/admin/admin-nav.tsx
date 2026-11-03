@@ -10,6 +10,7 @@ import {
   IndianRupee,
   LogOut,
   Menu as MenuIcon,
+  MessageCircle,
   QrCode,
   Receipt,
   Settings,
@@ -39,6 +40,7 @@ const ICONS = {
   qr: QrCode,
   customers: Users,
   passes: Ticket,
+  whatsapp: MessageCircle,
   reports: BarChart3,
   settings: Settings,
 } satisfies Record<NavItem["icon"], typeof ClipboardList>;

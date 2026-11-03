@@ -86,6 +86,11 @@ export default async function PrivacyPage() {
           <ul>
             <li>To prepare your order, call you when it&apos;s ready and make your bill.</li>
             <li>To contact you about that order if needed.</li>
+            <li>
+              To send your bill on WhatsApp, and – if you chose to pay later – a reminder of what&apos;s still
+              to pay, with a PDF of those bills. Reply STOP to get no more WhatsApp messages from us, START to
+              have them again.
+            </li>
             <li>To recognise you when you come back (number of visits).</li>
             <li>
               To send offers on WhatsApp or SMS – <strong>only</strong> if you ticked the box.
@@ -101,6 +106,10 @@ export default async function PrivacyPage() {
               98xxxxxx21).
             </li>
             <li>The owner can see the full number and your past visits.</li>
+            <li>
+              WhatsApp (Meta) carries the bills and reminders we send you, so it gets your number, the message
+              and the PDF.
+            </li>
             <li>We don&apos;t sell or share your details with anyone else.</li>
           </ul>
         </section>
@@ -110,6 +119,7 @@ export default async function PrivacyPage() {
           <ul>
             <li>Orders and bills are kept as the café&apos;s sales records.</li>
             <li>Your customer details (name, number, visits) are kept until you ask us to delete them.</li>
+            <li>A record of the WhatsApp messages we sent you is kept with them, and deleted with them.</li>
             <li>On your phone, your list clears itself after 12 hours, or when you tap “Clear list”.</li>
           </ul>
         </section>

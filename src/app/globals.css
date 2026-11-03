@@ -73,6 +73,7 @@
 }
 
 :root {
+  color-scheme: light;
   /* Brand palette – see doc/brand-palette.jpg */
   --hh-green: #055c1b; /* Deep Leaf Green */
   --hh-green-light: #55a90d; /* Fresh Green */
@@ -142,6 +143,8 @@
 }
 
 .dark {
+  /* native pickers (select lists, date pickers) and scrollbars follow the theme */
+  color-scheme: dark;
   --hh-ink: #eef5ef;
   --hh-sub: #cde5d3;
   --hh-body: #a7b8ac;

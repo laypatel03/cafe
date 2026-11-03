@@ -14,6 +14,7 @@ export type NavItem = {
     | "qr"
     | "customers"
     | "passes"
+    | "whatsapp"
     | "reports"
     | "settings";
   roles: Role[];
@@ -34,6 +35,7 @@ export const NAV: NavItem[] = [
   { href: "/admin/qr", label: "QR code", icon: "qr", roles: ["OWNER", "DEVELOPER"] },
   { href: "/admin/customers", label: "Customers", icon: "customers", roles: ["OWNER"] },
   { href: "/admin/passes", label: "Meal passes", icon: "passes", roles: ["OWNER"] },
+  { href: "/admin/whatsapp", label: "WhatsApp", icon: "whatsapp", roles: ["OWNER"] },
   { href: "/admin/reports", label: "Reports", icon: "reports", roles: ["OWNER"] },
   { href: "/admin/settings", label: "Settings", icon: "settings", roles: ["OWNER", "DEVELOPER"] },
 ];

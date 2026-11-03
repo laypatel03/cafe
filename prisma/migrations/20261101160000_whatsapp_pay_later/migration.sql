@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "WaKind" ADD VALUE 'PAY_LATER';

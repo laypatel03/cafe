@@ -62,7 +62,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **S-02 – See new orders and live picks**
 *As staff I want new orders to appear instantly with a chime so that no guest waits.*
-- Rules: SSE from Postgres NOTIFY; chime + highlight until accepted; guests' live pick lists visible; offline banner and catch-up (`resync`) when the connection returns.
+- Rules: SSE from Postgres NOTIFY; chime + highlight until accepted (sound on by default, unlocked by the first tap/key press – browser rule; "off" remembered per device in localStorage `hh-order-sound`); guests' live pick lists visible; offline banner and catch-up (`resync`) when the connection returns.
 - Code: `admin/live-board.tsx`, `lib/data/live.ts`, `app/api/admin/live/*`, `lib/realtime.ts`, `admin/offline-banner.tsx`.
 
 **S-03 – Move an order through its steps**
@@ -77,13 +77,13 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **S-05 – Take a counter order**
 *As staff I want to order for a walk-in using the guest menu so that everything goes through one system.*
-- Rules: name required, phone optional; typing a known mobile fills the name (typed name wins) and shows visit count; works any time (ignores hours); staff can't preselect a customer (they only see masked phones).
-- Code: `app/admin/counter-order/page.tsx`, `lib/cart-store.ts#useCounterCart`, `(dashboard)/actions.ts#createCounterOrder/findGuestByPhone`.
+- Rules: name required, phone optional; typing a known mobile fills the name (typed name wins) and shows visit count; owner only: typing 3+ digits of a number or 2+ letters of a name lists up to 6 saved customers (full numbers, latest visit first) – picking one fills both (`searchGuests`, owner-gated; never on the guest QR menu); works any time (ignores hours); staff can't preselect a customer (they only see masked phones).
+- Code: `app/admin/counter-order/page.tsx`, `lib/cart-store.ts#useCounterCart`, `(dashboard)/actions.ts#createCounterOrder/findGuestByPhone/searchGuests`, `menu/guest-suggestions.tsx`.
 
 **S-06 – Bill and take payment**
 *As staff I want one bill per dine-in visit and per takeaway order, paid by cash / UPI / card, so that billing is quick and correct.*
-- Rules: dine-in bill combines a guest's served, unbilled orders (waits while one is unserved); totals from server; methods Cash, UPI (Google Pay), Credit card, Debit card (legacy `CARD` = credit); "Pay later" bills show on the live board only on that day; wrong bills are voided with a reason, never deleted – numbers stay continuous; print 80 mm receipt; optional thank-you SMS via `sms:` link.
-- Code: `admin/billing-panel.tsx`, `lib/billing.ts`, `(dashboard)/actions.ts#generateBill/markBillPaid/markBillPayLater/voidBill/receiptSms`, `app/admin/print/bill/[id]/page.tsx`, `lib/receipt.ts`, `admin/receipt-sms.tsx`.
+- Rules: dine-in bill combines a guest's served, unbilled orders (waits while one is unserved); totals from server; methods Cash, UPI (Google Pay), Credit card, Debit card (legacy `CARD` = credit); "Pay later" bills show on the live board on that day, one card per guest (grouped by phone) with that guest's earlier unpaid pay-later bills added – tick which ones they're paying, one tap pays them all by one method (`markBillsPaid`, each bill paid as on its own); wrong bills are voided with a reason, never deleted – numbers stay continuous; print 80 mm receipt; the bill goes to the guest on WhatsApp by itself on payment (O-12) – the old thank-you SMS was removed 1 Nov.
+- Code: `admin/billing-panel.tsx`, `lib/billing.ts`, `(dashboard)/actions.ts#generateBill/markBillPaid/markBillsPaid/markBillPayLater/voidBill`, `app/admin/print/bill/[id]/page.tsx`.
 
 **S-07 – Find past orders**
 *As staff I want to search orders and bills by number, phone, name or date so that I can reprint or collect payment.*
@@ -167,6 +167,11 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 - Rules: owner makes plans (name, price, days, and 1–6 **meal types** the owner names – e.g. Bowl, Smoothie, Toast – each with a meal count, "counts dishes from" categories (tick several) and a price cap; "Add meal type" / remove; type names must differ) and switches them on/off (never deleted); owner sells on the customer page (plan, paid with, start today–+31 days) → `MealPass` copies the plan + a `ExtraSale` for the price that day. Staff on a "To bill" card with an active pass: "Use meal pass" lists covered dishes (category match, pass pays up to the cap, add-ons and the rest charged), pick counts, server re-checks inside a transaction. **Swaps**: a dish from another category can count as a meal (the first meal type with meals left), never preselected, marked "Swap" and saved as `MealPassUse.swap` – staff only for dishes priced within the cap (fully covered), the owner for any dish (guest pays above the cap); "Undo meal pass" before billing (after billing: void first). Item edits refused while pass lines exist. A category in two types uses the first one with meals left. Meals left (per type) = counts − uses on orders not cancelled/deleted. Pass status: upcoming/active/used up/lapsed (after `endsOn`)/refunded. Refund (≤ price, how paid back, reason) only with Settings → Editing → "Refund meal passes" on → minus `ExtraSale` today, pass stops. Customer delete anonymises passes; money-book notes carry no names.
 - Code: `lib/meal-pass.ts`, `lib/data/meal-passes.ts`, `(dashboard)/passes/*`, `components/admin/passes/pass-forms.tsx`, `components/admin/billing-panel.tsx`.
 
+**O-12 – WhatsApp bills and due reminders**
+*As the owner I want each bill sent to the guest on WhatsApp, and guests who owe money reminded every week or month with a PDF of what's unpaid, so that I get paid without chasing.*
+- Rules: Meta Cloud API, approved Utility templates `bill_receipt` / `due_reminder` with a PDF header (bodies in `lib/whatsapp/messages.ts`); bill PDF sent after `markBillPaid` via `after()`; bills put on pay later get one short `pay_later_thanks` per guest 30 min after closing (no PDF, `runPayLaterNotes`, once `WHATSAPP_PAYLATER_TEMPLATE` is set); pay-later bills paid off (one or several via `markBillsPaid`) → one `payment_received` with a receipt PDF and what's still due (once `WHATSAPP_PAYMENT_TEMPLATE` is set), never a PDF per bill when Settings "Send bills on WhatsApp" is on (default) and the bill has a phone; Reminders: café-wide Weekly (default) / Monthly / Off, weekday or day 1–28, hour (IST), minimum due; hourly timer → `/api/cron/due-reminders` (`CRON_SECRET`); due from the set hour for 24 h; one per guest per period (unique `customerId + kind + periodKey`, failed or stuck rows retried up to 3 times); amount = `owed.ts` (unpaid earlier-day orders + pay-later bills). Owner can pause a guest or "Send reminder now" (not counted as the period's). Reply STOP → `whatsappOptOutAt`, no bills or reminders; START undoes. Not connected → wa.me link with the text, no PDF, nothing automatic. Every send logged in `WhatsAppMessage` (status from the signed webhook, never moves backwards); `/admin/whatsapp` lists them with Retry. Delete-on-request removes the guest's messages.
+- Code: `lib/whatsapp/*`, `lib/bill-pdf/document.tsx`, `lib/dues-statement.ts`, `lib/reminder-schedule.ts`, `(dashboard)/whatsapp/*`, `admin/whatsapp/wa-buttons.tsx`, `app/api/{whatsapp/webhook,cron/due-reminders}/route.ts`, `scripts/whatsapp/*`, `doc/whatsapp-setup.md`.
+
 **O-08 – QR cards**
 *As the owner I want to print the café QR so that guests can scan it at every table.*
 - Rules: one QR → `/menu` (`SITE_URL`); warns when the site URL is local; A4 sheet with one card (2 Nov; was four) in a size set in inches (`?w=&h=`, 1.5–7.4 × 1.5–10.8, default 3.7 × 5.4); a view-only QR opens the PDF menu.
@@ -184,4 +189,4 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 ## Not built yet (see TASKS.md)
 
-FSSAI number on site and bills (P2-14) · kitchen ticket printing (P3-11) · server packaging, domain, security check, Playwright tests (P5-*) · real prices for 9 hidden dishes (P1-10) · online UPI, WhatsApp updates, loyalty (Later).
+FSSAI number on site and bills (P2-14) · kitchen ticket printing (P3-11) · server packaging, domain, security check, Playwright tests (P5-*) · real prices for 9 hidden dishes (P1-10) · online UPI, loyalty (Later).

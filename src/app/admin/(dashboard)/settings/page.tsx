@@ -1,6 +1,8 @@
 import { SettingsScreen } from "@/components/admin/settings/settings-screen";
 import { requireUser } from "@/lib/auth/dal";
 import { db } from "@/lib/db";
+import { nextScheduled } from "@/lib/reminder-schedule";
+import { whatsappReady } from "@/lib/whatsapp";
 
 export const metadata = { title: "Settings" };
 
@@ -56,6 +58,31 @@ export default async function SettingsPage() {
         ordering: settings.orderingEnabled,
         blog: settings.blogEnabled,
       }}
+      wa={
+        isOwner
+          ? {
+              bills: settings.waBillsEnabled,
+              frequency: settings.dueReminders,
+              weekday: settings.reminderWeekday,
+              monthDay: settings.reminderMonthDay,
+              hour: settings.reminderHour,
+              minPaise: settings.reminderMinPaise,
+              connected: whatsappReady(),
+              webhook: Boolean(process.env.WHATSAPP_VERIFY_TOKEN && process.env.WHATSAPP_APP_SECRET),
+              schedule: Boolean(process.env.CRON_SECRET),
+              next:
+                nextScheduled(
+                  {
+                    frequency: settings.dueReminders,
+                    weekday: settings.reminderWeekday,
+                    monthDay: settings.reminderMonthDay,
+                    hour: settings.reminderHour,
+                  },
+                  new Date(),
+                )?.toISOString() ?? null,
+            }
+          : null
+      }
       staff={staff.map((s) => ({ ...s, lastLoginAt: s.lastLoginAt?.toISOString() ?? null }))}
       items={items}
     />

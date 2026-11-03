@@ -70,13 +70,18 @@ export type LiveBill = {
   createdAt: string;
   /** set when the order was completed without payment; the guest pays later */
   payLaterAt: string | null;
+  /** same value for every bill of one guest (their number, else the bill) – pay-later bills group by it */
+  guestKey: string;
 };
 
 export type LiveBoard = {
   selections: LiveSelection[];
   orders: LiveOrder[];
   bills: LiveBill[];
-  /** bills completed with "pay later" today, still not paid (earlier days are in Order history) */
+  /**
+   * Bills completed with "pay later" today and still not paid, plus earlier unpaid pay-later bills of
+   * the same guests (so one guest's bills can be collected together). Others are in Order history.
+   */
   payLater: LiveBill[];
   /** guests' meal passes usable today, by customer id (only for orders waiting to be billed) */
   passes: Record<string, LivePass>;
@@ -144,6 +149,25 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       },
     }),
   ]);
+  // the same guests' pay-later bills from earlier days, collected together with today's
+  const phones = [...new Set(payLater.map((b) => b.customerPhone).filter((p): p is string => !!p))];
+  const earlierPayLater = phones.length
+    ? await db.bill.findMany({
+        where: {
+          paidAt: null,
+          voidedAt: null,
+          payLaterAt: { lt: startOfDay },
+          customerPhone: { in: phones },
+        },
+        orderBy: { payLaterAt: "asc" },
+        include: {
+          orders: {
+            select: { number: true, customerId: true, customerPhone: true },
+            orderBy: { number: "asc" },
+          },
+        },
+      })
+    : [];
   const toLiveBill = (b: (typeof bills)[number]): LiveBill => {
     const guests = [...new Set(b.orders.map((o) => o.customerId).filter(Boolean))];
     return {
@@ -158,6 +182,7 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       orderNumbers: b.orders.map((o) => o.number),
       createdAt: b.createdAt.toISOString(),
       payLaterAt: b.payLaterAt?.toISOString() ?? null,
+      guestKey: b.customerPhone ?? `bill:${b.id}`,
     };
   };
   const toBillGuests = orders
@@ -202,7 +227,7 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       })),
     })),
     bills: bills.map(toLiveBill),
-    payLater: payLater.map(toLiveBill),
+    payLater: [...earlierPayLater, ...payLater].map(toLiveBill),
     passes: await livePasses(toBillGuests),
     balances: await balancesFor(toBillGuests),
     serverTime: new Date().toISOString(),

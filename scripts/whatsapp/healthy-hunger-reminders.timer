@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for WhatsApp pay-later notes and due reminders every 5 minutes
+
+[Timer]
+# every 5 minutes; the app decides: pay-later notes 30 min after closing, reminders at the day and
+# hour set in Settings → WhatsApp – each goes once, so the extra runs send nothing
+OnCalendar=*-*-* *:00/5:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

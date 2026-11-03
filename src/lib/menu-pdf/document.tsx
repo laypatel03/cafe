@@ -1,24 +1,11 @@
 import "server-only";
 import path from "node:path";
-import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { CafeDetails, PublicMenu } from "@/lib/data/menu";
 import { NUTRITION_NOTE } from "@/lib/cafe";
 import type { MenuItem } from "@/lib/menu-types";
+import "@/lib/pdf-fonts";
 import { groupMenu, paginate, type PdfBlock } from "./layout";
-
-// Figtree (OFL, see fonts/OFL.txt) – the site's body face; it has the ₹ sign, the PDF base fonts don't.
-const fontDir = path.join(process.cwd(), "src/lib/menu-pdf/fonts");
-Font.register({
-  family: "Figtree",
-  fonts: [
-    { src: path.join(fontDir, "Figtree-Regular.ttf"), fontWeight: 400 },
-    { src: path.join(fontDir, "Figtree-SemiBold.ttf"), fontWeight: 600 },
-    { src: path.join(fontDir, "Figtree-Bold.ttf"), fontWeight: 700 },
-    { src: path.join(fontDir, "Figtree-ExtraBold.ttf"), fontWeight: 800 },
-  ],
-});
-// Keep words whole (react-pdf hyphenates by default).
-Font.registerHyphenationCallback((word) => [word]);
 
 const LOGO = path.join(process.cwd(), "public/brand/hh-wordmark.png");
 

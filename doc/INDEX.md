@@ -28,6 +28,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `/admin/cash` | `(dashboard)/cash/{page,actions}.ts(x)`, `components/admin/cash/cash-forms.tsx` | staff | Drawer open/close |
 | `/admin/expenses` | `(dashboard)/expenses/page.tsx` (actions in `cash/actions.ts`) | staff (today) / owner (any period) | |
 | `/admin/money` | `(dashboard)/money/{page,actions}.ts(x)`, `components/admin/money/*` | owner | Money book |
+| `/admin/whatsapp` | `(dashboard)/whatsapp/{page,actions}.ts(x)`, `components/admin/whatsapp/wa-buttons.tsx` | owner (sending a bill: staff) | Message log, Retry; actions: `sendBillWhatsApp`, `sendReminderNow`, `retryWhatsApp`, `setRemindersOn`, `setWaBillsEnabled`, `saveReminderSettings` |
 | `/admin/customers`, `/[id]` | `(dashboard)/customers/…`, `components/admin/customer-*.tsx` | owner | Owed money, balance (paid extra/less), notes, delete, CSV |
 | `/admin/reports` | `(dashboard)/reports/page.tsx`, `components/admin/reports/bar-chart.tsx` | owner | |
 | `/admin/qr`, `/admin/print/qr` | `(dashboard)/qr/page.tsx`, `admin/print/qr/page.tsx`, `lib/qr.ts` | owner | |
@@ -36,6 +37,8 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `/admin/session-ended` | `src/app/admin/session-ended/route.ts` | – | Clears stale cookie (avoids redirect loop) |
 | `/api/admin/live` (+`/stream`) | `src/app/api/admin/live/…` → `lib/data/live.ts`, `lib/realtime.ts` | staff | Live board JSON + SSE |
 | `/api/guest/stream` | `src/app/api/guest/stream/route.ts` | guest | SSE for the guest's own orders |
+| `/api/whatsapp/webhook` | `src/app/api/whatsapp/webhook/route.ts` → `lib/whatsapp/{webhook,events}.ts` | Meta (signed) | Delivery status, STOP/START |
+| `/api/cron/due-reminders` | `src/app/api/cron/due-reminders/route.ts` → `lib/whatsapp/reminders.ts` | timer (`CRON_SECRET`) | Hourly; sends only when due |
 | `/api/customers/export`, `/api/money/export` | `src/app/api/…/route.ts` + `lib/csv.ts` | owner | CSV downloads |
 
 `(dashboard)` = `src/app/admin/(dashboard)/`. Sidebar entries & roles: `components/admin/nav-items.ts`.
@@ -45,7 +48,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | File | Actions |
 |---|---|
 | `src/app/selection-actions.ts` | **Guest**: `syncSelection` (live pick list), `placeOrder`, `getGuestOrders` |
-| `(dashboard)/actions.ts` | **Live board**: `createCounterOrder`, `findGuestByPhone`, `removeSelection`, `updateOrderItems`, `advanceOrder`, `undoOrderStep`, `cancelOrder`, `generateBill`, `markBillPaid`, `markBillPayLater`, `voidBill`, `receiptSms` |
+| `(dashboard)/actions.ts` | **Live board**: `createCounterOrder`, `findGuestByPhone`, `searchGuests` (owner), `removeSelection`, `updateOrderItems`, `advanceOrder`, `undoOrderStep`, `cancelOrder`, `generateBill`, `markBillPaid`, `markBillsPaid` (several pay-later bills of one guest), `markBillPayLater`, `voidBill` |
 | `(dashboard)/orders/actions.ts` | `addPastOrder`, `editOrder`, `deleteOrder` (soft), `changeBillPayment` |
 | `(dashboard)/menu/actions.ts` | items / categories / add-ons CRUD, move, `setMenuItemOrder` (drag), `setItemAvailable` (staff) |
 | `(dashboard)/cash/actions.ts` | `setOpeningCash`, `closeDay`, `reopenDay`, `saveExpense`, `deleteExpense` |
@@ -77,7 +80,11 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `meal-pass.ts` | `passEndsOn`, `mealsLeft`, `passStatus`, `mealOptions` (dishes a pass can cover, cap; `SwapRule` none / within cap (staff) / any (owner)), `checkPicks` |
 | `offers.ts` | `offersOn(rows, day)`, `offerPrice` (never above menu price), `applyOffers` (sets `price`/`wasPrice`), `offerEndsLabel` |
 | `paging.ts` | Admin list pages (10/25/50) |
-| `receipt.ts` | Thank-you SMS text + `sms:` link (`RECEIPT_SMS_ENABLED`) |
+| `whatsapp/messages.ts` | WhatsApp template names + bodies (as submitted to Meta), `billMessage`, `dueReminderMessage`, `waLink` |
+| `whatsapp/webhook.ts` | `verifySignature`, `parseWebhook` (statuses, STOP/START), `DELIVERY_RANK` |
+| `reminder-schedule.ts` | Weekly/monthly in IST: `lastScheduled`, `nextScheduled`, `reminderDue` (period key, 24 h catch-up) |
+| `dues-statement.ts` | `statementGroups` – unpaid bills + unbilled orders for the dues PDF |
+| `whatsapp/client.ts` | Cloud API: `uploadPdf`, `sendTemplate`, `sendTemplateWithPdf`, `numberInfo` (quality, daily limit), `spend` (pricing analytics; needs `WHATSAPP_BUSINESS_ACCOUNT_ID`) – config + fetch injected |
 | `csv.ts` | Spreadsheet-safe CSV |
 | `phone-mask.ts` | `98xxxxxx10` for staff |
 | `format.ts` | `CAFE_TZ`, `startOfCafeDay`, `formatINR` |
@@ -99,13 +106,15 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `cash.ts` | `today`, `dayBounds`, `moneyBetween`, drawer day + history |
 | `money-book.ts` | `getMoneyBook` (+ pay later, short-paid balances, extra sales tagged `linked`) |
 | `reports.ts` | `getReport` |
+| `../whatsapp/send.ts` | `getBillDoc`, `getStatementDoc`, `sendBill`, `sendDueReminder` (log + period claim), `autoSendBill` |
+| `../whatsapp/reminders.ts` | `getReminderSettings`, `runDueReminders` |
 | `owed.ts` | `owedOrdersWhere`, `owedByCustomer` (unpaid earlier days + pay-later) |
 | `edit-switches.ts` | Owner switches for order/customer editing |
 | `blog-access.ts` | Blog visible to this viewer? |
 
-**Infra:** `db.ts` (Prisma singleton) · `auth/{session,dal,password}.ts` · `realtime.ts` (Postgres LISTEN/NOTIFY → SSE; events `selection`/`order`/`resync`) · `rate-limit.ts` (Postgres fixed window) · `request-ip.ts` · `uploads.ts` (sharp → WebP ≤1200px) · `qr.ts` · `site-url.ts` · `cart-store.ts` (zustand; guest `useCart`, counter `useCounterCart`) · `menu-types.ts` (client menu types, `HIGH_PROTEIN_MIN_G`=15, `LIGHT_MAX_KCAL`=300) · `payments.ts`, `expenses.ts` (labels for enums) · `articles.ts` (blog list) · `menu-pdf/`.
+**Infra:** `whatsapp/index.ts` (server-only: `whatsappConfig` from env, `whatsapp()` client or null) · `db.ts` (Prisma singleton) · `auth/{session,dal,password}.ts` · `realtime.ts` (Postgres LISTEN/NOTIFY → SSE; events `selection`/`order`/`resync`) · `rate-limit.ts` (Postgres fixed window) · `request-ip.ts` · `uploads.ts` (sharp → WebP ≤1200px) · `qr.ts` · `site-url.ts` · `cart-store.ts` (zustand; guest `useCart`, counter `useCounterCart`) · `menu-types.ts` (client menu types, `HIGH_PROTEIN_MIN_G`=15, `LIGHT_MAX_KCAL`=300) · `payments.ts`, `expenses.ts` (labels for enums) · `articles.ts` (blog list) · `menu-pdf/` · `pdf-fonts.ts` (Figtree, shared by all PDFs) · `bill-pdf/document.tsx` (`BillPdf`, `DuesStatementPdf`, A5).
 
-**Validators (`lib/validators/`):** `place-order` (guest + counter), `selection`, `menu`, `order-edit`, `cash`, `money-book`, `settings`, `phone` (`INDIAN_MOBILE`).
+**Validators (`lib/validators/`):** `place-order` (guest + counter), `selection`, `menu`, `order-edit`, `cash`, `money-book`, `settings`, `phone` (`INDIAN_MOBILE`), `whatsapp` (reminder settings).
 
 **Hooks:** `hooks/use-form-action.ts` (all admin forms), `hooks/use-open-now.ts` (menu opens/closes by hours client-side).
 
@@ -118,10 +127,11 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `OrderItem` | Price snapshot (`unitPricePaise`, `addOns` JSON, `lineTotalPaise`); `custom`=Other item |
 | `OrderStatusLog` | Every status change with staff user (used by Undo) |
 | `Bill` | Dine-in: one per visit; takeaway: per order. `paymentMethod`, `paidAt`, `payLaterAt`; voided never deleted (`voidedAt`, `voidedOrderNumbers`) |
-| `Customer` | Keyed by 10-digit `phone`; consent, notes, counters |
+| `Customer` | Keyed by 10-digit `phone`; consent, notes, counters; `remindersPaused`, `whatsappOptOutAt` (STOP) |
+| `WhatsAppMessage` | Every bill/reminder sent: status SENDING→SENT→DELIVERED→READ / FAILED, `waId`, error, `periodKey` (unique per customer + kind), `attempts`, `auto` |
 | `Selection` | Guest's live pick list per device (12 h TTL); staff watch it |
 | `StaffUser` | `role` STAFF/OWNER/DEVELOPER; `sessionVersion` bump = logout everywhere |
-| `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `googlePlaceId` (home page reviews), `hours` JSON, switches, tax bps, card fee bps, `todaysPickId` |
+| `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `googlePlaceId` (home page reviews), `hours` JSON, switches, WhatsApp (`waBillsEnabled`, `dueReminders` + weekday/month day/hour/min), tax bps, card fee bps, `todaysPickId` |
 | `CustomerBalanceEntry` | ± money a guest paid over/under (`kind`, `amountPaise`, `billId` – that bill's `differencePaise` holds it; `saleId` → `ExtraSale` for hand entries); SETTLED ↔ ± `OrderItem` (`balanceEntryId`, cascade). Balance = sum, minus SETTLED on cancelled/deleted orders (`COUNTED_BALANCE`) |
 | `MealPlan` / `MealPass` / `MealPassUse` | Plan = `parts` JSON (meal types `{name, meals, categoryIds, capPaise}`, read with `readParts`), days. Use = `part` index + `partName`; `swap` = counted at the counter from another category. Pass copies the plan, `saleId`/`refundSaleId` → `ExtraSale` (±). Use ↔ minus `OrderItem` (`mealPassUseId`, cascade) |
 | `Offer` | `menuItemId`, `pricePaise`, `title`, `startsOn`/`endsOn` (`yyyy-mm-dd` IST, inclusive); lowest wins if two overlap |
@@ -145,7 +155,7 @@ Enum labels for UI: `PaymentMethod` → `lib/payments.ts` (legacy `CARD` = credi
 
 ## 6. Scripts & ops
 
-`scripts/load-menu.ts` (`pnpm menu:load [--yes]`, source `prisma/seed-data.ts`) · `scripts/add-staff.ts` · `scripts/demo-data.ts` (`pnpm db:demo [--clear]`) · `scripts/setup-local-db.sh` · `scripts/backup/*` (systemd timer / macOS launchd, 03:00 IST, see PLAN.md Phase 5) · `scripts/status-board.mjs` (team board from TASKS/STATUS). Env vars: `.env.example`.
+`scripts/load-menu.ts` (`pnpm menu:load [--yes]`, source `prisma/seed-data.ts`) · `scripts/add-staff.ts` · `scripts/demo-data.ts` (`pnpm db:demo [--clear]`) · `scripts/setup-local-db.sh` · `scripts/backup/*` (systemd timer / macOS launchd, 03:00 IST, see PLAN.md Phase 5) · `scripts/whatsapp/*` (5-minute timer for pay-later notes + reminders, `pnpm reminders:run`; Meta setup: `doc/whatsapp-setup.md`, deploying: `doc/whatsapp-deploy.md`) · `scripts/status-board.mjs` (team board from TASKS/STATUS). Env vars: `.env.example`.
 
 ## 7. Topic → files (quick lookup)
 

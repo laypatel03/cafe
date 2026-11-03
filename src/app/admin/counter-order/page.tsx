@@ -9,7 +9,8 @@ export const metadata: Metadata = { title: "Counter order", robots: { index: fal
 /**
  * Staff take a walk-in guest's order with the same menu guests see on their phones.
  * Full screen (outside the dashboard layout) so it looks and works exactly like the QR menu.
- * `?customer=<id>` (owner, from a customer's page) fills in that guest's name and number.
+ * `?customer=<id>` (owner, from a customer's page) fills in that guest's name and number, and the
+ * owner can pick a saved customer while typing the number or name.
  */
 export default async function CounterOrderPage({ searchParams }: PageProps<"/admin/counter-order">) {
   const me = await requireUser();
@@ -30,6 +31,8 @@ export default async function CounterOrderPage({ searchParams }: PageProps<"/adm
       orderingEnabled
       counter
       counterGuest={guest ?? undefined}
+      // owner only: the pick list shows full numbers
+      suggestGuests={me.role === "OWNER"}
     />
   );
 }
