@@ -93,6 +93,25 @@ Footer: `Eat well, live well`. Samples: `Ravi`, `₹815`, `2 bills`, `Healthy Hu
 pay-later bills are paid off (one or several at once), only once `WHATSAPP_PAYMENT_TEMPLATE` is set.
 {{5}} is the amount still due, or "nothing – all paid up ✅".
 
+**`welcome_review`** (no header – no PDF; category **Marketing** – Meta treats a review request as marketing)
+
+```
+Hi {{1}} 👋
+
+Thank you for visiting {{2}} for the first time! 🥗 We hope you loved your meal.
+
+If you have a minute, a Google review helps a small café like ours a lot ⭐
+👉 {{3}}
+
+See you again soon! 💚
+```
+
+Footer: `Reply STOP to stop messages`. Samples: `Ravi`, `Healthy Hunger`,
+`https://search.google.com/local/writereview?placeid=ChIJ9A5uLXt4DsRvjgyoHzCAIA` (the link shown in Settings → WhatsApp
+→ First-time guests). Sent once per guest, an hour after their first bill (paid or pay later), between 9 am and 9 pm,
+only once `WHATSAPP_WELCOME_TEMPLATE` is set and Settings → Café has the Google Place ID. Guests who were customers
+before it was switched on never get it.
+
 Approval usually takes from a few minutes to a day. Until a template is approved, sending it fails with
 Meta's reason on Admin → WhatsApp.
 
@@ -132,7 +151,7 @@ sudo cp scripts/whatsapp/healthy-hunger-reminders.{service,timer} /etc/systemd/s
 sudo systemctl daemon-reload && sudo systemctl enable --now healthy-hunger-reminders.timer
 ```
 
-It runs every 5 minutes; the app sends pay-later notes 30 minutes after closing and reminders at the
+It runs every hour, on the hour; the app sends pay-later notes 30 minutes after closing and reminders at the
 day and hour set in Settings, each once, so an extra run never sends twice. After changing the timer
 file, copy it again and run `sudo systemctl daemon-reload`. Run it by hand: `pnpm reminders:run`
 (prints what it did, e.g. `{"ran":true,"periodKey":"WEEKLY:2026-11-02","sent":3,…}`).

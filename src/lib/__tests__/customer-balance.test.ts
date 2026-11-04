@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   balanceState,
   MANUAL_SIGN,
+  shortBillPayoffs,
+  shortfallsLeft,
   paymentDifference,
   settleLine,
   settleLineName,
@@ -31,6 +33,8 @@ describe("settleLine", () => {
   it("names the line by direction", () => {
     expect(settleLineName(-5000)).toBe("Paid extra on an earlier visit");
     expect(settleLineName(2000)).toBe("Still owed from an earlier visit");
+    expect(settleLineName(2000, [407])).toBe("Still owed from bill #407");
+    expect(settleLineName(-5000, [402, 408])).toBe("Paid extra on bills #402, #408");
   });
 });
 
@@ -46,5 +50,63 @@ describe("balance words and manual entries", () => {
     expect(MANUAL_SIGN.PAID_BACK).toBe(1);
     expect(MANUAL_SIGN.PAID_LESS).toBe(-1);
     expect(MANUAL_SIGN.RETURNED).toBe(-1);
+  });
+});
+
+describe("shortfallsLeft", () => {
+  const shorts = [
+    { customerId: "a", billId: "b3", amountPaise: -5000 },
+    { customerId: "a", billId: "b2", amountPaise: -3000 },
+    { customerId: "a", billId: "b1", amountPaise: -2000 },
+    { customerId: "b", billId: "x1", amountPaise: -1000 },
+  ];
+  it("keeps the newest short bills owed when part has been paid back", () => {
+    // owed 10,000 in all, 6,500 still owed → b3 in full, 1,500 of b2, b1 paid off
+    const due = shortfallsLeft(new Map([["a", 6500]]), shorts);
+    expect([...due]).toEqual([
+      ["b3", 5000],
+      ["b2", 1500],
+    ]);
+  });
+  it("works the same for credit (plus amounts)", () => {
+    const credit = [
+      { customerId: "c", billId: "e2", amountPaise: 3000 },
+      { customerId: "c", billId: "e1", amountPaise: 4000 },
+    ];
+    expect([...shortfallsLeft(new Map([["c", 5000]]), credit)]).toEqual([
+      ["e2", 3000],
+      ["e1", 2000],
+    ]);
+  });
+  it("leaves out guests who owe nothing and entries without a bill", () => {
+    const due = shortfallsLeft(new Map([["a", 1000]]), [
+      { customerId: "a", billId: null, amountPaise: -500 },
+      ...shorts,
+    ]);
+    expect([...due]).toEqual([["b3", 1000]]);
+  });
+});
+
+describe("shortBillPayoffs", () => {
+  const d = (day: number) => new Date(2026, 10, day);
+  it("pays the oldest short bill first, with the date of each payment", () => {
+    const paid = shortBillPayoffs([
+      { kind: "PAID_LESS", billId: "b1", amountPaise: -4800, createdAt: d(1) },
+      { kind: "PAID_LESS", billId: "b2", amountPaise: -8200, createdAt: d(2) },
+      { kind: "PAID_BACK", billId: null, amountPaise: 4000, createdAt: d(3) },
+      { kind: "SETTLED", billId: null, amountPaise: 5000, createdAt: d(4) },
+    ]);
+    expect(paid.get("b1")).toEqual([
+      { at: d(3), paise: 4000 },
+      { at: d(4), paise: 800 },
+    ]);
+    expect(paid.get("b2")).toEqual([{ at: d(4), paise: 4200 }]);
+  });
+  it("uses credit the guest already had when a bill is paid short", () => {
+    const paid = shortBillPayoffs([
+      { kind: "PAID_EXTRA", billId: "x", amountPaise: 1500, createdAt: d(1) },
+      { kind: "PAID_LESS", billId: "b1", amountPaise: -4000, createdAt: d(2) },
+    ]);
+    expect(paid.get("b1")).toEqual([{ at: d(2), paise: 1500 }]);
   });
 });

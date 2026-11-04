@@ -16,7 +16,7 @@ import { whatsapp, whatsappBusinessAccountId, whatsappReady } from "@/lib/whatsa
 export const metadata = { title: "WhatsApp" };
 
 const Filters = z.object({
-  show: z.enum(["all", "failed", "BILL", "DUE_REMINDER"]).catch("all"),
+  show: z.enum(["all", "failed", "BILL", "DUE_REMINDER", "WELCOME"]).catch("all"),
   page: z.coerce.number().int().min(1).max(10000).catch(1),
   per: z.string().optional().catch(undefined),
 });
@@ -30,6 +30,7 @@ const SHOW: {
   { id: "failed", label: "Failed", where: { status: "FAILED" } },
   { id: "BILL", label: "Bills", where: { kind: { in: ["BILL", "PAY_LATER", "PAYMENT_RECEIVED"] } } },
   { id: "DUE_REMINDER", label: "Reminders", where: { kind: "DUE_REMINDER" } },
+  { id: "WELCOME", label: "Welcome", where: { kind: "WELCOME" } },
 ];
 
 // always with a word, never colour alone
@@ -254,11 +255,13 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
                   {STATUS[m.status].label}
                 </span>
                 <p className="flex-1 font-semibold">
-                  {m.kind === "DUE_REMINDER"
-                    ? "Due reminder"
-                    : m.kind === "PAYMENT_RECEIVED"
-                      ? `Payment received · ${m.billIds.length} ${m.billIds.length === 1 ? "bill" : "bills"}`
-                      : `${m.kind === "PAY_LATER" ? "Pay later note" : "Bill"}${m.bill ? ` #${m.bill.number}` : ""}`}{" "}
+                  {m.kind === "WELCOME"
+                    ? "Welcome + review link"
+                    : m.kind === "DUE_REMINDER"
+                      ? "Due reminder"
+                      : m.kind === "PAYMENT_RECEIVED"
+                        ? `Payment received · ${m.billIds.length} ${m.billIds.length === 1 ? "bill" : "bills"}`
+                        : `${m.kind === "PAY_LATER" ? "Pay later note" : "Bill"}${m.bill ? ` #${m.bill.number}` : ""}`}{" "}
                   ·{" "}
                   {m.customerId ? (
                     <Link href={`/admin/customers/${m.customerId}`} className="hover:underline">

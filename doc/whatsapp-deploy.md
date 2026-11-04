@@ -11,6 +11,7 @@ For the developer merging this and putting it on the server. Meta account and te
 | Bill put on pay later | Nothing at once; one `pay_later_thanks` per guest **30 min after closing** (no PDF) |
 | Pay-later bills paid off | One `payment_received` with a receipt PDF and what's still due |
 | Weekly / monthly | `due_reminder` with a statement PDF of everything unpaid (Settings → WhatsApp) |
+| First visit (4 Nov) | `welcome_review` once per new guest, 1 h after their first bill, 9 am–9 pm, with the Google review link (migration `20261104090000_whatsapp_welcome`) |
 | Live orders | Pay-later bills grouped per guest; tick which bills they pay; order sound on by default |
 | Counter order | Owner picks a saved customer while typing number or name |
 | New pages | Admin → WhatsApp (message log, retry, account card); Settings → WhatsApp tab |
@@ -22,7 +23,7 @@ For the developer merging this and putting it on the server. Meta account and te
 
 - **The web app** (`pnpm start`, i.e. `next start`) does all the sending. A bill PDF goes out from the
   same process right after the payment request (`after()` in Next.js) – the cashier never waits.
-- **A systemd timer** calls `POST /api/cron/due-reminders` on the running app **every 5 minutes**
+- **A systemd timer** calls `POST /api/cron/due-reminders` on the running app **every hour, on the hour** (owner, 5 Nov; was every 5 minutes)
   (`scripts/whatsapp/run-reminders.sh`, secret `CRON_SECRET`). The app decides what is due: pay-later notes
   30 min after closing, reminders at the day and hour in Settings. Every note and reminder goes once, so
   extra calls send nothing. Like cron calling a Django view – there is no Celery/Redis equivalent to run.
@@ -59,8 +60,9 @@ Add these (see `.env.example`; values are in WhatsApp Manager / the Meta app –
 | `WHATSAPP_REMINDER_TEMPLATE` | no | Empty = `due_reminder` |
 | `WHATSAPP_PAYLATER_TEMPLATE` | yes* | `pay_later_thanks` – empty = no pay-later notes |
 | `WHATSAPP_PAYMENT_TEMPLATE` | yes* | `payment_received` – empty = nothing on paying off |
+| `WHATSAPP_WELCOME_TEMPLATE` | no | `welcome_review` (Marketing) – empty = no first-visit welcome with the Google review link |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | no | Empty = `en` |
-| `WHATSAPP_*_TEMPLATE_ID` | no | Kept for a future template editor; not used to send |
+| `WHATSAPP_*_TEMPLATE_ID` | no | BILL / REMINDER / PAYLATER / PAYMENT / WELCOME – Settings → WhatsApp → Messages shows each one's status and lets the owner edit the wording (sent to Meta for review); not used to send |
 | `WHATSAPP_VERIFY_TOKEN` | yes | Any long random text – the same text goes in Meta's webhook form |
 | `WHATSAPP_APP_SECRET` | yes | Meta app → App settings → Basic → App secret (checks webhook signatures) |
 | `WHATSAPP_BUSINESS_ACCOUNT_ID` | no | The **WhatsApp Business Account** ID (not the business portfolio ID) – shows "Charged by Meta this month" |
@@ -82,7 +84,7 @@ Without it, sending still works, but every message stays "Sent": failures that W
 (number not on WhatsApp, undeliverable…) never show, and STOP replies aren't recorded. Meta has no API to
 look a message's status up afterwards – the webhook is the only way.
 
-### 4. The 5-minute timer (systemd)
+### 4. The hourly timer (systemd)
 ```bash
 sudo cp scripts/whatsapp/healthy-hunger-reminders.service scripts/whatsapp/healthy-hunger-reminders.timer /etc/systemd/system/
 ```
@@ -91,7 +93,7 @@ Edit `/etc/systemd/system/healthy-hunger-reminders.service` if the app doesn't r
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now healthy-hunger-reminders.timer
-systemctl list-timers healthy-hunger-reminders.timer        # next run within 5 min
+systemctl list-timers healthy-hunger-reminders.timer        # next run at the top of the hour
 sudo systemctl start healthy-hunger-reminders.service       # run once now
 journalctl -u healthy-hunger-reminders.service -n 20        # what it printed
 ```

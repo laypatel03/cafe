@@ -220,6 +220,15 @@ Decisions in `PLAN.md` → "WhatsApp bills & due reminders". Branch `feat/whatsa
 - [ ] **WA-06 Templates + café setup** – template texts to submit to Meta (bill, due reminder – Utility, document header), setup steps (Meta Business account, number, token, webhook URL), privacy page: phone + bills shared with WhatsApp to send them.
   Plain: Get the café's WhatsApp messages approved by Meta and connect the café's number.
   1 Nov: `doc/whatsapp-setup.md` – Meta Business account, number, system-user token, the two template bodies with sample values, `.env`, webhook, timer, test steps. Left (owner / at go-live): create the Meta account and number, submit the templates, fill `.env`, webhook needs the live HTTPS address (P5-02), install the timer (P5-01).
+- [x] **WA-07 Welcome message for first-time guests** – once per new guest, a WhatsApp thank-you with the café's Google review link.
+  Plain: A guest's first visit gets a thank-you on WhatsApp an hour later, with a link to review the café on Google.
+  ✅ 4 Nov: template `welcome_review` (Marketing, no header) in `messages.ts` + `googleReviewUrl`; `sendWelcome` / `runWelcomes` in `lib/whatsapp/send.ts`, called by `/api/cron/due-reminders`; `WaKind.WELCOME`, `CafeSettings.waWelcomeEnabled` (migration `20261104090000_whatsapp_welcome`); Settings → WhatsApp → "First-time guests" switch + the review link; Admin → WhatsApp "Welcome" tab and retry. Left: submit the template to Meta, then set `WHATSAPP_WELCOME_TEMPLATE` on the server.
+- [x] **WA-08 Bills on WhatsApp per guest** – owner switch on the customer page; off = no bills on WhatsApp for that guest.
+  Plain: Turn off WhatsApp bills for one guest from their page; everyone else still gets theirs.
+  ✅ 4 Nov: `Customer.waBillsPaused` (migration `20261104120000_customer_bills_paused`), `setBillsOn` in `(dashboard)/whatsapp/actions.ts`, `BillsSwitch` in `wa-buttons.tsx`; the three bill senders skip the guest.
+- [x] **WA-09 Edit the messages** – Settings → WhatsApp → Messages: each template's Meta status and wording; the owner edits it and sends it to Meta for approval.
+  Plain: Change what the WhatsApp messages say from Settings; Meta approves each change first.
+  ✅ 5 Nov: `lib/whatsapp/templates.tsx` (`syncTemplates`, `submitTemplate`, `withLiveText`), client `templateInfo` / `uploadTemplateSample` (resumable upload via `GET /app`) / `editTemplate`, `checkTemplateText` + `WA_TEMPLATE_INFO` in `messages.ts` (tested), `WhatsAppTemplate` model (migration `20261105090000_whatsapp_templates`), `components/admin/whatsapp/template-editor.tsx`. Not yet tried against Meta for real (it would change the live templates) – first real edit: try the pay-later one.
 
 ## Phase 5 – Launch
 - [ ] **P5-01 Package for the server** – Next.js + Postgres + Caddy; production env.

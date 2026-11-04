@@ -45,6 +45,7 @@ export function OrdersPanel({
   payLater,
   passes,
   balances,
+  balanceBills,
   menu,
   isOwner,
   onChanged,
@@ -54,6 +55,7 @@ export function OrdersPanel({
   payLater: LiveBill[];
   passes: Record<string, LivePass>;
   balances: Record<string, number>;
+  balanceBills: Record<string, number[]>;
   menu: PublicMenu;
   isOwner: boolean;
   onChanged: () => void;
@@ -110,6 +112,7 @@ export function OrdersPanel({
         payLater={payLater}
         passes={passes}
         balances={balances}
+        balanceBills={balanceBills}
         onChanged={onChanged}
       />
 

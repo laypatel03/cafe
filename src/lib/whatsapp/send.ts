@@ -15,7 +15,7 @@ import { getCafeDetails } from "@/lib/data/menu";
 import { owedOrdersWhere } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 import { statementGroups } from "@/lib/dues-statement";
-import { startOfCafeDay } from "@/lib/format";
+import { CAFE_TZ, startOfCafeDay } from "@/lib/format";
 import { payLaterSendAt } from "@/lib/pay-later-notes";
 import {
   billMessage,
@@ -23,9 +23,12 @@ import {
   payLaterMessage,
   paymentReceivedMessage,
   type WaMessage,
+  googleReviewUrl,
   waLink,
+  welcomeMessage,
 } from "./messages";
-import { payLaterTemplateReady, paymentTemplateReady, whatsapp } from "./index";
+import { payLaterTemplateReady, paymentTemplateReady, welcomeTemplateReady, whatsapp } from "./index";
+import { withLiveText } from "./templates";
 
 // Sending bills and due reminders: build the PDF, send it, and keep every attempt in WhatsAppMessage.
 
@@ -35,6 +38,8 @@ export type SendResult = { ok: true } | { ok: false; error: string; link?: strin
 type Who = { auto: boolean; byId?: string | null };
 
 const MAX_ATTEMPTS = 3;
+
+const BILLS_OFF = "Bills on WhatsApp are off for this guest (their customer page).";
 
 async function pdfCafe(): Promise<PdfCafe> {
   const c = await getCafeDetails();
@@ -145,24 +150,28 @@ export async function sendBill(billId: string, who: Who): Promise<SendResult> {
   const { doc, phone, voided, customerId } = found;
   if (voided) return { ok: false, error: `Bill #${doc.number} is void.` };
   if (!phone) return { ok: false, error: "There's no phone number on this bill.", skipped: true };
-  const optedOut = customerId
-    ? await db.customer.findFirst({
-        where: { id: customerId, whatsappOptOutAt: { not: null } },
-        select: { id: true },
+  const guest = customerId
+    ? await db.customer.findUnique({
+        where: { id: customerId },
+        select: { whatsappOptOutAt: true, waBillsPaused: true },
       })
     : null;
-  if (optedOut) return { ok: false, error: "This guest replied STOP – no WhatsApp messages.", skipped: true };
+  if (guest?.whatsappOptOutAt)
+    return { ok: false, error: "This guest replied STOP – no WhatsApp messages.", skipped: true };
+  if (guest?.waBillsPaused) return { ok: false, error: BILLS_OFF, skipped: true };
 
-  const msg = billMessage({
-    guestName: doc.guestName,
-    cafeName: doc.cafe.name,
-    number: doc.number,
-    totalPaise: doc.totalPaise,
-    status:
-      doc.status.kind === "PAY_LATER"
-        ? { kind: "PAY_LATER" }
-        : { kind: "PAID", method: doc.status.kind === "PAID" ? doc.status.method : null },
-  });
+  const msg = await withLiveText(
+    billMessage({
+      guestName: doc.guestName,
+      cafeName: doc.cafe.name,
+      number: doc.number,
+      totalPaise: doc.totalPaise,
+      status:
+        doc.status.kind === "PAY_LATER"
+          ? { kind: "PAY_LATER" }
+          : { kind: "PAID", method: doc.status.kind === "PAID" ? doc.status.method : null },
+    }),
+  );
   if (!whatsapp())
     return { ok: false, error: "WhatsApp isn't connected yet.", link: waLink(phone, msg.text) };
 
@@ -183,8 +192,8 @@ export async function sendBill(billId: string, who: Who): Promise<SendResult> {
 }
 
 /**
- * Takes the log row for this guest's reminder in `periodKey`: a new one, or a failed one to try again.
- * Null = already sent (or being sent) this period.
+ * Takes the log row for this guest's reminder (or welcome) in `periodKey`: a new one, or a failed one
+ * to try again. Null = already sent (or being sent) this period.
  */
 async function claimPeriod(
   customerId: string,
@@ -201,7 +210,7 @@ async function claimPeriod(
   const retried = await db.whatsAppMessage.updateManyAndReturn({
     where: {
       customerId,
-      kind: "DUE_REMINDER",
+      kind: data.kind,
       periodKey,
       attempts: { lt: MAX_ATTEMPTS },
       OR: [{ status: "FAILED" }, { status: "SENDING", updatedAt: { lt: stuck } }],
@@ -224,12 +233,14 @@ export async function sendDueReminder(
   if (doc.totalPaise <= 0)
     return { ok: false, error: `${customer.name} doesn't owe anything now.`, skipped: true };
 
-  const msg = dueReminderMessage({
-    guestName: customer.name,
-    cafeName: doc.cafe.name,
-    duePaise: doc.totalPaise,
-    orders,
-  });
+  const msg = await withLiveText(
+    dueReminderMessage({
+      guestName: customer.name,
+      cafeName: doc.cafe.name,
+      duePaise: doc.totalPaise,
+      orders,
+    }),
+  );
   if (!whatsapp())
     return { ok: false, error: "WhatsApp isn't connected yet.", link: waLink(customer.phone, msg.text) };
 
@@ -279,10 +290,13 @@ export async function sendPayLaterNote(billIds: string[], who: Who): Promise<Sen
   const customer = customerId ? await db.customer.findUnique({ where: { id: customerId } }) : null;
   if (customer?.whatsappOptOutAt)
     return { ok: false, error: `${customer.name} replied STOP – no WhatsApp messages.`, skipped: true };
+  if (customer?.waBillsPaused) return { ok: false, error: BILLS_OFF, skipped: true };
 
   const guestName = customer?.name ?? bills[0].customerName;
   const totalPaise = bills.reduce((n, b) => n + b.totalPaise, 0);
-  const msg = payLaterMessage({ guestName, cafeName: (await getCafeDetails()).name, totalPaise });
+  const msg = await withLiveText(
+    payLaterMessage({ guestName, cafeName: (await getCafeDetails()).name, totalPaise }),
+  );
   const wa = whatsapp();
   if (!wa) return { ok: false, error: "WhatsApp isn't connected yet.", link: waLink(phone, msg.text) };
 
@@ -313,7 +327,7 @@ export type PayLaterRun =
   | { ran: true; sent: number; failed: number; skipped: number; errors: string[] };
 
 /**
- * Called with the reminders (every few minutes): once it's 30 minutes past closing, each guest who
+ * Called with the reminders (every hour): once it's 30 minutes past closing, each guest who
  * put bills on pay later that day – and hasn't paid them since – gets one thank-you for all of them.
  * Looks at today and yesterday (hours past midnight); a bill already in a note is never sent again.
  */
@@ -387,6 +401,7 @@ export async function sendPaymentReceived(billIds: string[], who: Who): Promise<
   const customer = customerId ? await db.customer.findUnique({ where: { id: customerId } }) : null;
   if (customer?.whatsappOptOutAt)
     return { ok: false, error: `${customer.name} replied STOP – no WhatsApp messages.`, skipped: true };
+  if (customer?.waBillsPaused) return { ok: false, error: BILLS_OFF, skipped: true };
 
   const { groups } = statementGroups(
     orders.map((o) => ({
@@ -414,13 +429,15 @@ export async function sendPaymentReceived(billIds: string[], who: Who): Promise<
     receivedPaise,
     stillDuePaise,
   };
-  const msg = paymentReceivedMessage({
-    guestName,
-    cafeName: doc.cafe.name,
-    receivedPaise,
-    bills: bills.length,
-    stillDuePaise,
-  });
+  const msg = await withLiveText(
+    paymentReceivedMessage({
+      guestName,
+      cafeName: doc.cafe.name,
+      receivedPaise,
+      bills: bills.length,
+      stillDuePaise,
+    }),
+  );
   if (!whatsapp())
     return { ok: false, error: "WhatsApp isn't connected yet.", link: waLink(phone, msg.text) };
 
@@ -462,4 +479,101 @@ export async function autoSendPayment(billIds: string[], byId: string) {
   ]);
   for (const res of results)
     if (res && !res.ok && !res.skipped) console.warn(`WhatsApp after payment not sent: ${res.error}`);
+}
+
+/** The welcome goes once per guest – one key for all time. */
+const WELCOME_KEY = "first-visit";
+/** after the first bill is paid or put on pay later, so it lands once they've eaten (the hourly timer adds up to an hour) */
+const WELCOME_DELAY_MS = 60 * 60_000;
+/** India time; outside these hours it waits for the morning */
+const WELCOME_HOURS = { from: 9, to: 21 };
+
+/** Thanks a first-time guest and asks for a Google review. Once per guest (a failed one may be retried). */
+export async function sendWelcome(customerId: string, who: Who): Promise<SendResult> {
+  const customer = await db.customer.findUnique({ where: { id: customerId } });
+  if (!customer) return { ok: false, error: "Customer not found." };
+  if (customer.whatsappOptOutAt)
+    return { ok: false, error: `${customer.name} replied STOP – no WhatsApp messages.`, skipped: true };
+  const cafe = await getCafeDetails();
+  if (!cafe.googlePlaceId)
+    return { ok: false, error: "Add the Google Place ID in Settings → Café first.", skipped: true };
+  const msg = await withLiveText(
+    welcomeMessage({
+      guestName: customer.name,
+      cafeName: cafe.name,
+      reviewUrl: googleReviewUrl(cafe.googlePlaceId),
+    }),
+  );
+  const wa = whatsapp();
+  if (!wa)
+    return { ok: false, error: "WhatsApp isn't connected yet.", link: waLink(customer.phone, msg.text) };
+
+  const log = await claimPeriod(customerId, WELCOME_KEY, {
+    kind: "WELCOME",
+    customerId,
+    phone: customer.phone,
+    guestName: customer.name,
+    text: msg.text,
+    amountPaise: 0,
+    auto: who.auto,
+    sentById: who.byId ?? null,
+  });
+  if (!log) return { ok: false, error: `${customer.name} already got the welcome message.`, skipped: true };
+  const res = await wa.sendTemplate(customer.phone, msg);
+  await db.whatsAppMessage.update({
+    where: { id: log.id },
+    data: res.ok ? { status: "SENT", waId: res.id, error: null } : { status: "FAILED", error: res.error },
+  });
+  return res.ok ? { ok: true } : { ok: false, error: res.error };
+}
+
+export type WelcomeRun = PayLaterRun;
+
+const cafeHour = (d: Date) =>
+  Number(
+    new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: CAFE_TZ }).format(d),
+  );
+
+/**
+ * Called with the reminders (every hour): guests whose first visit was in the last two days get
+ * the welcome an hour after their first bill (paid or pay later), between 9 am and 9 pm India time.
+ * Guests who were customers before never get one (only new records count).
+ */
+export async function runWelcomes(now = new Date()): Promise<WelcomeRun> {
+  if (!whatsapp()) return { ran: false, reason: "WhatsApp isn't connected (WHATSAPP_TOKEN)." };
+  if (!welcomeTemplateReady()) return { ran: false, reason: "WHATSAPP_WELCOME_TEMPLATE isn't set." };
+  const settings = await db.cafeSettings.findUnique({ where: { id: 1 }, select: { waWelcomeEnabled: true } });
+  if (!settings?.waWelcomeEnabled) return { ran: false, reason: "Welcome messages are off in Settings." };
+  if (!(await getCafeDetails()).googlePlaceId)
+    return { ran: false, reason: "No Google Place ID in Settings." };
+  const hour = cafeHour(now);
+  if (hour < WELCOME_HOURS.from || hour >= WELCOME_HOURS.to)
+    return { ran: false, reason: "Outside 9 am – 9 pm." };
+
+  const before = new Date(now.getTime() - WELCOME_DELAY_MS);
+  const billed = {
+    voidedAt: null,
+    OR: [{ paidAt: { lte: before } }, { payLaterAt: { lte: before } }],
+  } satisfies Prisma.BillWhereInput;
+  const guests = await db.customer.findMany({
+    where: {
+      firstVisitAt: { gte: new Date(now.getTime() - 2 * 86_400_000) },
+      whatsappOptOutAt: null,
+      waMessages: { none: { kind: "WELCOME" } },
+      orders: { some: { deletedAt: null, bill: { is: billed } } },
+    },
+    select: { id: true },
+    take: 50,
+  });
+  const run = { ran: true as const, sent: 0, failed: 0, skipped: 0, errors: [] as string[] };
+  for (const g of guests) {
+    const res = await sendWelcome(g.id, { auto: true });
+    if (res.ok) run.sent++;
+    else if (res.skipped) run.skipped++;
+    else {
+      run.failed++;
+      run.errors.push(res.error);
+    }
+  }
+  return run;
 }

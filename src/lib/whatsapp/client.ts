@@ -29,6 +29,15 @@ export type WaNumberInfo = {
 
 export type WaSpend = { cost: number; messages: number };
 
+/** A message template as Meta has it: APPROVED, PENDING (in review), REJECTED, PAUSED, DISABLED… */
+export type WaTemplateState = {
+  name: string;
+  status: string;
+  reason: string | null;
+  body: string;
+  footer: string;
+};
+
 const TIMEOUT_MS = 15_000;
 
 type GraphError = { error?: { message?: string; error_data?: { details?: string } } };
@@ -174,7 +183,95 @@ export function createWhatsAppClient(config: WaConfig, fetchImpl: typeof fetch =
     return { ok: true as const, spend: total };
   }
 
-  return { uploadPdf, sendTemplate, sendTemplateWithPdf, numberInfo, spend };
+  const graph = `https://graph.facebook.com/${config.apiVersion}`;
+
+  /** One template's status, rejection reason and current wording (WhatsApp Manager → template ID). */
+  async function templateInfo(templateId: string) {
+    const res = await get<{
+      name?: string;
+      status?: string;
+      rejected_reason?: string;
+      components?: { type?: string; text?: string }[];
+    }>(`${graph}/${templateId}?fields=name,status,rejected_reason,components`);
+    if (!res.ok) return res;
+    const part = (type: string) => res.data.components?.find((c) => c.type === type)?.text ?? "";
+    const reason = res.data.rejected_reason;
+    const template: WaTemplateState = {
+      name: res.data.name ?? "",
+      status: res.data.status ?? "UNKNOWN",
+      reason: reason && reason !== "NONE" ? reason : null,
+      body: part("BODY"),
+      footer: part("FOOTER"),
+    };
+    return { ok: true as const, template };
+  }
+
+  /**
+   * A sample PDF for a template's Document heading, through Meta's resumable upload (needs the app the
+   * token belongs to). Returns the handle Meta reviews the template with.
+   */
+  async function uploadTemplateSample(bytes: Uint8Array): Promise<WaResult> {
+    const app = await get<{ id?: string }>(`${graph}/app`);
+    if (!app.ok) return app;
+    if (!app.data.id) return { ok: false, error: "Couldn't find the Meta app for this token." };
+    try {
+      const start = await fetchImpl(
+        `${graph}/${app.data.id}/uploads?file_name=sample.pdf&file_length=${bytes.length}&file_type=application/pdf`,
+        { method: "POST", headers: auth, signal: AbortSignal.timeout(TIMEOUT_MS) },
+      );
+      if (!start.ok) return { ok: false, error: await graphError(start) };
+      const { id: session } = (await start.json()) as { id?: string };
+      if (!session) return { ok: false, error: "Meta didn't start the upload." };
+      const done = await fetchImpl(`${graph}/${session}`, {
+        method: "POST",
+        headers: { Authorization: `OAuth ${config.token}`, file_offset: "0" },
+        body: new Blob([new Uint8Array(bytes)], { type: "application/pdf" }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!done.ok) return { ok: false, error: await graphError(done) };
+      const { h } = (await done.json()) as { h?: string };
+      return h ? { ok: true, id: h } : { ok: false, error: "Meta didn't return the sample file." };
+    } catch {
+      return { ok: false, error: "Couldn't reach WhatsApp – check the internet connection." };
+    }
+  }
+
+  /**
+   * Sends a new wording to Meta for review. Meta replaces every part of the template, so the PDF
+   * heading (with a sample) goes again too. An approved template can be edited once a day.
+   */
+  async function editTemplate(
+    templateId: string,
+    t: { body: string; footer: string; samples: string[]; pdfSample?: string },
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const components: object[] = [{ type: "BODY", text: t.body, example: { body_text: [t.samples] } }];
+    if (t.pdfSample)
+      components.unshift({ type: "HEADER", format: "DOCUMENT", example: { header_handle: [t.pdfSample] } });
+    if (t.footer) components.push({ type: "FOOTER", text: t.footer });
+    try {
+      const res = await fetchImpl(`${graph}/${templateId}`, {
+        method: "POST",
+        headers: { ...auth, "Content-Type": "application/json" },
+        body: JSON.stringify({ components }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!res.ok) return { ok: false, error: await graphError(res) };
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "Couldn't reach WhatsApp – check the internet connection." };
+    }
+  }
+
+  return {
+    uploadPdf,
+    sendTemplate,
+    sendTemplateWithPdf,
+    numberInfo,
+    spend,
+    templateInfo,
+    uploadTemplateSample,
+    editTemplate,
+  };
 }
 
 export type WhatsAppClient = ReturnType<typeof createWhatsAppClient>;

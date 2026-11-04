@@ -4,7 +4,12 @@ import { LoaderCircle, MessageCircle, RotateCw, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { retryWhatsApp, sendReminderNow, setRemindersOn } from "@/app/admin/(dashboard)/whatsapp/actions";
+import {
+  retryWhatsApp,
+  sendReminderNow,
+  setBillsOn,
+  setRemindersOn,
+} from "@/app/admin/(dashboard)/whatsapp/actions";
 import { ActionSwitch } from "@/components/admin/action-switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -88,6 +93,18 @@ export function RemindersSwitch({ customer }: { customer: { id: string; on: bool
       action={(on) => setRemindersOn(customer.id, on)}
       label="Due reminders"
       successMessage={(on) => (on ? "Reminders on" : "Reminders paused")}
+    />
+  );
+}
+
+/** Owner: bills on WhatsApp on or off for one guest. */
+export function BillsSwitch({ customer }: { customer: { id: string; on: boolean } }) {
+  return (
+    <ActionSwitch
+      checked={customer.on}
+      action={(on) => setBillsOn(customer.id, on)}
+      label="Bills on WhatsApp"
+      successMessage={(on) => (on ? "Bills will be sent on WhatsApp" : "No bills on WhatsApp for this guest")}
     />
   );
 }

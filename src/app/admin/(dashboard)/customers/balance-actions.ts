@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { AuthError, assertUser, type Access, type CurrentUser } from "@/lib/auth/dal";
 import { BALANCE_KIND_LABEL, MANUAL_SIGN, settleLine, settleLineName } from "@/lib/customer-balance";
-import { balanceOf } from "@/lib/data/customer-balance";
+import { balanceBills, balanceOf } from "@/lib/data/customer-balance";
 import { getCafeDetails } from "@/lib/data/menu";
 import { retotal } from "@/lib/data/order-totals";
 import { db } from "@/lib/db";
@@ -117,6 +117,7 @@ export async function settleBalance(orderIds: string[]): Promise<{ ok: true; lin
       );
       if (linePaise === 0) throw new Error("NOTHING");
       const last = orders[orders.length - 1];
+      const bills = (await balanceBills({ [customerId]: balance }, tx))[customerId] ?? [];
       const entry = await tx.customerBalanceEntry.create({
         data: { customerId, kind: "SETTLED", amountPaise: linePaise, orderId: last.id, createdById: me.id },
         select: { id: true },
@@ -124,7 +125,7 @@ export async function settleBalance(orderIds: string[]): Promise<{ ok: true; lin
       await tx.orderItem.create({
         data: {
           orderId: last.id,
-          itemName: settleLineName(linePaise),
+          itemName: settleLineName(linePaise, bills),
           unitPricePaise: linePaise,
           quantity: 1,
           lineTotalPaise: linePaise,

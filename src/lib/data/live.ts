@@ -2,7 +2,7 @@ import "server-only";
 import type { OrderStatus, OrderType, Role, SelectionStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { startOfCafeDay } from "@/lib/format";
-import { balancesFor } from "@/lib/data/customer-balance";
+import { balanceBills, balancesFor } from "@/lib/data/customer-balance";
 import { type LivePass, livePasses } from "@/lib/data/meal-passes";
 import { type StatusLogEntry, stepToUndo } from "@/lib/order-flow";
 import { maskPhone } from "@/lib/phone-mask";
@@ -87,6 +87,8 @@ export type LiveBoard = {
   passes: Record<string, LivePass>;
   /** guests' balances (plus = credit, minus = owed), by customer id, for orders waiting to be billed */
   balances: Record<string, number>;
+  /** the bill numbers each of those balances comes from */
+  balanceBills: Record<string, number[]>;
   serverTime: string;
 };
 
@@ -188,6 +190,7 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
   const toBillGuests = orders
     .filter((o) => !o.billId && o.customerId && o.status !== "CANCELLED")
     .map((o) => o.customerId!);
+  const balances = await balancesFor(toBillGuests);
   return {
     selections: selections.map((s) => ({
       id: s.id,
@@ -229,7 +232,8 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
     bills: bills.map(toLiveBill),
     payLater: [...earlierPayLater, ...payLater].map(toLiveBill),
     passes: await livePasses(toBillGuests),
-    balances: await balancesFor(toBillGuests),
+    balances,
+    balanceBills: await balanceBills(balances),
     serverTime: new Date().toISOString(),
   };
 }

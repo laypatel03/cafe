@@ -16,7 +16,13 @@ import {
   setOrderingEnabled,
   setStaffActive,
 } from "@/app/admin/(dashboard)/settings/actions";
-import { saveReminderSettings, setWaBillsEnabled } from "@/app/admin/(dashboard)/whatsapp/actions";
+import {
+  saveReminderSettings,
+  setWaBillsEnabled,
+  setWaWelcomeEnabled,
+} from "@/app/admin/(dashboard)/whatsapp/actions";
+import { TemplateEditors } from "@/components/admin/whatsapp/template-editor";
+import type { TemplateRow } from "@/lib/whatsapp/templates";
 import { ActionSwitch } from "@/components/admin/action-switch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
@@ -55,6 +61,11 @@ type Switches = {
 };
 export type WaSettings = {
   bills: boolean;
+  welcome: boolean;
+  /** WHATSAPP_WELCOME_TEMPLATE is set */
+  welcomeReady: boolean;
+  /** the Google review link from the Place ID, or null when there's none */
+  reviewUrl: string | null;
   frequency: "OFF" | "WEEKLY" | "MONTHLY";
   weekday: number;
   monthDay: number;
@@ -66,6 +77,8 @@ export type WaSettings = {
   schedule: boolean;
   /** next scheduled reminders (ISO), or null when off */
   next: string | null;
+  /** each message's wording and Meta status */
+  templates: TemplateRow[];
 };
 type Staff = {
   id: string;
@@ -283,7 +296,7 @@ function WhatsAppPanel({ wa }: { wa: WaSettings }) {
     },
     {
       ok: wa.schedule,
-      text: "Reminder timer (every 5 minutes)",
+      text: "Reminder timer (every hour)",
       fix: "Add CRON_SECRET to .env and install the timer",
     },
   ];
@@ -338,6 +351,45 @@ function WhatsAppPanel({ wa }: { wa: WaSettings }) {
             },
           ]}
         />
+      </section>
+
+      <section
+        aria-labelledby="wa-welcome-h"
+        className="space-y-3 rounded-3xl border border-border bg-card p-5"
+      >
+        <h2 id="wa-welcome-h" className="font-semibold">
+          First-time guests
+        </h2>
+        <SwitchRows
+          rows={[
+            {
+              id: "wa-welcome",
+              title: "Welcome message with Google review link",
+              hint: "Once per guest: a thank-you and your Google review link, an hour after their first bill (paid or pay later), between 9 am and 9 pm. Guests from before never get it.",
+              checked: wa.welcome,
+              action: setWaWelcomeEnabled,
+              done: (on) => (on ? "First-time guests will get the welcome" : "No welcome messages"),
+            },
+          ]}
+        />
+        {!wa.reviewUrl ? (
+          <p className="text-sm font-semibold text-destructive">
+            Add the Google Place ID under Settings → Café – the message needs your review link.
+          </p>
+        ) : (
+          <p className="text-xs break-all text-muted-foreground">
+            Review link:{" "}
+            <a href={wa.reviewUrl} target="_blank" rel="noopener" className="underline">
+              {wa.reviewUrl}
+            </a>
+          </p>
+        )}
+        {!wa.welcomeReady && (
+          <p className="text-sm text-muted-foreground">
+            Waiting for Meta: once the <code>welcome_review</code> template is approved, add
+            WHATSAPP_WELCOME_TEMPLATE to .env and restart.
+          </p>
+        )}
       </section>
 
       <form
@@ -433,6 +485,19 @@ function WhatsAppPanel({ wa }: { wa: WaSettings }) {
           Save reminders
         </Button>
       </form>
+
+      <section aria-labelledby="wa-msg-h" className="space-y-3 rounded-3xl border border-border bg-card p-5">
+        <div>
+          <h2 id="wa-msg-h" className="font-semibold">
+            Messages
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Change what each WhatsApp message says. Keep the {"{{blanks}}"} – the app fills them in. Every
+            change goes to Meta for approval first.
+          </p>
+        </div>
+        <TemplateEditors rows={wa.templates} />
+      </section>
     </div>
   );
 }

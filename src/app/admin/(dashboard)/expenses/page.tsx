@@ -1,7 +1,10 @@
 import { Pencil } from "lucide-react";
 import Link from "next/link";
+import { z } from "zod";
 import { DeleteExpenseButton, ExpenseForm } from "@/components/admin/cash/cash-forms";
+import { SortButtons } from "@/components/admin/sort-buttons";
 import { Button } from "@/components/ui/button";
+import type { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
 import { today } from "@/lib/data/cash";
 import { db } from "@/lib/db";
@@ -13,6 +16,15 @@ import { isoDay, RANGE_PRESETS, resolveRange } from "@/lib/reports";
 export const metadata = { title: "Expenses" };
 
 const rupees = (paise: number) => formatINR(toRupees(paise));
+
+const SORTS = {
+  new: { label: "Newest", orderBy: [{ paidAt: "desc" }] },
+  old: { label: "Oldest", orderBy: [{ paidAt: "asc" }] },
+  amount: { label: "Highest amount", orderBy: [{ amountPaise: "desc" }, { paidAt: "desc" }] },
+  category: { label: "Category", orderBy: [{ category: "asc" }, { paidAt: "desc" }] },
+} satisfies Record<string, { label: string; orderBy: Prisma.ExpenseOrderByWithRelationInput[] }>;
+type Sort = keyof typeof SORTS;
+const SortParam = z.enum(["new", "old", "amount", "category"]).catch("new");
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const when = (d: Date) =>
   d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
@@ -26,9 +38,24 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/admin/e
   const range = owner
     ? resolveRange({ range: first(p.range), from: first(p.from), to: first(p.to) })
     : resolveRange({});
+  const sort = SortParam.parse(first(p.sort));
+  // the period as it's in the URL, so a sort or period change keeps the other
+  const period: Record<string, string> =
+    !owner || range.preset === "today"
+      ? {}
+      : range.preset
+        ? { range: range.preset }
+        : { from: range.from, to: range.to };
+  const href = (to: { sort?: Sort; period?: Record<string, string> }) => {
+    const q = new URLSearchParams({ ...(to.period ?? period) });
+    const sortTo = to.sort ?? sort;
+    if (sortTo !== "new") q.set("sort", sortTo);
+    const qs = q.toString();
+    return qs ? `/admin/expenses?${qs}` : "/admin/expenses";
+  };
   const expenses = await db.expense.findMany({
     where: { paidAt: { gte: range.start, lt: range.end } },
-    orderBy: { paidAt: "desc" },
+    orderBy: SORTS[sort].orderBy,
     include: { createdBy: { select: { name: true } } },
   });
   const total = expenses.reduce((s, e) => s + e.amountPaise, 0);
@@ -73,10 +100,11 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/admin/e
               variant={range.preset === key ? "default" : "outline"}
               className="rounded-full"
             >
-              <Link href={key === "today" ? "/admin/expenses" : `/admin/expenses?range=${key}`}>{label}</Link>
+              <Link href={href({ period: key === "today" ? {} : { range: key } })}>{label}</Link>
             </Button>
           ))}
           <form method="get" className="ml-auto flex flex-wrap items-end gap-2">
+            {sort !== "new" && <input type="hidden" name="sort" value={sort} />}
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
               From
               <input
@@ -136,6 +164,17 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/admin/e
               </li>
             ))}
           </ul>
+        )}
+
+        {expenses.length > 1 && (
+          <SortButtons
+            current={sort}
+            options={(Object.keys(SORTS) as Sort[]).map((k) => ({
+              key: k,
+              label: SORTS[k].label,
+              href: href({ sort: k }),
+            }))}
+          />
         )}
 
         {expenses.length === 0 ? (

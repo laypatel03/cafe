@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { runDueReminders } from "@/lib/whatsapp/reminders";
-import { runPayLaterNotes } from "@/lib/whatsapp/send";
+import { runPayLaterNotes, runWelcomes } from "@/lib/whatsapp/send";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,8 @@ const sameSecret = (given: string, secret: string) => {
 };
 
 /**
- * Called every 5 minutes by the server's timer (scripts/whatsapp/): the pay-later thank-yous once it's
- * 30 minutes past closing, and the due reminders on their day and hour. `Authorization: Bearer
+ * Called every hour by the server's timer (scripts/whatsapp/): the pay-later thank-yous once it's
+ * 30 minutes past closing, the due reminders on their day and hour, and first-visit welcomes. `Authorization: Bearer
  * <CRON_SECRET>`. Safe to call any number of times – each note and reminder goes once.
  */
 export async function POST(req: Request) {
@@ -20,5 +20,9 @@ export async function POST(req: Request) {
   if (!secret) return Response.json({ error: "Set CRON_SECRET in .env first." }, { status: 503 });
   const given = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   if (!sameSecret(given, secret)) return Response.json({ error: "Wrong secret." }, { status: 401 });
-  return Response.json({ payLater: await runPayLaterNotes(), reminders: await runDueReminders() });
+  return Response.json({
+    payLater: await runPayLaterNotes(),
+    reminders: await runDueReminders(),
+    welcome: await runWelcomes(),
+  });
 }
