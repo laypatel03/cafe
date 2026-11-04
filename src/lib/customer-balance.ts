@@ -111,3 +111,22 @@ export function shortBillPayoffs(
   }
   return paid;
 }
+
+/** Money a guest owes on one bill: the whole bill (not paid yet) or what's left of a short payment. */
+export type Debt = { billId: string; number: number; at: Date; paise: number; kind: "unpaid" | "short" };
+
+/**
+ * Spreads a payment over what a guest owes, oldest bill first: each bill it covers is paid in full,
+ * the one it runs out on is paid in part, newer ones stay owed. Returns only the bills it touches.
+ */
+export function allocatePayment(debts: Debt[], amountPaise: number): { debt: Debt; pay: number }[] {
+  const out: { debt: Debt; pay: number }[] = [];
+  let left = amountPaise;
+  for (const debt of [...debts].sort((a, b) => a.at.getTime() - b.at.getTime() || a.number - b.number)) {
+    if (left <= 0) break;
+    const pay = Math.min(left, debt.paise);
+    out.push({ debt, pay });
+    left -= pay;
+  }
+  return out;
+}

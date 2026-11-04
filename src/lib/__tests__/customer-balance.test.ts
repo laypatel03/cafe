@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  allocatePayment,
   balanceState,
   MANUAL_SIGN,
   shortBillPayoffs,
@@ -108,5 +109,34 @@ describe("shortBillPayoffs", () => {
       { kind: "PAID_LESS", billId: "b1", amountPaise: -4000, createdAt: d(2) },
     ]);
     expect(paid.get("b1")).toEqual([{ at: d(2), paise: 1500 }]);
+  });
+});
+
+describe("allocatePayment", () => {
+  const d = (n: number, day: number, paise: number, kind: "unpaid" | "short" = "unpaid") => ({
+    billId: `b${n}`,
+    number: n,
+    at: new Date(2026, 10, day),
+    paise,
+    kind,
+  });
+  // ₹1,000 over 4 bills, listed out of order
+  const debts = [d(4, 4, 30000), d(1, 1, 20000), d(3, 3, 25000), d(2, 2, 25000)];
+  it("pays the oldest bills in full and the next one in part", () => {
+    expect(allocatePayment(debts, 50000).map((a) => [a.debt.number, a.pay])).toEqual([
+      [1, 20000],
+      [2, 25000],
+      [3, 5000],
+    ]);
+  });
+  it("covers everything when it's enough, never more than each bill", () => {
+    expect(allocatePayment(debts, 100000).map((a) => a.pay)).toEqual([20000, 25000, 25000, 30000]);
+  });
+  it("mixes unpaid bills and short ones by date", () => {
+    const mixed = [d(2, 2, 10000), d(1, 1, 4000, "short")];
+    expect(allocatePayment(mixed, 6000).map((a) => [a.debt.kind, a.pay])).toEqual([
+      ["short", 4000],
+      ["unpaid", 2000],
+    ]);
   });
 });

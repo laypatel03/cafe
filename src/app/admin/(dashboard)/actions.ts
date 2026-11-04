@@ -18,7 +18,10 @@ import {
   UNDO_NOTE,
 } from "@/lib/order-flow";
 import { billFromOrders } from "@/lib/billing";
-import { paymentDifference } from "@/lib/customer-balance";
+import { allocatePayment, paymentDifference } from "@/lib/customer-balance";
+import { debtsOf } from "@/lib/data/customer-balance";
+import { formatINR } from "@/lib/format";
+import { toRupees } from "@/lib/money";
 import {
   type CustomLineInput,
   CustomLinesSchema,
@@ -482,8 +485,22 @@ export async function markBillPaid(
   const me = await staff();
   if ("ok" in me) return me;
   const res = await payBill(me, billId, method, receivedPaise);
+  // only payments taken on Live orders message the guest by themselves
   if (res.ok) after(() => autoSendPayment([billId], me.id));
   return res;
+}
+
+/**
+ * Order history / Bills / customer page: record that a bill was paid, without messaging the guest –
+ * they can be sent the bill by hand ("Send on WhatsApp") if they want it.
+ */
+export async function recordBillPayment(
+  billId: string,
+  method: PayChoice,
+): Promise<{ ok: true; difference: number } | Fail> {
+  const me = await staff();
+  if ("ok" in me) return me;
+  return payBill(me, billId, method);
 }
 
 /**
@@ -702,4 +719,84 @@ export async function voidBill(billId: string, reason: string): Promise<{ ok: tr
   for (const o of bill.orders)
     await publish({ type: "order", orderId: o.id, number: o.number, status: o.status });
   return { ok: true };
+}
+
+const PayOwedSchema = z.object({
+  customerId: z.string().min(1).max(40),
+  amountPaise: z.number().int().positive().max(100_000_000),
+  method: z.enum(PAY_CHOICES),
+});
+
+export type PayOwedResult =
+  { ok: true; paid: number[]; part: { number: number; left: number } | null } | Fail;
+
+/**
+ * A guest pays towards what they owe (customer page): the money goes on their oldest bills first –
+ * each one it covers is paid in full, the one it runs out on is paid in part (the rest stays owed,
+ * like "Received" at the counter), what's left of short bills is paid back. No WhatsApp by itself.
+ */
+export async function payOwed(
+  customerId: string,
+  amountPaise: number,
+  method: PayChoice,
+): Promise<PayOwedResult> {
+  const me = await staff();
+  if ("ok" in me) return me;
+  const parsed = PayOwedSchema.safeParse({ customerId, amountPaise, method });
+  if (!parsed.success) return { ok: false, error: "Enter the amount they paid and how." };
+  const { debts } = await debtsOf(parsed.data.customerId);
+  const owed = debts.reduce((n, d) => n + d.paise, 0);
+  if (owed === 0) return { ok: false, error: "They don't owe anything on a bill." };
+  if (parsed.data.amountPaise > owed)
+    return { ok: false, error: `They owe ${formatINR(toRupees(owed))} on their bills – take that or less.` };
+
+  const paid: number[] = [];
+  let part: { number: number; left: number } | null = null;
+  for (const { debt, pay } of allocatePayment(debts, parsed.data.amountPaise)) {
+    if (debt.kind === "unpaid") {
+      // a part payment is the counter's "Received": the rest goes on the guest's balance
+      const res = await payBill(me, debt.billId, parsed.data.method, pay < debt.paise ? pay : undefined);
+      if (!res.ok)
+        return {
+          ok: false,
+          error: paid.length
+            ? `Bills ${paid.map((n) => `#${n}`).join(", ")} paid, then: ${res.error}`
+            : res.error,
+        };
+    } else {
+      // what's left of a short bill: paid back on the balance (oldest short bills clear first)
+      await db.$transaction(async (tx) => {
+        const sale = await tx.extraSale.create({
+          data: {
+            soldAt: new Date(),
+            method: parsed.data.method,
+            amountPaise: pay,
+            note: `Customer balance – paid back on bill #${debt.number}`,
+            createdById: me.id,
+          },
+          select: { id: true },
+        });
+        await tx.customerBalanceEntry.create({
+          data: {
+            customerId: parsed.data.customerId,
+            kind: "PAID_BACK",
+            amountPaise: pay,
+            method: parsed.data.method,
+            saleId: sale.id,
+            note: `for bill #${debt.number}`,
+            createdById: me.id,
+          },
+        });
+      });
+    }
+    if (pay < debt.paise) part = { number: debt.number, left: debt.paise - pay };
+    else paid.push(debt.number);
+  }
+  // no WhatsApp by itself here – only Live orders send; the bills can be sent by hand
+  revalidatePath(`/admin/customers/${parsed.data.customerId}`);
+  revalidatePath("/admin/customers");
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin/bills");
+  revalidatePath("/admin/money");
+  return { ok: true, paid, part };
 }
