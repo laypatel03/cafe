@@ -19,7 +19,7 @@ import { PAY_CHOICES, PAYMENT_LABEL } from "@/lib/payments";
 const HINT: Record<(typeof MANUAL_KINDS)[number], string> = {
   PAID_EXTRA: "Adds to their credit – e.g. an advance",
   PAID_LESS: "They owe this – no money changed hands, so sales don't change",
-  PAID_BACK: "They paid back money owed on their balance (an unpaid bill: use Record payment at the top)",
+  PAID_BACK: "They paid back money owed on their balance (unpaid bills: use Take payment at the top)",
   RETURNED: "You gave their extra back",
 };
 

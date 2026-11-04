@@ -1,3 +1,4 @@
+import { MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 import { Pager } from "@/components/admin/pager";
@@ -11,7 +12,15 @@ import { CAFE_TZ, formatINR, startOfCafeDay } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { clampPage, resolvePerPage } from "@/lib/paging";
 import { cn } from "@/lib/utils";
-import { whatsapp, whatsappBusinessAccountId, whatsappReady } from "@/lib/whatsapp";
+import {
+  googleReviewUrl,
+  smsLink,
+  smsText,
+  whatsapp,
+  whatsappBusinessAccountId,
+  whatsappReady,
+} from "@/lib/whatsapp";
+import { getCafeDetails } from "@/lib/data/menu";
 
 export const metadata = { title: "WhatsApp" };
 
@@ -109,6 +118,20 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
     take: perPage,
     include: { bill: { select: { number: true } }, sentBy: { select: { name: true } } },
   });
+  // a failed message can go as a plain SMS from the counter phone instead
+  const cafe = messages.some((m) => m.status === "FAILED") ? await getCafeDetails() : null;
+  const sms = (m: (typeof messages)[number]) =>
+    smsLink(
+      m.phone,
+      smsText({
+        kind: m.kind,
+        guestName: m.guestName,
+        cafeName: cafe?.name ?? "",
+        amountPaise: m.amountPaise,
+        billNumber: m.bill?.number,
+        reviewUrl: cafe?.googlePlaceId ? googleReviewUrl(cafe.googlePlaceId) : null,
+      }),
+    );
   const href = (to: { page: number; perPage: number }, show = f.show) => {
     const p = new URLSearchParams({
       ...(show !== "all" && { show }),
@@ -274,6 +297,14 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
                 </p>
                 <span className="tabular font-semibold">{formatINR(toRupees(m.amountPaise))}</span>
                 {m.status === "FAILED" && <RetryWhatsAppButton id={m.id} />}
+                {m.status === "FAILED" && (
+                  <Button asChild size="sm" variant="outline" className="rounded-full">
+                    {/* opens this phone's messages app with the number and text filled in */}
+                    <a href={sms(m)}>
+                      <MessageSquareText data-icon="inline-start" /> Send as SMS
+                    </a>
+                  </Button>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 {when(m.createdAt)} ·{" "}

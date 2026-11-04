@@ -39,7 +39,7 @@ export async function addBalanceEntry(_prev: FormState, formData: FormData): Pro
   if (!customer) return { error: "Customer not found." };
   const signed = MANUAL_SIGN[kind] * amount;
 
-  // paying back / giving back only settles the balance – an unpaid bill is paid with Record payment
+  // paying back / giving back only settles the balance – unpaid bills are paid with Take payment
   const balance = await balanceOf(customerId);
   const rupees = (paise: number) => formatINR(toRupees(paise));
   let tooMuch: string | null = null;
@@ -50,7 +50,7 @@ export async function addBalanceEntry(_prev: FormState, formData: FormData): Pro
         ? `They owe ${rupees(-balance)} on their balance – that's the most they can pay back here.`
         : "They don't owe anything on their balance.";
     if (unpaid)
-      tooMuch += ` The ${rupees(unpaid.paise)} still to pay is an unpaid bill – use Record payment under "Still to pay" at the top.`;
+      tooMuch += ` The ${rupees(unpaid.paise)} still to pay is on unpaid bills – use Take payment under "Still to pay" at the top.`;
   } else if (kind === "RETURNED" && amount > balance)
     tooMuch =
       balance > 0

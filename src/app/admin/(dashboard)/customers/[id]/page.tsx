@@ -8,9 +8,14 @@ import {
 } from "@/components/admin/customer-profile-actions";
 import { EditCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
-import { RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
 import { PaidDifference } from "@/components/admin/paid-difference";
-import { BillsSwitch, RemindersSwitch, SendReminderButton } from "@/components/admin/whatsapp/wa-buttons";
+import { PayOwedForm } from "@/components/admin/pay-owed-form";
+import {
+  BillsSwitch,
+  RemindersSwitch,
+  SendBillButton,
+  SendReminderButton,
+} from "@/components/admin/whatsapp/wa-buttons";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import {
@@ -21,11 +26,11 @@ import {
 import { SellPassForm } from "@/components/admin/passes/pass-forms";
 import { BALANCE_KIND_LABEL, balanceState } from "@/lib/customer-balance";
 import { favouriteItems } from "@/lib/customer-stats";
-import { COUNTED_BALANCE, shortBillsDue } from "@/lib/data/customer-balance";
+import { COUNTED_BALANCE, debtsOf, shortBillsDue } from "@/lib/data/customer-balance";
 import { today as todayKey } from "@/lib/data/cash";
 import { getPasses } from "@/lib/data/meal-passes";
 import { getEditSwitches } from "@/lib/data/edit-switches";
-import { owedByCustomer, owedOrdersWhere } from "@/lib/data/owed";
+import { owedByCustomer } from "@/lib/data/owed";
 import type { BalanceKind, PaymentMethod } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { CAFE_TZ, formatINR } from "@/lib/format";
@@ -149,22 +154,10 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
     if (counted(e)) after -= e.amountPaise;
   }
   const dueBills = balance < 0 ? await shortBillsDue([id]) : new Map<string, number>();
-  // what makes up "Still to pay": unpaid bills (paid with Record payment) and orders not billed yet
-  const unpaidOrders = owedMap.get(id)
-    ? await db.order.findMany({
-        where: { ...owedOrdersWhere(), customerId: id },
-        orderBy: { number: "asc" },
-        select: {
-          number: true,
-          totalPaise: true,
-          bill: { select: { id: true, number: true, totalPaise: true, payLaterAt: true } },
-        },
-      })
-    : [];
-  const unpaidBills = [
-    ...new Map(unpaidOrders.filter((o) => o.bill).map((o) => [o.bill!.id, o.bill!])).values(),
-  ];
-  const unbilled = unpaidOrders.filter((o) => !o.bill);
+  // what makes up "Still to pay": bills not paid, the rest of short bills, and orders not billed yet
+  const { debts, unbilled } =
+    owedMap.get(id) || balance < 0 ? await debtsOf(id) : { debts: [], unbilled: [] };
+  const stillToPay = debts.reduce((n, d) => n + d.paise, 0) + unbilled.reduce((n, o) => n + o.totalPaise, 0);
   const today = todayKey();
   const shortDay = (d: string) =>
     new Date(`${d}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
@@ -225,7 +218,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
         </div>
       </div>
 
-      {owes && (
+      {stillToPay > 0 && (
         <div
           role="status"
           className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-3xl border border-hh-orange/40 bg-hh-orange/10 px-4 py-3"
@@ -233,35 +226,28 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           <CircleAlert className="size-5 shrink-0 text-brand-text" aria-hidden />
           <p className="flex-1 text-sm">
             <span className="font-semibold">
-              Still to pay: <span className="tabular">{formatINR(toRupees(owes.paise))}</span>
+              Still to pay: <span className="tabular">{formatINR(toRupees(stillToPay))}</span>
             </span>{" "}
-            · {owes.orders} unpaid {owes.orders === 1 ? "order" : "orders"} from earlier days or on pay later
-            {balance < 0 && (
-              <>
-                {" "}
-                · plus <span className="tabular font-semibold">{formatINR(toRupees(-balance))}</span> from
-                paying less
-              </>
-            )}
+            · {debts.length} {debts.length === 1 ? "bill" : "bills"}
+            {unbilled.length > 0 && ` and ${unbilled.length} not billed yet`}
           </p>
           <Button asChild size="sm" variant="outline" className="rounded-full">
             <Link href={`/admin/orders?q=${customer.phone}&pay=OWED`}>Show what they owe</Link>
           </Button>
-          {/* paying these clears "Still to pay" – the balance below is only money paid more or less */}
-          {(unpaidBills.length > 0 || unbilled.length > 0) && (
+          {debts.length > 0 && (
+            <PayOwedForm
+              customerId={customer.id}
+              debts={debts.map((d) => ({ ...d, at: d.at.toISOString() }))}
+            />
+          )}
+          {unbilled.length > 0 && (
             <ul className="w-full divide-y divide-hh-orange/20 rounded-2xl bg-background/60 text-sm">
-              {unpaidBills.map((b) => (
-                <li key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-                  <span className="font-semibold">Bill #{b.number}</span>
-                  <span className="text-muted-foreground">{b.payLaterAt ? "pay later" : "not paid"}</span>
-                  <span className="ml-auto tabular font-semibold">{formatINR(toRupees(b.totalPaise))}</span>
-                  <RecordPaymentButton bill={{ id: b.id, number: b.number, totalPaise: b.totalPaise }} />
-                </li>
-              ))}
               {unbilled.map((o) => (
-                <li key={o.number} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                <li key={o.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                   <span className="font-semibold">Order #{o.number}</span>
-                  <span className="text-muted-foreground">not billed yet – bill it in Order history</span>
+                  <span className="text-muted-foreground">
+                    not billed yet – bill it in Order history first
+                  </span>
                   <span className="ml-auto tabular font-semibold">{formatINR(toRupees(o.totalPaise))}</span>
                 </li>
               ))}
@@ -549,6 +535,9 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
                         )}
                       </span>
                       {o.bill && <span className="text-xs text-muted-foreground">Bill #{o.bill.number}</span>}
+                      {o.bill && !o.bill.voidedAt && !o.deletedAt && (
+                        <SendBillButton bill={{ id: o.bill.id, number: o.bill.number }} />
+                      )}
                     </li>
                   ))}
                 </ul>

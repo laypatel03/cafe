@@ -6,6 +6,7 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import {
   retryWhatsApp,
+  sendBillNow,
   sendReminderNow,
   setBillsOn,
   setRemindersOn,
@@ -106,5 +107,20 @@ export function BillsSwitch({ customer }: { customer: { id: string; on: boolean 
       label="Bills on WhatsApp"
       successMessage={(on) => (on ? "Bills will be sent on WhatsApp" : "No bills on WhatsApp for this guest")}
     />
+  );
+}
+
+/** Staff: send this bill to the guest on WhatsApp by hand (payments outside Live orders don't send). */
+export function SendBillButton({ bill }: { bill: { id: string; number: number } }) {
+  const [pending, run] = useSend(() => sendBillNow(bill.id), `Bill #${bill.number} sent on WhatsApp`);
+  return (
+    <Button size="sm" variant="outline" className="rounded-full" disabled={pending} onClick={run}>
+      {pending ? (
+        <LoaderCircle className="animate-spin" aria-hidden />
+      ) : (
+        <MessageCircle data-icon="inline-start" />
+      )}
+      WhatsApp
+    </Button>
   );
 }

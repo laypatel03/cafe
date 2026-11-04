@@ -4,7 +4,7 @@ import { Banknote, Clock, CreditCard, LoaderCircle, Smartphone, Wallet } from "l
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { markBillPaid } from "@/app/admin/(dashboard)/actions";
+import { recordBillPayment } from "@/app/admin/(dashboard)/actions";
 import { changeBillPayment } from "@/app/admin/(dashboard)/orders/actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -19,14 +19,14 @@ const METHODS = [
   { id: "DEBIT_CARD", label: "Debit card", icon: CreditCard },
 ] as const;
 
-/** Order history: the guest paid a "pay later" (or unpaid) bill – record how. */
+/** Order history / Bills: the guest paid a "pay later" (or unpaid) bill – record how (no WhatsApp by itself). */
 export function RecordPaymentButton({ bill }: { bill: { id: string; number: number; totalPaise: number } }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const pay = (method: (typeof METHODS)[number]) =>
     start(async () => {
-      const res = await markBillPaid(bill.id, method.id);
+      const res = await recordBillPayment(bill.id, method.id);
       if (res.ok) {
         toast.success(`Bill #${bill.number} paid by ${method.label}`);
         setOpen(false);

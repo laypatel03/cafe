@@ -5,6 +5,7 @@ import { RecordPaymentButton } from "@/components/admin/orders/record-payment-bu
 import { Pager } from "@/components/admin/pager";
 import { PaidDifference } from "@/components/admin/paid-difference";
 import { SortButtons } from "@/components/admin/sort-buttons";
+import { SendBillButton } from "@/components/admin/whatsapp/wa-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -322,6 +323,7 @@ export default async function BillsPage({ searchParams }: PageProps<"/admin/bill
                       <Printer data-icon="inline-start" /> {b.paidAt ? "Reprint" : "Print"}
                     </Link>
                   </Button>
+                  {!b.voidedAt && b.customerPhone && <SendBillButton bill={{ id: b.id, number: b.number }} />}
                   {(state === "later" || state === "unpaid") && (
                     <RecordPaymentButton bill={{ id: b.id, number: b.number, totalPaise: b.totalPaise }} />
                   )}

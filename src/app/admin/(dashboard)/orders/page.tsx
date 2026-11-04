@@ -11,6 +11,7 @@ import { ChangePaymentButton, RecordPaymentButton } from "@/components/admin/ord
 import { Pager } from "@/components/admin/pager";
 import { PaidDifference } from "@/components/admin/paid-difference";
 import { SortButtons } from "@/components/admin/sort-buttons";
+import { SendBillButton } from "@/components/admin/whatsapp/wa-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -490,6 +491,9 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                     {o.bill.number}
                   </Link>
                 </Button>
+              )}
+              {o.bill && !o.bill.voidedAt && !o.deletedAt && o.bill.customerPhone && (
+                <SendBillButton bill={{ id: o.bill.id, number: o.bill.number }} />
               )}
               {o.bill && !o.bill.paidAt && !o.bill.voidedAt && !o.deletedAt && (
                 <RecordPaymentButton

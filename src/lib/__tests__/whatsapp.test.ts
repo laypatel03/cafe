@@ -14,6 +14,8 @@ import {
   WA_TEMPLATE_INFO,
   WA_TEMPLATES,
   type WaTemplateKey,
+  smsLink,
+  smsText,
   welcomeMessage,
 } from "@/lib/whatsapp/messages";
 
@@ -258,5 +260,20 @@ describe("editing message templates", () => {
     expect(fetch.mock.calls[0][0]).toBe(
       "https://graph.facebook.com/v23.0/777?fields=name,status,rejected_reason,components",
     );
+  });
+});
+
+describe("SMS when WhatsApp can't deliver", () => {
+  it("writes a short text per message, without the PDF line", () => {
+    const base = { guestName: "Asha Mehta", cafeName: "Healthy Hunger", amountPaise: 41800 };
+    expect(smsText({ ...base, kind: "BILL", billNumber: 14 })).toBe(
+      "Hi Asha, thank you for eating at Healthy Hunger! Bill #14: ₹418. See you again soon!",
+    );
+    expect(smsText({ ...base, kind: "DUE_REMINDER" })).toContain("₹418 is due");
+    expect(smsText({ ...base, kind: "WELCOME", reviewUrl: "https://g.co/r" })).toContain("https://g.co/r");
+    expect(smsText({ ...base, kind: "BILL" })).not.toMatch(/PDF/);
+  });
+  it("opens the messages app with the Indian number and the text", () => {
+    expect(smsLink("9876543210", "Hi & bye")).toBe("sms:+919876543210?&body=Hi%20%26%20bye");
   });
 });

@@ -259,6 +259,37 @@ export function welcomeMessage(w: { guestName: string; cafeName: string; reviewU
   return message("welcome", [firstName(w.guestName), cleanParam(w.cafeName), cleanParam(w.reviewUrl, "")]);
 }
 
+/**
+ * A plain text message (SMS) when WhatsApp couldn't deliver – e.g. the number isn't on WhatsApp.
+ * Short, and no "PDF attached": it goes from the counter phone's own messages app.
+ */
+export function smsText(m: {
+  kind: "BILL" | "DUE_REMINDER" | "PAY_LATER" | "PAYMENT_RECEIVED" | "WELCOME";
+  guestName: string;
+  cafeName: string;
+  amountPaise: number;
+  billNumber?: number | null;
+  reviewUrl?: string | null;
+}) {
+  const hi = `Hi ${firstName(m.guestName)},`;
+  const amount = rupees(m.amountPaise);
+  switch (m.kind) {
+    case "BILL":
+      return `${hi} thank you for eating at ${m.cafeName}! ${m.billNumber ? `Bill #${m.billNumber}: ` : "Your bill: "}${amount}. See you again soon!`;
+    case "DUE_REMINDER":
+      return `${hi} a gentle reminder from ${m.cafeName}: ${amount} is due. You can pay at the counter on your next visit. Thank you!`;
+    case "PAY_LATER":
+      return `${hi} thank you for eating at ${m.cafeName}! ${amount} has been added to your account, to pay on your next visit.`;
+    case "PAYMENT_RECEIVED":
+      return `${hi} thank you! We've received ${amount} at ${m.cafeName}.`;
+    case "WELCOME":
+      return `${hi} thank you for visiting ${m.cafeName} for the first time!${m.reviewUrl ? ` If you enjoyed it, a Google review helps us a lot: ${m.reviewUrl}` : ""}`;
+  }
+}
+
+/** Opens the phone's messages app with the number and text filled in (`?&body=` works on Android and iPhone). */
+export const smsLink = (phone: string, text: string) => `sms:+91${phone}?&body=${encodeURIComponent(text)}`;
+
 /** WhatsApp wants the number with the country code and no "+": 919876543210. */
 export const waNumber = (phone: string) => `91${phone}`;
 

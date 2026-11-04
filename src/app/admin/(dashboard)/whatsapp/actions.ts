@@ -6,6 +6,7 @@ import { type Access, AuthError, assertUser, type CurrentUser } from "@/lib/auth
 import { db } from "@/lib/db";
 import { fieldErrors, type FormState } from "@/lib/validators/menu";
 import { ReminderSettingsSchema, TemplateTextSchema } from "@/lib/validators/whatsapp";
+import { paymentTemplateReady } from "@/lib/whatsapp";
 import { submitTemplate } from "@/lib/whatsapp/templates";
 import {
   sendBill,
@@ -41,6 +42,29 @@ export async function sendReminderNow(customerId: string): Promise<SendResult> {
   const id = Id.safeParse(customerId);
   if (!id.success) return { ok: false, error: "Customer not found." };
   const res = await sendDueReminder(id.data, { auto: false, byId: me.id });
+  refresh();
+  return res;
+}
+
+/**
+ * Staff, from Order history / Bills / a customer's page: send one bill to the guest by hand – a paid
+ * pay-later bill as "payment received" with its receipt, any other bill as the bill PDF.
+ */
+export async function sendBillNow(billId: string): Promise<SendResult> {
+  const me = await allowed("team");
+  if ("error" in me) return { ok: false, error: me.error };
+  const id = Id.safeParse(billId);
+  if (!id.success) return { ok: false, error: "Bill not found." };
+  const bill = await db.bill.findUnique({
+    where: { id: id.data },
+    select: { voidedAt: true, paidAt: true, payLaterAt: true, number: true },
+  });
+  if (!bill) return { ok: false, error: "Bill not found." };
+  if (bill.voidedAt) return { ok: false, error: `Bill #${bill.number} is void.` };
+  const res =
+    bill.paidAt && bill.payLaterAt && paymentTemplateReady()
+      ? await sendPaymentReceived([id.data], { auto: false, byId: me.id })
+      : await sendBill(id.data, { auto: false, byId: me.id });
   refresh();
   return res;
 }

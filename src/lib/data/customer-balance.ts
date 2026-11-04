@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
-import { shortBillPayoffs, shortfallsLeft } from "@/lib/customer-balance";
+import { type Debt, shortBillPayoffs, shortfallsLeft } from "@/lib/customer-balance";
+import { owedOrdersWhere } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 
 /** Entries that count: not deleted, and a settlement on a cancelled or deleted order gives the balance back. */
@@ -109,4 +110,54 @@ export async function billPayoffs(customerId: string) {
     select: { amountPaise: true, billId: true, kind: true, createdAt: true },
   });
   return shortBillPayoffs(entries);
+}
+
+/**
+ * Everything one guest owes, by bill: bills not paid yet (from an earlier day or on pay later) and
+ * what's left of bills paid short – plus orders not billed yet, which need a bill before they're paid.
+ */
+export async function debtsOf(customerId: string) {
+  const [orders, due] = await Promise.all([
+    db.order.findMany({
+      where: { ...owedOrdersWhere(), customerId },
+      orderBy: { number: "asc" },
+      select: {
+        id: true,
+        number: true,
+        totalPaise: true,
+        createdAt: true,
+        bill: { select: { id: true, number: true, totalPaise: true, createdAt: true, payLaterAt: true } },
+      },
+    }),
+    shortBillsDue([customerId]),
+  ]);
+  const unpaid = new Map<string, Debt & { payLater: boolean }>();
+  for (const o of orders)
+    if (o.bill)
+      unpaid.set(o.bill.id, {
+        billId: o.bill.id,
+        number: o.bill.number,
+        at: o.bill.createdAt,
+        paise: o.bill.totalPaise,
+        kind: "unpaid",
+        payLater: !!o.bill.payLaterAt,
+      });
+  const shortBills = due.size
+    ? await db.bill.findMany({
+        where: { id: { in: [...due.keys()] } },
+        select: { id: true, number: true, createdAt: true },
+      })
+    : [];
+  const debts: (Debt & { payLater: boolean })[] = [
+    ...unpaid.values(),
+    ...shortBills.map((b) => ({
+      billId: b.id,
+      number: b.number,
+      at: b.createdAt,
+      paise: due.get(b.id) ?? 0,
+      kind: "short" as const,
+      payLater: false,
+    })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime() || a.number - b.number);
+  return { debts, unbilled: orders.filter((o) => !o.bill) };
 }
