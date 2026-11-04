@@ -1,9 +1,10 @@
 "use client";
 
-import { CircleCheck, LoaderCircle, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CircleCheck, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { addBalanceEntry } from "@/app/admin/(dashboard)/customers/balance-actions";
+import { addBalanceEntry, deleteBalanceEntry } from "@/app/admin/(dashboard)/customers/balance-actions";
 import { FormField } from "@/components/admin/form-field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
@@ -18,7 +19,7 @@ import { PAY_CHOICES, PAYMENT_LABEL } from "@/lib/payments";
 const HINT: Record<(typeof MANUAL_KINDS)[number], string> = {
   PAID_EXTRA: "Adds to their credit – e.g. an advance",
   PAID_LESS: "They owe this – no money changed hands, so sales don't change",
-  PAID_BACK: "They paid what they owed",
+  PAID_BACK: "They paid back money owed on their balance (an unpaid bill: use Record payment at the top)",
   RETURNED: "You gave their extra back",
 };
 
@@ -166,6 +167,54 @@ export function ClearBalanceButton({ customerId, balance }: { customerId: string
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/** Owner: delete a hand entry made by mistake – it stays on the page in red and stops counting. */
+export function DeleteBalanceButton({ id, label }: { id: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  const remove = () =>
+    start(async () => {
+      const res = await deleteBalanceEntry(id);
+      if (res.ok) {
+        toast.success("Entry deleted – it no longer counts");
+        setOpen(false);
+        router.refresh();
+      } else toast.error(res.error);
+    });
+  return (
+    <>
+      <Button
+        type="button"
+        size="icon-sm"
+        variant="ghost"
+        className="ml-1 size-7 align-middle text-muted-foreground hover:text-destructive"
+        aria-label={`Delete ${label}`}
+        onClick={() => setOpen(true)}
+      >
+        <Trash2 aria-hidden />
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogTitle>Delete {label}?</DialogTitle>
+          <DialogDescription>
+            It stays in the list in red but no longer counts in the balance, and its money is taken out of the
+            money book and cash drawer.
+          </DialogDescription>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Keep it
+            </Button>
+            <Button type="button" variant="destructive" disabled={pending} onClick={remove}>
+              {pending && <LoaderCircle className="animate-spin" data-icon="inline-start" />}
+              Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

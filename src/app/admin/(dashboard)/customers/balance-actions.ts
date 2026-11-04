@@ -8,7 +8,10 @@ import { getCafeDetails } from "@/lib/data/menu";
 import { retotal } from "@/lib/data/order-totals";
 import { db } from "@/lib/db";
 import { publish } from "@/lib/realtime";
-import { BalanceEntrySchema, BalanceOrderIds } from "@/lib/validators/customer-balance";
+import { BalanceEntryId, BalanceEntrySchema, BalanceOrderIds } from "@/lib/validators/customer-balance";
+import { owedByCustomer } from "@/lib/data/owed";
+import { formatINR } from "@/lib/format";
+import { toRupees } from "@/lib/money";
 import { fieldErrors, type FormState } from "@/lib/validators/menu";
 
 type Fail = { ok: false; error: string };
@@ -35,6 +38,25 @@ export async function addBalanceEntry(_prev: FormState, formData: FormData): Pro
   const customer = await db.customer.findUnique({ where: { id: customerId }, select: { id: true } });
   if (!customer) return { error: "Customer not found." };
   const signed = MANUAL_SIGN[kind] * amount;
+
+  // paying back / giving back only settles the balance – an unpaid bill is paid with Record payment
+  const balance = await balanceOf(customerId);
+  const rupees = (paise: number) => formatINR(toRupees(paise));
+  let tooMuch: string | null = null;
+  if (kind === "PAID_BACK" && amount > -balance) {
+    const unpaid = (await owedByCustomer([customerId])).get(customerId);
+    tooMuch =
+      balance < 0
+        ? `They owe ${rupees(-balance)} on their balance – that's the most they can pay back here.`
+        : "They don't owe anything on their balance.";
+    if (unpaid)
+      tooMuch += ` The ${rupees(unpaid.paise)} still to pay is an unpaid bill – use Record payment under "Still to pay" at the top.`;
+  } else if (kind === "RETURNED" && amount > balance)
+    tooMuch =
+      balance > 0
+        ? `They have ${rupees(balance)} credit – that's the most you can give back.`
+        : "They have no credit to give back.";
+  if (tooMuch) return { error: tooMuch, fieldErrors: { amount: tooMuch } };
 
   await db.$transaction(async (tx) => {
     const sale = method
@@ -171,4 +193,35 @@ export async function undoBalanceSettle(orderIds: string[]): Promise<{ ok: true;
     await publish({ type: "order", orderId: o.id, number: o.number, status: o.status });
   revalidatePath(`/admin/customers/${res.customerId}`);
   return { ok: true, paise: out.paise };
+}
+
+/**
+ * Owner: delete a hand entry made by mistake. It stays on the page in red but no longer counts, and
+ * its money-book sale is removed. Entries from a bill are changed through the bill instead.
+ */
+export async function deleteBalanceEntry(entryId: string): Promise<{ ok: true } | Fail> {
+  const me = await signedIn("OWNER");
+  if ("ok" in me) return me;
+  const id = BalanceEntryId.safeParse(entryId);
+  if (!id.success) return { ok: false, error: "Entry not found." };
+  const entry = await db.customerBalanceEntry.findUnique({ where: { id: id.data } });
+  if (!entry) return { ok: false, error: "Entry not found." };
+  if (entry.deletedAt) return { ok: false, error: "This entry is already deleted." };
+  if (entry.billId || entry.orderId || entry.kind === "SETTLED")
+    return {
+      ok: false,
+      error: "This came from a bill – change the bill (void it or change the payment) instead.",
+    };
+  await db.$transaction(async (tx) => {
+    await tx.customerBalanceEntry.update({
+      where: { id: entry.id },
+      data: { deletedAt: new Date(), deletedById: me.id },
+    });
+    if (entry.saleId) await tx.extraSale.deleteMany({ where: { id: entry.saleId } });
+  });
+  revalidatePath(`/admin/customers/${entry.customerId}`);
+  revalidatePath("/admin/customers");
+  revalidatePath("/admin/money");
+  revalidatePath("/admin/cash");
+  return { ok: true };
 }

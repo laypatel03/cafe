@@ -299,6 +299,7 @@ model StaffUser {
   passesSold     MealPass[]             @relation("PassesSold")
   mealPassUses   MealPassUse[]          @relation("MealPassUses")
   balanceEntries CustomerBalanceEntry[] @relation("BalanceEntries")
+  balanceDeleted CustomerBalanceEntry[] @relation("BalanceDeleted")
   waMessages     WhatsAppMessage[]      @relation("WaSentBy")
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
@@ -553,6 +554,10 @@ model CustomerBalanceEntry {
   createdBy   StaffUser?     @relation("BalanceEntries", fields: [createdById], references: [id], onDelete: SetNull)
   line        OrderItem?
   createdAt   DateTime       @default(now())
+  /// a hand entry the owner deleted: kept (shown in red), no longer counted, its money-book sale removed
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   StaffUser?     @relation("BalanceDeleted", fields: [deletedById], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@index([orderId])
