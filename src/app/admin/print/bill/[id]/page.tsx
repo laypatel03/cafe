@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/dal";
 import { mergeBillLines } from "@/lib/billing";
+import { billPayoffs, shortBillsDue } from "@/lib/data/customer-balance";
 import { getCafeDetails } from "@/lib/data/menu";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
@@ -43,6 +44,27 @@ export default async function BillPage({ params }: PageProps<"/admin/print/bill/
     ),
   );
   const when = bill.createdAt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  // paid short: how much of the rest is still owed now (paying back on the customer page clears it)
+  const short = bill.paidAt && !bill.voidedAt && bill.differencePaise < 0 ? -bill.differencePaise : 0;
+  const shortEntry = short
+    ? await db.customerBalanceEntry.findFirst({
+        where: { billId: bill.id, kind: "PAID_LESS" },
+        select: { customerId: true },
+      })
+    : null;
+  const stillDue = shortEntry ? ((await shortBillsDue([shortEntry.customerId])).get(bill.id) ?? 0) : 0;
+  const paidSince = short - stillDue;
+  // the days it was paid back, short: "11/4" (month/day)
+  const paidOn =
+    shortEntry && paidSince > 0
+      ? [
+          ...new Set(
+            ((await billPayoffs(shortEntry.customerId)).get(bill.id) ?? []).map(
+              (p) => `${p.at.getMonth() + 1}/${p.at.getDate()}`,
+            ),
+          ),
+        ].join(", ")
+      : "";
 
   return (
     <div className="min-h-svh bg-muted py-6 print:bg-white print:py-0">
@@ -129,14 +151,26 @@ export default async function BillPage({ params }: PageProps<"/admin/print/bill/
           <dt className="font-sans text-sm font-extrabold">Total</dt>
           <dd className="font-sans text-sm font-extrabold">{rupees(bill.totalPaise)}</dd>
           {/* paid more or less than the total: the difference is on the guest's balance */}
-          {bill.paidAt && bill.differencePaise !== 0 && (
+          {bill.paidAt && bill.differencePaise > 0 && (
             <>
               <dt>Paid</dt>
               <dd className="text-right">{rupees(bill.totalPaise + bill.differencePaise)}</dd>
-              <dt className="font-bold">
-                {bill.differencePaise < 0 ? "Still to pay" : "Paid extra (credit)"}
-              </dt>
-              <dd className="text-right font-bold">{rupees(Math.abs(bill.differencePaise))}</dd>
+              <dt className="font-bold">Paid extra (credit)</dt>
+              <dd className="text-right font-bold">{rupees(bill.differencePaise)}</dd>
+            </>
+          )}
+          {short > 0 && (
+            <>
+              <dt>Paid at the counter</dt>
+              <dd className="text-right">{rupees(bill.totalPaise - short)}</dd>
+              {paidSince > 0 && (
+                <>
+                  <dt>Paid later{paidOn && ` (${paidOn})`}</dt>
+                  <dd className="text-right">{rupees(paidSince)}</dd>
+                </>
+              )}
+              <dt className="font-bold">{stillDue > 0 ? "Still to pay" : "Fully paid"}</dt>
+              <dd className="text-right font-bold">{stillDue > 0 ? rupees(stillDue) : "✓"}</dd>
             </>
           )}
         </dl>
@@ -146,7 +180,7 @@ export default async function BillPage({ params }: PageProps<"/admin/print/bill/
           {bill.voidedAt
             ? "This bill is void – not payable"
             : bill.paidAt
-              ? `PAID · ${METHOD[bill.paymentMethod ?? "CASH"]} · ${bill.paidAt.toLocaleTimeString("en-IN", { timeStyle: "short" })}`
+              ? `${stillDue > 0 ? "PART PAID" : "PAID"} · ${METHOD[bill.paymentMethod ?? "CASH"]} · ${bill.paidAt.toLocaleTimeString("en-IN", { timeStyle: "short" })}`
               : "Please pay at the counter"}
         </p>
         <p className="mt-2 text-center">Thank you! Eat well, live well.</p>

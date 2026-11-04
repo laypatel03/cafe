@@ -222,6 +222,7 @@ export function LiveBoard({
         payLater={data.payLater}
         passes={data.passes}
         balances={data.balances}
+        balanceBills={data.balanceBills}
         menu={menu}
         isOwner={isOwner}
         onChanged={refresh}

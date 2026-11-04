@@ -2,7 +2,8 @@ import { SettingsScreen } from "@/components/admin/settings/settings-screen";
 import { requireUser } from "@/lib/auth/dal";
 import { db } from "@/lib/db";
 import { nextScheduled } from "@/lib/reminder-schedule";
-import { whatsappReady } from "@/lib/whatsapp";
+import { googleReviewUrl, welcomeTemplateReady, whatsappReady } from "@/lib/whatsapp";
+import { syncTemplates } from "@/lib/whatsapp/templates";
 
 export const metadata = { title: "Settings" };
 
@@ -62,6 +63,10 @@ export default async function SettingsPage() {
         isOwner
           ? {
               bills: settings.waBillsEnabled,
+              welcome: settings.waWelcomeEnabled,
+              welcomeReady: welcomeTemplateReady(),
+              reviewUrl: settings.googlePlaceId ? googleReviewUrl(settings.googlePlaceId) : null,
+              templates: await syncTemplates(),
               frequency: settings.dueReminders,
               weekday: settings.reminderWeekday,
               monthDay: settings.reminderMonthDay,

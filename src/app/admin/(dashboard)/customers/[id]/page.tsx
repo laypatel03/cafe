@@ -1,4 +1,4 @@
-import { ArrowLeft, CircleAlert, MessageCircle, Plus, ReceiptText } from "lucide-react";
+import { ArrowLeft, ChevronRight, CircleAlert, MessageCircle, Plus, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -8,20 +8,22 @@ import {
 } from "@/components/admin/customer-profile-actions";
 import { EditCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
-import { RemindersSwitch, SendReminderButton } from "@/components/admin/whatsapp/wa-buttons";
+import { PaidDifference } from "@/components/admin/paid-difference";
+import { BillsSwitch, RemindersSwitch, SendReminderButton } from "@/components/admin/whatsapp/wa-buttons";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
 import { BalanceEntryForm, ClearBalanceButton } from "@/components/admin/balance-entry-form";
 import { SellPassForm } from "@/components/admin/passes/pass-forms";
 import { BALANCE_KIND_LABEL, balanceState } from "@/lib/customer-balance";
 import { favouriteItems } from "@/lib/customer-stats";
-import { COUNTED_BALANCE } from "@/lib/data/customer-balance";
+import { COUNTED_BALANCE, shortBillsDue } from "@/lib/data/customer-balance";
 import { today as todayKey } from "@/lib/data/cash";
 import { getPasses } from "@/lib/data/meal-passes";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { owedByCustomer } from "@/lib/data/owed";
+import type { BalanceKind, PaymentMethod } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { formatINR } from "@/lib/format";
+import { CAFE_TZ, formatINR } from "@/lib/format";
 import { type MealPart, mealsSummary, readParts } from "@/lib/meal-pass";
 import { toRupees } from "@/lib/money";
 import { PAYMENT_LABEL } from "@/lib/payments";
@@ -37,7 +39,24 @@ const WA_FREQUENCY = {
   OFF: "Scheduled reminders off",
 };
 
-const RECENT = 20;
+/** rows loaded (newest first), shown by month – the latest month open, older ones folded */
+const BALANCE_ROWS = 300;
+const ORDER_ROWS = 300;
+const monthKey = (d: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: CAFE_TZ, year: "numeric", month: "2-digit" }).format(d);
+const monthName = (d: Date) =>
+  d.toLocaleDateString("en-IN", { timeZone: CAFE_TZ, month: "long", year: "numeric" });
+
+/** Rows (newest first) in month groups, newest month first. */
+function byMonth<T>(rows: T[], at: (r: T) => Date) {
+  const groups: { key: string; label: string; rows: T[] }[] = [];
+  for (const r of rows) {
+    const key = monthKey(at(r));
+    if (groups.at(-1)?.key !== key) groups.push({ key, label: monthName(at(r)), rows: [] });
+    groups.at(-1)!.rows.push(r);
+  }
+  return groups;
+}
 const planMeals = (parts: MealPart[]) =>
   mealsSummary(
     parts,
@@ -68,10 +87,20 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
     db.order.findMany({
       where: { customerId: id },
       orderBy: { createdAt: "desc" },
-      take: RECENT,
+      take: ORDER_ROWS,
       include: {
         items: { select: { itemName: true, quantity: true } },
-        bill: { select: { number: true } },
+        bill: {
+          select: {
+            id: true,
+            number: true,
+            totalPaise: true,
+            differencePaise: true,
+            paidAt: true,
+            voidedAt: true,
+            _count: { select: { orders: { where: { deletedAt: null } } } },
+          },
+        },
       },
     }),
     db.orderItem.findMany({
@@ -87,7 +116,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
     db.customerBalanceEntry.findMany({
       where: { customerId: id },
       orderBy: { createdAt: "desc" },
-      take: RECENT,
+      take: BALANCE_ROWS,
       include: {
         bill: { select: { number: true } },
         order: { select: { number: true, status: true, deletedAt: true } },
@@ -104,6 +133,16 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
     }),
   ]);
   const balance = balanceSum._sum.amountPaise ?? 0;
+  // the balance after each entry, worked back from today's (newest first); uncounted ones change nothing
+  const counted = (e: (typeof balanceEntries)[number]) =>
+    !(e.order && (e.order.deletedAt || e.order.status === "CANCELLED"));
+  const balanceRows: ((typeof balanceEntries)[number] & { after: number; counted: boolean })[] = [];
+  for (let i = 0, after = balance; i < balanceEntries.length; i++) {
+    const e = balanceEntries[i];
+    balanceRows.push({ ...e, after, counted: counted(e) });
+    if (counted(e)) after -= e.amountPaise;
+  }
+  const dueBills = balance < 0 ? await shortBillsDue([id]) : new Map<string, number>();
   const today = todayKey();
   const shortDay = (d: string) =>
     new Date(`${d}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
@@ -175,9 +214,16 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
               Still to pay: <span className="tabular">{formatINR(toRupees(owes.paise))}</span>
             </span>{" "}
             · {owes.orders} unpaid {owes.orders === 1 ? "order" : "orders"} from earlier days or on pay later
+            {balance < 0 && (
+              <>
+                {" "}
+                · plus <span className="tabular font-semibold">{formatINR(toRupees(-balance))}</span> from
+                paying less
+              </>
+            )}
           </p>
           <Button asChild size="sm" variant="outline" className="rounded-full">
-            <Link href={`/admin/orders?q=${customer.phone}&pay=PENDING`}>Show unpaid orders</Link>
+            <Link href={`/admin/orders?q=${customer.phone}&pay=OWED`}>Show what they owe</Link>
           </Button>
         </div>
       )}
@@ -204,7 +250,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
         <div className="min-w-0 flex-1 space-y-1 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="wa-h" className="text-base font-bold">
-              WhatsApp reminders
+              WhatsApp
             </h2>
             <span
               className={cn(
@@ -225,13 +271,23 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
             {waState === "stopped"
               ? `Replied STOP on ${date(customer.whatsappOptOutAt!)} – no bills or reminders on WhatsApp until they send START.`
               : waState === "paused"
-                ? "Due reminders are paused for this guest. Bills are still sent."
+                ? `Due reminders are paused for this guest.${customer.waBillsPaused ? "" : " Bills are still sent."}`
                 : owes
                   ? nextReminder
                     ? `${formatINR(toRupees(owes.paise))} still to pay goes in the next reminder: ${dateTime(nextReminder)}.`
                     : `${formatINR(toRupees(owes.paise))} still to pay. Scheduled reminders are off in Settings – send one now.`
-                  : "All paid up – nothing to remind them about."}
+                  : balance < 0
+                    ? `Owes ${formatINR(toRupees(-balance))} from paying less (see Balance below) – reminders only cover unpaid bills.`
+                    : "All paid up – nothing to remind them about."}
           </p>
+          {owes && balance < 0 && waState !== "stopped" && (
+            <p className="font-semibold">
+              Also owes {formatINR(toRupees(-balance))} from paying less (see Balance) – not in reminders.
+            </p>
+          )}
+          {waState !== "stopped" && customer.waBillsPaused && (
+            <p className="font-semibold">Bills aren&apos;t sent on WhatsApp to this guest.</p>
+          )}
           {lastReminder && (
             <p className="text-xs text-muted-foreground">
               Last reminder: {dateTime(lastReminder.createdAt)}
@@ -241,6 +297,10 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
         </div>
         {waState !== "stopped" && (
           <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <BillsSwitch customer={{ id: customer.id, on: !customer.waBillsPaused }} />
+              Bills
+            </label>
             <label className="flex items-center gap-2 text-sm font-semibold">
               <RemindersSwitch customer={{ id: customer.id, on: !customer.remindersPaused }} />
               Reminders
@@ -317,46 +377,36 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
         </div>
         <p className="mb-3 text-xs text-muted-foreground">
           Money paid more or less than a bill. Paid it all? Tap the button above. Or on their next visit, the
-          bill shows &ldquo;Add owed&rdquo; / &ldquo;Use credit&rdquo;. For part payments or advances, use the
-          form below.
+          bill shows &ldquo;Add owed&rdquo; / &ldquo;Use credit&rdquo;. Part payments or advances: add an
+          entry by hand below.
         </p>
-        {balanceEntries.length > 0 && (
-          <ul className="mb-4 divide-y divide-border rounded-2xl border border-border">
-            {balanceEntries.map((e) => {
-              const notCounted = e.order && (e.order.deletedAt || e.order.status === "CANCELLED");
-              return (
-                <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">{date(e.createdAt)}</span>
-                  <span className="font-semibold">{BALANCE_KIND_LABEL[e.kind]}</span>
-                  <span className="order-last min-w-0 basis-full text-muted-foreground sm:order-none sm:flex-1 sm:basis-0">
-                    {[
-                      e.bill && `bill #${e.bill.number}`,
-                      e.order && `order #${e.order.number}`,
-                      e.method && PAYMENT_LABEL[e.method],
-                      e.note,
-                      notCounted && "order cancelled – not counted",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                  <span
-                    className={
-                      notCounted
-                        ? "ml-auto tabular text-muted-foreground line-through"
-                        : e.amountPaise > 0
-                          ? "ml-auto tabular font-semibold text-hh-green dark:text-hh-green-light"
-                          : "ml-auto tabular font-semibold text-brand-text"
-                    }
-                  >
-                    {e.amountPaise > 0 ? "+" : "−"}
-                    {formatINR(toRupees(Math.abs(e.amountPaise)))}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+        {balanceRows.length > 0 && (
+          <div className="mb-4 overflow-hidden rounded-2xl border border-border">
+            <div className="hidden grid-cols-[8.5rem_1fr_6rem_7.5rem] gap-3 bg-muted/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground sm:grid">
+              <span>When</span>
+              <span>What</span>
+              <span className="text-right">Amount</span>
+              <span className="text-right">Balance after</span>
+            </div>
+            {byMonth(balanceRows, (e) => e.createdAt).map((m, i) => (
+              <MonthGroup
+                key={m.key}
+                open={i === 0}
+                label={m.label}
+                meta={`${m.rows.length} ${m.rows.length === 1 ? "entry" : "entries"}`}
+                right={`End of month: ${afterWords(m.rows[0].after)}`}
+              >
+                <BalanceRows rows={m.rows} />
+              </MonthGroup>
+            ))}
+          </div>
         )}
-        <BalanceEntryForm customerId={customer.id} />
+        <details className="rounded-2xl border border-dashed border-border">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">+ Add an entry by hand</summary>
+          <div className="border-t border-border p-3">
+            <BalanceEntryForm customerId={customer.id} />
+          </div>
+        </details>
       </section>
 
       <section className="rounded-3xl border border-border bg-card p-4" aria-labelledby="pass-h">
@@ -415,27 +465,58 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
             No orders yet.
           </p>
         ) : (
-          <ul className="divide-y divide-border rounded-3xl border border-border bg-card">
-            {orders.map((o) => (
-              <li key={o.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
-                <Link href={`/admin/orders?q=${o.number}`} className="font-semibold hover:underline">
-                  #{o.number}
-                </Link>
-                <span className="text-muted-foreground">{o.type === "PARCEL" ? "Takeaway" : "Dine-in"}</span>
-                <span className="text-muted-foreground">{dateTime(o.createdAt)}</span>
-                <OrderStatusBadge status={o.status} />
-                <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                  {o.items.map((i) => `${i.quantity}× ${i.itemName}`).join(", ")}
-                </span>
-                <span className="tabular font-semibold">{formatINR(toRupees(o.totalPaise))}</span>
-                {o.bill && <span className="text-xs text-muted-foreground">Bill #{o.bill.number}</span>}
-              </li>
+          <div className="overflow-hidden rounded-3xl border border-border bg-card">
+            {byMonth(orders, (o) => o.createdAt).map((m, i) => (
+              <MonthGroup
+                key={m.key}
+                open={i === 0}
+                label={m.label}
+                meta={`${m.rows.length} ${m.rows.length === 1 ? "order" : "orders"}`}
+                right={formatINR(
+                  toRupees(
+                    m.rows
+                      .filter((o) => !o.deletedAt && o.status !== "CANCELLED")
+                      .reduce((n, o) => n + o.totalPaise, 0),
+                  ),
+                )}
+              >
+                <ul className="divide-y divide-border">
+                  {m.rows.map((o) => (
+                    <li key={o.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
+                      <Link href={`/admin/orders?q=${o.number}`} className="font-semibold hover:underline">
+                        #{o.number}
+                      </Link>
+                      <span className="text-muted-foreground">
+                        {o.type === "PARCEL" ? "Takeaway" : "Dine-in"}
+                      </span>
+                      <span className="text-muted-foreground">{dateTime(o.createdAt)}</span>
+                      <OrderStatusBadge status={o.status} />
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                        {o.items.map((i) => `${i.quantity}× ${i.itemName}`).join(", ")}
+                      </span>
+                      <span className="text-right">
+                        <span className="block tabular font-semibold">
+                          {formatINR(toRupees(o.totalPaise))}
+                        </span>
+                        {o.bill && (
+                          <PaidDifference
+                            bill={{ ...o.bill, orders: o.bill._count.orders }}
+                            duePaise={dueBills.get(o.bill.id)}
+                            className="text-xs"
+                          />
+                        )}
+                      </span>
+                      {o.bill && <span className="text-xs text-muted-foreground">Bill #{o.bill.number}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </MonthGroup>
             ))}
-          </ul>
+          </div>
         )}
-        {orderTotal > RECENT && (
+        {orderTotal > ORDER_ROWS && (
           <p className="text-center text-xs text-muted-foreground">
-            Showing the latest {RECENT} – see Full history for the rest.
+            Showing the latest {ORDER_ROWS} – see Full history for the rest.
           </p>
         )}
       </section>
@@ -447,5 +528,103 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
         <DeleteCustomerButton id={customer.id} name={customer.name} />
       </section>
     </div>
+  );
+}
+
+const signed = (paise: number) => `${paise > 0 ? "+" : "−"}${formatINR(toRupees(Math.abs(paise)))}`;
+const afterWords = (paise: number) =>
+  paise > 0
+    ? `Credit ${formatINR(toRupees(paise))}`
+    : paise < 0
+      ? `Owes ${formatINR(toRupees(-paise))}`
+      : "₹0";
+
+/** Balance entries as rows: when, what (and its bill, order, method, note), amount, and the balance after. */
+function BalanceRows({
+  rows,
+}: {
+  rows: {
+    id: string;
+    createdAt: Date;
+    kind: BalanceKind;
+    amountPaise: number;
+    method: PaymentMethod | null;
+    note: string | null;
+    bill: { number: number } | null;
+    order: { number: number } | null;
+    after: number;
+    counted: boolean;
+  }[];
+}) {
+  return (
+    <ul className="divide-y divide-border">
+      {rows.map((e) => (
+        <li
+          key={e.id}
+          className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 px-3 py-2 text-sm sm:grid-cols-[8.5rem_1fr_6rem_7.5rem] sm:items-center"
+        >
+          <span className="text-xs text-muted-foreground sm:order-none">{dateTime(e.createdAt)}</span>
+          <span className="row-span-2 self-center text-right sm:order-3 sm:row-span-1">
+            <span
+              className={cn(
+                "tabular font-semibold",
+                !e.counted
+                  ? "text-muted-foreground line-through"
+                  : e.amountPaise > 0
+                    ? "text-hh-green dark:text-hh-green-light"
+                    : "text-brand-text",
+              )}
+            >
+              {signed(e.amountPaise)}
+            </span>
+            <span className="block text-xs text-muted-foreground sm:hidden">→ {afterWords(e.after)}</span>
+          </span>
+          <span className="min-w-0 sm:order-2">
+            <span className="font-semibold">{BALANCE_KIND_LABEL[e.kind]}</span>
+            <span className="text-muted-foreground">
+              {[
+                e.bill && ` · bill #${e.bill.number}`,
+                e.order && ` · order #${e.order.number}`,
+                e.method && ` · ${PAYMENT_LABEL[e.method]}`,
+                e.note && ` · ${e.note}`,
+                !e.counted && " · order cancelled – not counted",
+              ]
+                .filter(Boolean)
+                .join("")}
+            </span>
+          </span>
+          <span className="hidden text-right tabular text-xs text-muted-foreground sm:order-4 sm:block">
+            {afterWords(e.after)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A month heading that folds its rows away; `right` sits at the end of the heading. */
+function MonthGroup({
+  open,
+  label,
+  meta,
+  right,
+  children,
+}: {
+  open: boolean;
+  label: string;
+  meta: string;
+  right: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details open={open} className="group border-t border-border first:border-t-0">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 bg-muted/40 px-3 py-2 text-sm hover:bg-muted/70 [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" aria-hidden />
+        <span className="font-semibold">{label}</span>
+        <span className="text-muted-foreground">{meta}</span>
+        <span className="ml-auto tabular text-xs font-semibold text-muted-foreground">{right}</span>
+      </summary>
+      {children}
+    </details>
   );
 }

@@ -8,6 +8,7 @@ export type NavItem = {
     | "menu"
     | "offers"
     | "history"
+    | "bills"
     | "cash"
     | "expenses"
     | "money"
@@ -29,6 +30,7 @@ export const NAV: NavItem[] = [
   { href: "/admin/menu", label: "Menu", icon: "menu", roles: ["STAFF", "OWNER", "DEVELOPER"] },
   { href: "/admin/offers", label: "Today's offer", icon: "offers", roles: ["OWNER", "DEVELOPER"] },
   { href: "/admin/orders", label: "Order history", icon: "history", roles: ["STAFF", "OWNER"] },
+  { href: "/admin/bills", label: "Bills", icon: "bills", roles: ["STAFF", "OWNER"] },
   { href: "/admin/cash", label: "Cash counter", icon: "cash", roles: ["STAFF", "OWNER"] },
   { href: "/admin/expenses", label: "Expenses", icon: "expenses", roles: ["STAFF", "OWNER"] },
   { href: "/admin/money", label: "Money book", icon: "money", roles: ["OWNER"] },

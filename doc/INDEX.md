@@ -24,6 +24,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `/admin/offers` | `(dashboard)/offers/{page,actions}.ts(x)`, `components/admin/offers/offer-form.tsx` | owner / developer | Today's offer: dish, offer price, days |
 | `/admin/passes` | `(dashboard)/passes/{page,actions}.ts(x)`, `components/admin/passes/pass-forms.tsx` | owner (use at billing: staff) | Meal pass plans, passes, refunds |
 | `/admin/orders` | `(dashboard)/orders/{page,actions}.ts(x)`, `components/admin/orders/*` | staff / owner | History, filters, pay-later, edit (owner switch) |
+| `/admin/bills` | `(dashboard)/bills/page.tsx` | staff / owner | Every bill: status (Paid / Part paid / Pay later / Not paid / Void), date, method, type, search, sort, billed vs received, reprint, record payment |
 | `/admin/counter-order` | `src/app/admin/counter-order/page.tsx` (reuses `menu-browser` + `useCounterCart`) | staff | Walk-in orders; `?customer=` owner only |
 | `/admin/cash` | `(dashboard)/cash/{page,actions}.ts(x)`, `components/admin/cash/cash-forms.tsx` | staff | Drawer open/close |
 | `/admin/expenses` | `(dashboard)/expenses/page.tsx` (actions in `cash/actions.ts`) | staff (today) / owner (any period) | |
@@ -99,7 +100,7 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `admin-menu.ts` | Menu manager lists, `getMenuItemForEdit` |
 | `menu-prices.ts` | `loadMenuPrices` – DB prices for `pricing.ts`, today's offers applied (`{ offers: false }` for owner past-order edits) |
 | `meal-passes.ts` | `COUNTED_USES` (not cancelled/deleted), `getPasses` (+left/status), `activePassFor`, `livePasses` (live board) |
-| `customer-balance.ts` | `COUNTED_BALANCE`, `balancesFor` (live board), `balanceOf`, `allBalances` (customers list) |
+| `customer-balance.ts` | `COUNTED_BALANCE`, `balancesFor` (live board), `balanceOf`, `allBalances` (customers list), `shortBillsDue` (short bills still owed – Order history, customer page) |
 | `order-totals.ts` | `retotal(tx, orderId, tax)` after meal pass / balance lines change |
 | `offers.ts` | `getTodaysOffers` (cached per IST day, tag `menu`), `getMenuWithOffers` – used by `/`, `/menu`, counter order, live board (not the PDF menu or blog) |
 | `live.ts` | `getLiveBoard` – selections, active orders, bills to make/pay (+ bill `customerId`), passes, balances |
@@ -128,7 +129,7 @@ Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) 
 | `OrderStatusLog` | Every status change with staff user (used by Undo) |
 | `Bill` | Dine-in: one per visit; takeaway: per order. `paymentMethod`, `paidAt`, `payLaterAt`; voided never deleted (`voidedAt`, `voidedOrderNumbers`) |
 | `Customer` | Keyed by 10-digit `phone`; consent, notes, counters; `remindersPaused`, `whatsappOptOutAt` (STOP) |
-| `WhatsAppMessage` | Every bill/reminder sent: status SENDING→SENT→DELIVERED→READ / FAILED, `waId`, error, `periodKey` (unique per customer + kind), `attempts`, `auto` |
+| `WhatsAppMessage` | Every bill/reminder/pay-later note/payment received/first-visit welcome (`WELCOME`, `periodKey` "first-visit") sent: status SENDING→SENT→DELIVERED→READ / FAILED, `waId`, error, `periodKey` (unique per customer + kind), `attempts`, `auto` |
 | `Selection` | Guest's live pick list per device (12 h TTL); staff watch it |
 | `StaffUser` | `role` STAFF/OWNER/DEVELOPER; `sessionVersion` bump = logout everywhere |
 | `CafeSettings` | Single row id=1: details, `fssaiLicence`, `gaMeasurementId` (→ `components/analytics/*` in root layout), `googlePlaceId` (home page reviews), `hours` JSON, switches, WhatsApp (`waBillsEnabled`, `dueReminders` + weekday/month day/hour/min), tax bps, card fee bps, `todaysPickId` |
@@ -155,7 +156,7 @@ Enum labels for UI: `PaymentMethod` → `lib/payments.ts` (legacy `CARD` = credi
 
 ## 6. Scripts & ops
 
-`scripts/load-menu.ts` (`pnpm menu:load [--yes]`, source `prisma/seed-data.ts`) · `scripts/add-staff.ts` · `scripts/demo-data.ts` (`pnpm db:demo [--clear]`) · `scripts/setup-local-db.sh` · `scripts/backup/*` (systemd timer / macOS launchd, 03:00 IST, see PLAN.md Phase 5) · `scripts/whatsapp/*` (5-minute timer for pay-later notes + reminders, `pnpm reminders:run`; Meta setup: `doc/whatsapp-setup.md`, deploying: `doc/whatsapp-deploy.md`) · `scripts/status-board.mjs` (team board from TASKS/STATUS). Env vars: `.env.example`.
+`scripts/load-menu.ts` (`pnpm menu:load [--yes]`, source `prisma/seed-data.ts`) · `scripts/add-staff.ts` · `scripts/demo-data.ts` (`pnpm db:demo [--clear]`) · `scripts/setup-local-db.sh` · `scripts/backup/*` (systemd timer / macOS launchd, 03:00 IST, see PLAN.md Phase 5) · `scripts/whatsapp/*` (hourly timer for pay-later notes, reminders and welcomes, `pnpm reminders:run`; Meta setup: `doc/whatsapp-setup.md`, deploying: `doc/whatsapp-deploy.md`) · `scripts/status-board.mjs` (team board from TASKS/STATUS). Env vars: `.env.example`.
 
 ## 7. Topic → files (quick lookup)
 
@@ -168,10 +169,12 @@ Enum labels for UI: `PaymentMethod` → `lib/payments.ts` (legacy `CARD` = credi
 | Editing items on an order | `components/admin/item-lines-editor.tsx`, `lib/custom-lines.ts`, `updateOrderItems` |
 | Bills, pay later, void | `components/admin/billing-panel.tsx`, `lib/billing.ts`, `generateBill`/`markBill*`/`voidBill` |
 | Order history filters / owed | `(dashboard)/orders/page.tsx`, `lib/data/owed.ts`, `lib/paging.ts` |
+| WhatsApp message wording | `lib/whatsapp/templates.tsx`, `lib/whatsapp/messages.ts` (`WA_TEMPLATE_INFO`, `checkTemplateText`), `lib/whatsapp/client.ts` (`templateInfo`/`editTemplate`), `components/admin/whatsapp/template-editor.tsx`, `WhatsAppTemplate` |
+| Sort buttons above lists | `components/admin/sort-buttons.tsx` (links, `?sort=`) – Customers, Expenses, Order history, Meal passes |
 | Opening hours | `lib/cafe-hours.ts`, `hooks/use-open-now.ts`, `validators/settings.ts#hoursFromForm` |
 | Login / sessions / staff accounts | `lib/auth/*`, `admin/login/*`, `settings/actions.ts` |
 | Today's offer | `lib/offers.ts`, `lib/data/offers.ts`, `(dashboard)/offers/*`, `components/landing/todays-offers.tsx`, `components/menu/{price,offers-strip}.tsx` |
-| Customer balance | `lib/customer-balance.ts`, `lib/data/customer-balance.ts`, `(dashboard)/customers/balance-actions.ts`, `components/admin/balance-{box,entry-form}.tsx`, `markBillPaid` |
+| Customer balance | `lib/customer-balance.ts`, `lib/data/customer-balance.ts`, `(dashboard)/customers/balance-actions.ts`, `components/admin/balance-{box,entry-form}.tsx`, `components/admin/paid-difference.tsx`, `markBillPaid` |
 | Order totals after added lines | `lib/data/order-totals.ts` (`retotal`) |
 | Meal passes | `lib/meal-pass.ts`, `lib/data/meal-passes.ts`, `(dashboard)/passes/*`, `components/admin/passes/pass-forms.tsx`, `billing-panel.tsx` |
 | Photos | `lib/uploads.ts`, `media/[...path]/route.ts`, `components/menu/item-art.tsx` |

@@ -83,6 +83,7 @@ export function BillingPanel({
   payLater,
   passes,
   balances,
+  balanceBills,
   onChanged,
 }: {
   orders: LiveOrder[];
@@ -90,6 +91,7 @@ export function BillingPanel({
   payLater: LiveBill[];
   passes: Record<string, LivePass>;
   balances: Record<string, number>;
+  balanceBills: Record<string, number[]>;
   onChanged: () => void;
 }) {
   const pending = toBill(orders);
@@ -108,6 +110,7 @@ export function BillingPanel({
                 entry={b}
                 pass={b.orders[0].customerId ? passes[b.orders[0].customerId] : undefined}
                 balance={b.orders[0].customerId ? balances[b.orders[0].customerId] : undefined}
+                balanceBills={b.orders[0].customerId ? balanceBills[b.orders[0].customerId] : undefined}
                 onChanged={onChanged}
               />
             ))}
@@ -157,11 +160,13 @@ function ToBillCard({
   entry,
   pass,
   balance,
+  balanceBills,
   onChanged,
 }: {
   entry: ToBill;
   pass: LivePass | undefined;
   balance: number | undefined;
+  balanceBills: number[] | undefined;
   onChanged: () => void;
 }) {
   const [pending, start] = useTransition();
@@ -203,6 +208,7 @@ function ToBillCard({
       />
       <BalanceBox
         balance={balance}
+        bills={balanceBills ?? []}
         orderIds={entry.orders.map((o) => o.id)}
         ordersTotalPaise={total}
         used={entry.orders.some((o) => o.items.some((i) => i.balance))}

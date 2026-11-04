@@ -3,9 +3,9 @@ import Link from "next/link";
 import { z } from "zod";
 import { AddCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { Pager } from "@/components/admin/pager";
+import { SortButtons } from "@/components/admin/sort-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireUser } from "@/lib/auth/dal";
 import { allBalances } from "@/lib/data/customer-balance";
@@ -24,11 +24,15 @@ const SORTS = {
   visits: { label: "Most visits", orderBy: { orderCount: "desc" } },
   spend: { label: "Top spend", orderBy: { totalSpendPaise: "desc" } },
   new: { label: "Newest", orderBy: { firstVisitAt: "desc" } },
+  name: { label: "Name A–Z", orderBy: { name: "asc" } },
+  // worked out from unpaid orders + balance, not a column – sorted in code (only guests who owe)
+  owes: { label: "Owes most", orderBy: { name: "asc" } },
 } satisfies Record<string, { label: string; orderBy: Prisma.CustomerOrderByWithRelationInput }>;
+type Sort = keyof typeof SORTS;
 
 const Filters = z.object({
   q: z.string().trim().max(60).optional().catch(undefined),
-  sort: z.enum(["recent", "visits", "spend", "new"]).catch("recent"),
+  sort: z.enum(["recent", "visits", "spend", "new", "name", "owes"]).catch("recent"),
   offers: z.literal("1").optional().catch(undefined),
   owes: z.literal("1").optional().catch(undefined),
   page: z.coerce.number().int().min(1).max(10000).catch(1),
@@ -61,28 +65,42 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         ? { phone: { contains: digits } }
         : { name: { contains: f.q, mode: "insensitive" } })),
     ...(f.offers && { marketingConsent: true }),
-    ...(f.owes && { id: { in: [...owingIds] } }),
+    ...((f.owes || f.sort === "owes") && { id: { in: [...owingIds] } }),
   };
 
   const perPage = resolvePerPage(f.per, 25);
   const total = await db.customer.count({ where });
   const { page, pages } = clampPage(f.page, total, perPage);
+  // "Owes most": rank the matching guests by what they owe, then load just this page of them
+  const owesOf = (id: string) => (owed.get(id)?.paise ?? 0) + Math.max(0, -(balances.get(id) ?? 0));
+  const owesPage =
+    f.sort === "owes"
+      ? (await db.customer.findMany({ where, select: { id: true } }))
+          .map((c) => c.id)
+          .sort((a, b) => owesOf(b) - owesOf(a))
+          .slice((page - 1) * perPage, page * perPage)
+      : null;
   const [customers, all] = await Promise.all([
-    db.customer.findMany({
-      where,
-      orderBy: [SORTS[f.sort].orderBy, { name: "asc" }],
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
+    owesPage
+      ? db.customer
+          .findMany({ where: { id: { in: owesPage } } })
+          .then((rows) => rows.sort((a, b) => owesPage.indexOf(a.id) - owesPage.indexOf(b.id)))
+      : db.customer.findMany({
+          where,
+          orderBy: [SORTS[f.sort].orderBy, { name: "asc" }],
+          skip: (page - 1) * perPage,
+          take: perPage,
+        }),
     db.customer.aggregate({ _count: true, _sum: { totalSpendPaise: true } }),
   ]);
   const consenting = await db.customer.count({ where: { marketingConsent: true } });
   const canEdit = (await getEditSwitches()).customers;
 
-  const pageHref = (to: { page: number; perPage: number }) => {
+  const pageHref = (to: { page: number; perPage: number; sort?: Sort }) => {
     const p = new URLSearchParams();
+    const sort = to.sort ?? f.sort;
     if (f.q) p.set("q", f.q);
-    if (f.sort !== "recent") p.set("sort", f.sort);
+    if (sort !== "recent") p.set("sort", sort);
     if (f.offers) p.set("offers", "1");
     if (f.owes) p.set("owes", "1");
     if (to.perPage !== 25) p.set("per", String(to.perPage));
@@ -146,9 +164,10 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
 
       <form
         method="get"
-        className="grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-[1.6fr_1fr_auto_auto_auto] sm:items-end"
+        className="grid grid-cols-2 gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
       >
         {perPage !== 25 && <input type="hidden" name="per" value={perPage} />}
+        {f.sort !== "recent" && <input type="hidden" name="sort" value={f.sort} />}
         <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Search
           <span className="relative">
@@ -163,16 +182,6 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
               className="h-10 pl-8 text-foreground"
             />
           </span>
-        </label>
-        <label className="col-span-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
-          Sort by
-          <NativeSelect name="sort" defaultValue={f.sort} className="h-10 text-foreground">
-            {Object.entries(SORTS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v.label}
-              </option>
-            ))}
-          </NativeSelect>
         </label>
         <label className="flex h-10 items-center gap-2 text-sm">
           <input type="checkbox" name="offers" value="1" defaultChecked={!!f.offers} className="size-4" />
@@ -192,9 +201,18 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         </div>
       </form>
 
+      <SortButtons
+        current={f.sort}
+        options={(Object.keys(SORTS) as Sort[]).map((k) => ({
+          key: k,
+          label: SORTS[k].label,
+          href: pageHref({ page: 1, perPage, sort: k }),
+        }))}
+      />
+
       {total === 0 && (
         <p className="text-sm text-muted-foreground" role="status">
-          {f.owes ? "Nobody owes anything." : "No customers match."}
+          {f.owes || f.sort === "owes" ? "Nobody owes anything." : "No customers match."}
         </p>
       )}
 
@@ -255,7 +273,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
                 <dd title={`First visit ${date(c.firstVisitAt)}`}>{date(c.lastVisitAt)}</dd>
               </dl>
               <Button asChild size="sm" variant="outline" className="rounded-full">
-                <Link href={owes ? `/admin/orders?q=${c.phone}&pay=PENDING` : `/admin/orders?q=${c.phone}`}>
+                <Link href={owes ? `/admin/orders?q=${c.phone}&pay=OWED` : `/admin/orders?q=${c.phone}`}>
                   <ReceiptText data-icon="inline-start" /> {owes ? "Unpaid orders" : "Orders"}
                 </Link>
               </Button>

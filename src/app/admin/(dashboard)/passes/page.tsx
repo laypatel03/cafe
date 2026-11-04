@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SortButtons } from "@/components/admin/sort-buttons";
 import {
   EditPlanButton,
   PlanForm,
@@ -39,11 +40,23 @@ const planMeals = (parts: MealPart[]) =>
     parts.map((p) => p.meals),
   );
 
+const PASS_SORTS = { new: "Newest", ends: "Ends soonest", left: "Most meals left" };
+type PassSort = keyof typeof PASS_SORTS;
+
 /** Owner: the pass plans on sale, every pass sold, and what's still owed to guests. */
 export default async function PassesPage({ searchParams }: PageProps<"/admin/passes">) {
   await requireUser("OWNER");
-  const { show } = await searchParams;
+  const { show, sort: sortParam } = await searchParams;
   const all = show === "all";
+  const sort: PassSort = sortParam === "ends" || sortParam === "left" ? sortParam : "new";
+  const passesHref = (to: { all?: boolean; sort?: PassSort }) => {
+    const q = new URLSearchParams();
+    if (to.all ?? all) q.set("show", "all");
+    const sortTo = to.sort ?? sort;
+    if (sortTo !== "new") q.set("sort", sortTo);
+    const qs = q.toString();
+    return qs ? `/admin/passes?${qs}` : "/admin/passes";
+  };
   const today = todayKey();
   const monthStart = new Date(`${today.slice(0, 7)}-01T00:00:00`);
 
@@ -60,6 +73,9 @@ export default async function PassesPage({ searchParams }: PageProps<"/admin/pas
     _sum: { pricePaise: true },
   });
   const plans = planRows.map((p) => ({ ...p, parts: readParts(p.parts) }));
+  const mealsLeft = (p: (typeof passes)[number]) => p.left.reduce((n, l) => n + l, 0);
+  if (sort === "ends") passes.sort((a, b) => a.endsOn.localeCompare(b.endsOn) || b.number - a.number);
+  if (sort === "left") passes.sort((a, b) => mealsLeft(b) - mealsLeft(a) || b.number - a.number);
   const running = passes.filter((p) => p.status === "active" || p.status === "upcoming");
   // meals still owed, added up by meal type name across passes
   const owed = new Map<string, number>();
@@ -108,13 +124,20 @@ export default async function PassesPage({ searchParams }: PageProps<"/admin/pas
             {all ? "All passes" : "Running and coming up"}{" "}
             <span className="text-sm font-normal text-muted-foreground">{passes.length}</span>
           </h2>
-          <Link
-            href={all ? "/admin/passes" : "/admin/passes?show=all"}
-            className="text-sm font-semibold hover:underline"
-          >
+          <Link href={passesHref({ all: !all })} className="text-sm font-semibold hover:underline">
             {all ? "Show running only" : "Show all, including lapsed and refunded"}
           </Link>
         </div>
+        {passes.length > 1 && (
+          <SortButtons
+            current={sort}
+            options={(Object.keys(PASS_SORTS) as PassSort[]).map((k) => ({
+              key: k,
+              label: PASS_SORTS[k],
+              href: passesHref({ sort: k }),
+            }))}
+          />
+        )}
         {passes.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
             No passes yet.

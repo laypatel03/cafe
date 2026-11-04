@@ -80,6 +80,7 @@ enum WaKind {
   DUE_REMINDER
   PAY_LATER // short thank-you when a bill goes on pay later (no PDF – the weekly reminder carries it)
   PAYMENT_RECEIVED // pay-later bills paid off: one message for the payment, with a receipt PDF
+  WELCOME // once per guest, after their first visit: thanks + the Google review link
 }
 
 enum WaStatus {
@@ -158,6 +159,8 @@ model Customer {
   totalSpendPaise  Int                    @default(0)
   // WhatsApp: the owner paused due reminders for this guest / the guest replied STOP (no messages at all)
   remindersPaused  Boolean                @default(false)
+  // the owner switched off bills on WhatsApp for this guest (bill PDF, pay-later note, payment received)
+  waBillsPaused    Boolean                @default(false)
   whatsappOptOutAt DateTime?
   orders           Order[]
   waMessages       WhatsAppMessage[]
@@ -347,6 +350,8 @@ model CafeSettings {
   customerEditsEnabled   Boolean           @default(false)
   // WhatsApp (API keys in .env): send each bill when it's paid or put on pay later
   waBillsEnabled         Boolean           @default(true)
+  // a thank-you with the Google review link, once per guest, an hour after their first visit
+  waWelcomeEnabled       Boolean           @default(true)
   // reminders to guests who owe money, at reminderHour café time; weekday 0 = Sunday, month day 1–28
   dueReminders           ReminderFrequency @default(WEEKLY)
   reminderWeekday        Int               @default(1)
@@ -581,4 +586,16 @@ model WhatsAppMessage {
   @@unique([customerId, kind, periodKey])
   @@index([createdAt])
   @@index([billId])
+}
+
+/// What Meta has for each WhatsApp template (key = WA_TEMPLATES key): the approved wording the app writes
+/// into the message log and wa.me links, the last status seen, and when an edit was last sent for review.
+model WhatsAppTemplate {
+  key         String    @id
+  body        String
+  footer      String    @default("")
+  status      String    @default("APPROVED")
+  reason      String?
+  submittedAt DateTime?
+  updatedAt   DateTime  @updatedAt
 }

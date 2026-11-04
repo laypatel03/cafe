@@ -9,12 +9,15 @@ import {
 } from "@/components/admin/orders/order-record-dialog";
 import { ChangePaymentButton, RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
 import { Pager } from "@/components/admin/pager";
+import { PaidDifference } from "@/components/admin/paid-difference";
+import { SortButtons } from "@/components/admin/sort-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import type { Prisma } from "@/generated/prisma/client";
 import type { PaymentMethod } from "@/generated/prisma/enums";
 import { requireUser } from "@/lib/auth/dal";
+import { shortBillsDue } from "@/lib/data/customer-balance";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { getPublicMenu } from "@/lib/data/menu";
 import { db } from "@/lib/db";
@@ -29,6 +32,7 @@ import { PAYMENT_SHORT } from "@/lib/payments";
 export const metadata = { title: "Order history" };
 
 const PAY_FILTERS = [
+  "OWED",
   "PENDING",
   "PENDING_EARLIER",
   "PAY_LATER",
@@ -45,16 +49,46 @@ const paidBy = (...methods: PaymentMethod[]): Prisma.OrderWhereInput => ({
     is: { paidAt: { not: null }, voidedAt: null, ...(methods.length && { paymentMethod: { in: methods } }) },
   },
 });
-// not paid yet and still owed: no bill made, or a bill waiting for payment
-const PENDING: Prisma.OrderWhereInput = {
+// not paid yet and still owed: no bill made, a bill waiting for payment, or a bill paid short whose
+// rest is still owed (`dueBillIds`, from the guest's balance)
+const pendingWhere = (dueBillIds: string[]): Prisma.OrderWhereInput => ({
   deletedAt: null,
   status: { not: "CANCELLED" },
-  OR: [{ billId: null }, { bill: { is: { paidAt: null, voidedAt: null } } }],
+  OR: [
+    { billId: null },
+    { bill: { is: { paidAt: null, voidedAt: null } } },
+    ...(dueBillIds.length ? [{ billId: { in: dueBillIds } }] : []),
+  ],
+});
+/**
+ * Still owed, any kind: unpaid from an earlier day, on pay later, or a bill paid short whose rest is
+ * still owed. Today's orders still being served or billed don't count yet (same as the customer pages).
+ */
+const owedWhere = (dueBillIds: string[]): Prisma.OrderWhereInput => {
+  const unpaidBill = { paidAt: null, voidedAt: null };
+  return {
+    deletedAt: null,
+    status: { not: "CANCELLED" },
+    OR: [
+      { billId: null, createdAt: { lt: startOfCafeDay() } },
+      { createdAt: { lt: startOfCafeDay() }, bill: { is: unpaidBill } },
+      { bill: { is: { ...unpaidBill, payLaterAt: { not: null } } } },
+      ...(dueBillIds.length ? [{ billId: { in: dueBillIds } }] : []),
+    ],
+  };
 };
-const payWhere = (pay: PayFilter): Prisma.OrderWhereInput =>
-  pay === "PENDING_EARLIER" ? { ...PENDING, createdAt: { lt: startOfCafeDay() } } : PAY_WHERE[pay];
-const PAY_WHERE: Record<Exclude<PayFilter, "PENDING_EARLIER">, Prisma.OrderWhereInput> = {
-  PENDING,
+const payWhere = (pay: PayFilter, dueBillIds: string[]): Prisma.OrderWhereInput =>
+  pay === "OWED"
+    ? owedWhere(dueBillIds)
+    : pay === "PENDING"
+      ? pendingWhere(dueBillIds)
+      : pay === "PENDING_EARLIER"
+        ? { ...pendingWhere(dueBillIds), createdAt: { lt: startOfCafeDay() } }
+        : PAY_WHERE[pay];
+const PAY_WHERE: Record<
+  Exclude<PayFilter, "OWED" | "PENDING" | "PENDING_EARLIER">,
+  Prisma.OrderWhereInput
+> = {
   PAY_LATER: { bill: { is: { payLaterAt: { not: null }, paidAt: null, voidedAt: null } } },
   PAID: paidBy(),
   CASH: paidBy("CASH"),
@@ -64,6 +98,7 @@ const PAY_WHERE: Record<Exclude<PayFilter, "PENDING_EARLIER">, Prisma.OrderWhere
   DEBIT_CARD: paidBy("DEBIT_CARD"),
 };
 const PAY_FILTER_LABEL: Record<PayFilter, string> = {
+  OWED: "Still owed – any kind",
   PENDING: "Payment pending",
   PENDING_EARLIER: "Payment pending – earlier days",
   PAY_LATER: "Pay later",
@@ -73,6 +108,12 @@ const PAY_FILTER_LABEL: Record<PayFilter, string> = {
   CREDIT_CARD: "Paid by credit card",
   DEBIT_CARD: "Paid by debit card",
 };
+const SORTS = {
+  new: { label: "Newest", orderBy: [{ createdAt: "desc" }] },
+  old: { label: "Oldest", orderBy: [{ createdAt: "asc" }] },
+  amount: { label: "Highest amount", orderBy: [{ totalPaise: "desc" }, { createdAt: "desc" }] },
+} satisfies Record<string, { label: string; orderBy: Prisma.OrderOrderByWithRelationInput[] }>;
+type Sort = keyof typeof SORTS;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const Filters = z.object({
   from: day.optional().catch(undefined),
@@ -84,6 +125,7 @@ const Filters = z.object({
     .optional()
     .catch(undefined),
   pay: z.enum(PAY_FILTERS).optional().catch(undefined),
+  sort: z.enum(["new", "old", "amount"]).catch("new"),
   page: z.coerce.number().int().min(1).max(10000).catch(1),
   per: z.string().optional().catch(undefined),
 });
@@ -121,13 +163,16 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         ? { OR: [{ number: Number(q) }, { bill: { number: Number(q) } }] }
         : { customerName: { contains: q, mode: "insensitive" } };
 
-  const owedOnly = f.pay === "PENDING" || f.pay === "PENDING_EARLIER" || f.pay === "PAY_LATER";
+  const owedOnly =
+    f.pay === "OWED" || f.pay === "PENDING" || f.pay === "PENDING_EARLIER" || f.pay === "PAY_LATER";
+  const dueBills = await shortBillsDue();
+  const dueBillIds = [...dueBills.keys()];
   const where: Prisma.OrderWhereInput = {
     // a number or phone search, or a "still owed" filter, looks across all dates
     ...((q && /^\d+$/.test(q)) || owedOnly ? {} : { createdAt: { gte: start, lt: end } }),
     ...(f.type && { type: f.type }),
     ...(f.status && { status: f.status }),
-    AND: [search ?? {}, f.pay ? payWhere(f.pay) : {}],
+    AND: [search ?? {}, f.pay ? payWhere(f.pay, dueBillIds) : {}],
   };
 
   // owner only, while Settings → Editing → "Add and edit orders" is on
@@ -135,20 +180,33 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
   const menu = canEdit ? await getPublicMenu() : null;
 
   const perPage = resolvePerPage(f.per, 10);
-  const [total, earlierOwed] = await Promise.all([
+  const [total, owedUnpaid, owedShort] = await Promise.all([
     db.order.count({ where }),
-    // orders from before today still waiting for payment, shown as a reminder above the filters
+    // everything still owed, shown above the filters: unpaid orders count in full…
     db.order.aggregate({
-      where: payWhere("PENDING_EARLIER"),
+      where: payWhere("OWED", []),
       _count: true,
       _sum: { totalPaise: true },
     }),
+    // …bills paid short only what's left on them
+    dueBillIds.length
+      ? db.order.findMany({
+          where: { deletedAt: null, status: { not: "CANCELLED" }, billId: { in: dueBillIds } },
+          select: { billId: true },
+        })
+      : [],
   ]);
+  const owedAll = {
+    orders: owedUnpaid._count + owedShort.length,
+    paise:
+      (owedUnpaid._sum.totalPaise ?? 0) +
+      [...new Set(owedShort.map((o) => o.billId!))].reduce((n, id) => n + (dueBills.get(id) ?? 0), 0),
+  };
   const { page, pages } = clampPage(f.page, total, perPage);
   const [orders] = await Promise.all([
     db.order.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: SORTS[f.sort].orderBy,
       skip: (page - 1) * perPage,
       take: perPage,
       include: {
@@ -171,7 +229,8 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
       },
     }),
   ]);
-  const pageHref = (to: { page: number; perPage: number }) => {
+  const pageHref = (to: { page: number; perPage: number; sort?: Sort }) => {
+    const sort = to.sort ?? f.sort;
     const params = new URLSearchParams({
       ...(f.from && { from }),
       ...(f.to && { to: f.to }),
@@ -179,12 +238,21 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
       ...(f.type && { type: f.type }),
       ...(f.status && { status: f.status }),
       ...(f.pay && { pay: f.pay }),
+      ...(sort !== "new" && { sort }),
       ...(to.perPage !== 10 && { per: String(to.perPage) }),
       ...(to.page > 1 && { page: String(to.page) }),
     });
     const qs = params.toString();
     return qs ? `/admin/orders?${qs}` : "/admin/orders";
   };
+  // not paid and already owed (an earlier day, or pay later) – the same rule as "Still owed"
+  const dayStart = startOfCafeDay();
+  const owesInFull = (o: (typeof orders)[number]) =>
+    !o.deletedAt &&
+    o.status !== "CANCELLED" &&
+    o.totalPaise > 0 &&
+    (!o.bill || (!o.bill.paidAt && !o.bill.voidedAt)) &&
+    (o.createdAt < dayStart || !!o.bill?.payLaterAt);
   const showPhone = (p: string | null) => (p ? (user.role === "OWNER" ? p : maskPhone(p)) : null);
   const time = (d: Date) =>
     d.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
@@ -202,7 +270,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         {menu && <AddOrderButton menu={menu} />}
       </div>
 
-      {earlierOwed._count > 0 && (
+      {owedAll.orders > 0 && (
         <div
           role="status"
           className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-3xl border border-hh-orange/40 bg-hh-orange/10 px-4 py-3"
@@ -210,14 +278,14 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
           <CircleAlert className="size-5 shrink-0 text-brand-text" aria-hidden />
           <p className="flex-1 text-sm">
             <span className="font-semibold">
-              {earlierOwed._count} {earlierOwed._count === 1 ? "order" : "orders"} from earlier days still
-              need payment
+              Still owed: <span className="tabular">{formatINR(toRupees(owedAll.paise))}</span>
             </span>{" "}
-            · <span className="tabular">{formatINR(toRupees(earlierOwed._sum.totalPaise ?? 0))}</span>
+            · {owedAll.orders} {owedAll.orders === 1 ? "order" : "orders"} – unpaid from earlier days, pay
+            later, or paid less
           </p>
-          {f.pay !== "PENDING_EARLIER" && (
+          {f.pay !== "OWED" && (
             <Button asChild size="sm" variant="outline" className="rounded-full">
-              <Link href="/admin/orders?pay=PENDING_EARLIER">Show these orders</Link>
+              <Link href="/admin/orders?pay=OWED">Show them</Link>
             </Button>
           )}
         </div>
@@ -228,6 +296,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         className="grid grid-cols-6 gap-3 rounded-3xl border border-border bg-card p-4 sm:grid-cols-2 sm:items-end xl:grid-cols-[1.6fr_1fr_1fr_8rem_9rem_11rem_auto]"
       >
         {perPage !== 10 && <input type="hidden" name="per" value={perPage} />}
+        {f.sort !== "new" && <input type="hidden" name="sort" value={f.sort} />}
         <label className="col-span-6 flex flex-col gap-1 text-xs font-medium text-muted-foreground sm:col-span-1">
           Search
           <span className="relative">
@@ -297,6 +366,16 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
         </p>
       )}
 
+      {total > 1 && (
+        <SortButtons
+          current={f.sort}
+          options={(Object.keys(SORTS) as Sort[]).map((k) => ({
+            key: k,
+            label: SORTS[k].label,
+            href: pageHref({ page: 1, perPage, sort: k }),
+          }))}
+        />
+      )}
       <ul className="space-y-3">
         {orders.map((o) => (
           <li
@@ -318,14 +397,27 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
               ) : (
                 <OrderStatusBadge status={o.status} className="mt-1" />
               )}
-              <p
-                className={cn(
-                  "ml-auto tabular text-lg font-semibold",
-                  o.deletedAt && "text-muted-foreground line-through",
+              <div className="ml-auto text-right">
+                <p
+                  className={cn(
+                    "tabular text-lg font-semibold",
+                    o.deletedAt && "text-muted-foreground line-through",
+                  )}
+                >
+                  {formatINR(toRupees(o.totalPaise))}
+                </p>
+                {o.bill && (
+                  <PaidDifference
+                    bill={{ ...o.bill, orders: o.bill._count.orders }}
+                    duePaise={dueBills.get(o.bill.id)}
+                  />
                 )}
-              >
-                {formatINR(toRupees(o.totalPaise))}
-              </p>
+                {owesInFull(o) && (
+                  <p className="text-sm font-semibold text-brand-text">
+                    Owes <span className="tabular">{formatINR(toRupees(o.totalPaise))}</span>
+                  </p>
+                )}
+              </div>
               <p className="w-full text-xs text-muted-foreground">
                 {o.customerName}
                 {o.customerPhone && ` · ${showPhone(o.customerPhone)}`} · {time(o.createdAt)}
@@ -336,13 +428,7 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                     {o.bill.voidedAt
                       ? " · bill voided"
                       : o.bill.paidAt
-                        ? ` · paid by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}${
-                            o.bill.differencePaise < 0
-                              ? ` · paid ${formatINR(toRupees(o.bill.totalPaise + o.bill.differencePaise))}, ${formatINR(toRupees(-o.bill.differencePaise))} still to pay`
-                              : o.bill.differencePaise > 0
-                                ? ` · paid ${formatINR(toRupees(o.bill.totalPaise + o.bill.differencePaise))}, ${formatINR(toRupees(o.bill.differencePaise))} extra as credit`
-                                : ""
-                          }`
+                        ? ` · ${o.bill.differencePaise < 0 ? "paid less" : o.bill.differencePaise > 0 ? "paid extra" : "paid"} by ${o.bill.paymentMethod ? PAYMENT_SHORT[o.bill.paymentMethod] : "–"}`
                         : o.bill.payLaterAt
                           ? " · pay later – not paid yet"
                           : " · not paid yet"}

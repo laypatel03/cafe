@@ -5,7 +5,7 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { settleBalance, undoBalanceSettle } from "@/app/admin/(dashboard)/customers/balance-actions";
 import { Button } from "@/components/ui/button";
-import { settleLine } from "@/lib/customer-balance";
+import { fromBills, settleLine } from "@/lib/customer-balance";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 
@@ -14,6 +14,7 @@ const rupees = (paise: number) => formatINR(toRupees(Math.abs(paise)));
 /** On a "To bill" card: the guest's credit or what they owe from earlier, and "Use on this bill". */
 export function BalanceBox({
   balance,
+  bills,
   orderIds,
   ordersTotalPaise,
   used,
@@ -21,6 +22,8 @@ export function BalanceBox({
 }: {
   /** plus = credit, minus = owed; 0 or undefined = nothing */
   balance: number | undefined;
+  /** the bill numbers the balance comes from */
+  bills: number[];
   orderIds: string[];
   ordersTotalPaise: number;
   /** these orders already have the balance line */
@@ -41,12 +44,12 @@ export function BalanceBox({
               <span className="font-semibold text-hh-green dark:text-hh-green-light">
                 Credit {rupees(balance)}
               </span>{" "}
-              · paid extra on an earlier visit
+              · paid extra on {fromBills(bills)}
             </>
           ) : (
             <>
-              <span className="font-semibold text-brand-text">Owes {rupees(balance)}</span> · paid less on an
-              earlier visit
+              <span className="font-semibold text-brand-text">Owes {rupees(balance)}</span> · paid less on{" "}
+              {fromBills(bills)}
             </>
           )}
         </p>

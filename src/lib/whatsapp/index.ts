@@ -1,5 +1,6 @@
 import "server-only";
 import { createWhatsAppClient, type WaConfig, type WhatsAppClient } from "./client";
+import type { WaTemplateKey } from "./messages";
 
 export * from "./client";
 export * from "./messages";
@@ -20,6 +21,7 @@ export function whatsappConfig(): WaConfig | null {
       dueReminder: env("WHATSAPP_REMINDER_TEMPLATE"),
       payLater: env("WHATSAPP_PAYLATER_TEMPLATE"),
       paymentReceived: env("WHATSAPP_PAYMENT_TEMPLATE"),
+      welcome: env("WHATSAPP_WELCOME_TEMPLATE"),
     },
     language: env("WHATSAPP_TEMPLATE_LANGUAGE"),
   };
@@ -32,6 +34,21 @@ export const payLaterTemplateReady = () => !!process.env.WHATSAPP_PAYLATER_TEMPL
 
 /** Same for "payment received" when pay-later bills are paid off. */
 export const paymentTemplateReady = () => !!process.env.WHATSAPP_PAYMENT_TEMPLATE?.trim();
+
+/** Same for the first-visit welcome with the Google review link. */
+export const welcomeTemplateReady = () => !!process.env.WHATSAPP_WELCOME_TEMPLATE?.trim();
+
+/** Template IDs from WhatsApp Manager – needed to see a template's status and to edit its wording. */
+export function templateIds(): Partial<Record<WaTemplateKey, string>> {
+  const env = (k: string) => process.env[k]?.trim() || undefined;
+  return {
+    bill: env("WHATSAPP_BILL_TEMPLATE_ID"),
+    dueReminder: env("WHATSAPP_REMINDER_TEMPLATE_ID"),
+    payLater: env("WHATSAPP_PAYLATER_TEMPLATE_ID"),
+    paymentReceived: env("WHATSAPP_PAYMENT_TEMPLATE_ID"),
+    welcome: env("WHATSAPP_WELCOME_TEMPLATE_ID"),
+  };
+}
 
 /** WhatsApp Manager → Account tools → WhatsApp account ID; only needed to show what Meta charged. */
 export const whatsappBusinessAccountId = () => process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim() || null;
