@@ -3,8 +3,9 @@ import type { Prisma } from "@/generated/prisma/client";
 import { shortBillPayoffs, shortfallsLeft } from "@/lib/customer-balance";
 import { db } from "@/lib/db";
 
-/** Entries that count: a settlement on a cancelled or deleted order gives the balance back. */
+/** Entries that count: not deleted, and a settlement on a cancelled or deleted order gives the balance back. */
 export const COUNTED_BALANCE = {
+  deletedAt: null,
   OR: [{ orderId: null }, { order: { deletedAt: null, status: { not: "CANCELLED" } } }],
 } satisfies Prisma.CustomerBalanceEntryWhereInput;
 
@@ -51,6 +52,7 @@ export async function shortBillsDue(customerIds?: string[]): Promise<Map<string,
   const shorts = await db.customerBalanceEntry.findMany({
     where: {
       kind: "PAID_LESS",
+      deletedAt: null,
       customerId: { in: [...left.keys()] },
       bill: { is: { voidedAt: null } },
     },
@@ -74,6 +76,7 @@ export async function balanceBills(
     where: {
       customerId: { in: ids },
       kind: { in: ["PAID_LESS", "PAID_EXTRA"] },
+      deletedAt: null,
       bill: { is: { voidedAt: null } },
     },
     orderBy: { createdAt: "desc" },

@@ -19,3 +19,5 @@ export const BalanceEntrySchema = z
   });
 
 export const BalanceOrderIds = z.array(z.string().min(1).max(40)).min(1).max(20);
+
+export const BalanceEntryId = z.string().min(1).max(40);

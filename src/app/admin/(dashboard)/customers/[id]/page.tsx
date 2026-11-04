@@ -8,11 +8,16 @@ import {
 } from "@/components/admin/customer-profile-actions";
 import { EditCustomerButton } from "@/components/admin/customer-edit-dialog";
 import { OrderStatusBadge } from "@/components/admin/order-status-badge";
+import { RecordPaymentButton } from "@/components/admin/orders/record-payment-button";
 import { PaidDifference } from "@/components/admin/paid-difference";
 import { BillsSwitch, RemindersSwitch, SendReminderButton } from "@/components/admin/whatsapp/wa-buttons";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth/dal";
-import { BalanceEntryForm, ClearBalanceButton } from "@/components/admin/balance-entry-form";
+import {
+  BalanceEntryForm,
+  ClearBalanceButton,
+  DeleteBalanceButton,
+} from "@/components/admin/balance-entry-form";
 import { SellPassForm } from "@/components/admin/passes/pass-forms";
 import { BALANCE_KIND_LABEL, balanceState } from "@/lib/customer-balance";
 import { favouriteItems } from "@/lib/customer-stats";
@@ -20,7 +25,7 @@ import { COUNTED_BALANCE, shortBillsDue } from "@/lib/data/customer-balance";
 import { today as todayKey } from "@/lib/data/cash";
 import { getPasses } from "@/lib/data/meal-passes";
 import { getEditSwitches } from "@/lib/data/edit-switches";
-import { owedByCustomer } from "@/lib/data/owed";
+import { owedByCustomer, owedOrdersWhere } from "@/lib/data/owed";
 import type { BalanceKind, PaymentMethod } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { CAFE_TZ, formatINR } from "@/lib/format";
@@ -120,6 +125,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
       include: {
         bill: { select: { number: true } },
         order: { select: { number: true, status: true, deletedAt: true } },
+        deletedBy: { select: { name: true } },
       },
     }),
     db.customerBalanceEntry.aggregate({
@@ -135,7 +141,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const balance = balanceSum._sum.amountPaise ?? 0;
   // the balance after each entry, worked back from today's (newest first); uncounted ones change nothing
   const counted = (e: (typeof balanceEntries)[number]) =>
-    !(e.order && (e.order.deletedAt || e.order.status === "CANCELLED"));
+    !e.deletedAt && !(e.order && (e.order.deletedAt || e.order.status === "CANCELLED"));
   const balanceRows: ((typeof balanceEntries)[number] & { after: number; counted: boolean })[] = [];
   for (let i = 0, after = balance; i < balanceEntries.length; i++) {
     const e = balanceEntries[i];
@@ -143,6 +149,22 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
     if (counted(e)) after -= e.amountPaise;
   }
   const dueBills = balance < 0 ? await shortBillsDue([id]) : new Map<string, number>();
+  // what makes up "Still to pay": unpaid bills (paid with Record payment) and orders not billed yet
+  const unpaidOrders = owedMap.get(id)
+    ? await db.order.findMany({
+        where: { ...owedOrdersWhere(), customerId: id },
+        orderBy: { number: "asc" },
+        select: {
+          number: true,
+          totalPaise: true,
+          bill: { select: { id: true, number: true, totalPaise: true, payLaterAt: true } },
+        },
+      })
+    : [];
+  const unpaidBills = [
+    ...new Map(unpaidOrders.filter((o) => o.bill).map((o) => [o.bill!.id, o.bill!])).values(),
+  ];
+  const unbilled = unpaidOrders.filter((o) => !o.bill);
   const today = todayKey();
   const shortDay = (d: string) =>
     new Date(`${d}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
@@ -225,6 +247,26 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           <Button asChild size="sm" variant="outline" className="rounded-full">
             <Link href={`/admin/orders?q=${customer.phone}&pay=OWED`}>Show what they owe</Link>
           </Button>
+          {/* paying these clears "Still to pay" – the balance below is only money paid more or less */}
+          {(unpaidBills.length > 0 || unbilled.length > 0) && (
+            <ul className="w-full divide-y divide-hh-orange/20 rounded-2xl bg-background/60 text-sm">
+              {unpaidBills.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                  <span className="font-semibold">Bill #{b.number}</span>
+                  <span className="text-muted-foreground">{b.payLaterAt ? "pay later" : "not paid"}</span>
+                  <span className="ml-auto tabular font-semibold">{formatINR(toRupees(b.totalPaise))}</span>
+                  <RecordPaymentButton bill={{ id: b.id, number: b.number, totalPaise: b.totalPaise }} />
+                </li>
+              ))}
+              {unbilled.map((o) => (
+                <li key={o.number} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                  <span className="font-semibold">Order #{o.number}</span>
+                  <span className="text-muted-foreground">not billed yet – bill it in Order history</span>
+                  <span className="ml-auto tabular font-semibold">{formatINR(toRupees(o.totalPaise))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -552,6 +594,8 @@ function BalanceRows({
     note: string | null;
     bill: { number: number } | null;
     order: { number: number } | null;
+    deletedAt: Date | null;
+    deletedBy: { name: string } | null;
     after: number;
     counted: boolean;
   }[];
@@ -561,18 +605,23 @@ function BalanceRows({
       {rows.map((e) => (
         <li
           key={e.id}
-          className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 px-3 py-2 text-sm sm:grid-cols-[8.5rem_1fr_6rem_7.5rem] sm:items-center"
+          className={cn(
+            "grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 px-3 py-2 text-sm sm:grid-cols-[8.5rem_1fr_6rem_7.5rem] sm:items-center",
+            e.deletedAt && "bg-destructive/10",
+          )}
         >
           <span className="text-xs text-muted-foreground sm:order-none">{dateTime(e.createdAt)}</span>
           <span className="row-span-2 self-center text-right sm:order-3 sm:row-span-1">
             <span
               className={cn(
                 "tabular font-semibold",
-                !e.counted
-                  ? "text-muted-foreground line-through"
-                  : e.amountPaise > 0
-                    ? "text-hh-green dark:text-hh-green-light"
-                    : "text-brand-text",
+                e.deletedAt
+                  ? "text-destructive line-through"
+                  : !e.counted
+                    ? "text-muted-foreground line-through"
+                    : e.amountPaise > 0
+                      ? "text-hh-green dark:text-hh-green-light"
+                      : "text-brand-text",
               )}
             >
               {signed(e.amountPaise)}
@@ -580,18 +629,34 @@ function BalanceRows({
             <span className="block text-xs text-muted-foreground sm:hidden">→ {afterWords(e.after)}</span>
           </span>
           <span className="min-w-0 sm:order-2">
-            <span className="font-semibold">{BALANCE_KIND_LABEL[e.kind]}</span>
-            <span className="text-muted-foreground">
+            {e.deletedAt && (
+              <span className="mr-1.5 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-white">
+                Deleted
+              </span>
+            )}
+            <span className={cn("font-semibold", e.deletedAt && "text-destructive line-through")}>
+              {BALANCE_KIND_LABEL[e.kind]}
+            </span>
+            <span className={e.deletedAt ? "text-destructive" : "text-muted-foreground"}>
               {[
                 e.bill && ` · bill #${e.bill.number}`,
                 e.order && ` · order #${e.order.number}`,
                 e.method && ` · ${PAYMENT_LABEL[e.method]}`,
                 e.note && ` · ${e.note}`,
-                !e.counted && " · order cancelled – not counted",
+                e.deletedAt
+                  ? ` · deleted ${dateTime(e.deletedAt)}${e.deletedBy ? ` by ${e.deletedBy.name}` : ""} – not counted`
+                  : !e.counted && " · order cancelled – not counted",
               ]
                 .filter(Boolean)
                 .join("")}
             </span>
+            {/* hand entries only – ones from a bill are changed through the bill */}
+            {!e.deletedAt && !e.bill && !e.order && e.kind !== "SETTLED" && (
+              <DeleteBalanceButton
+                id={e.id}
+                label={`${BALANCE_KIND_LABEL[e.kind]} ${signed(e.amountPaise)}`}
+              />
+            )}
           </span>
           <span className="hidden text-right tabular text-xs text-muted-foreground sm:order-4 sm:block">
             {afterWords(e.after)}
