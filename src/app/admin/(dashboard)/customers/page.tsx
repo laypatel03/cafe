@@ -220,13 +220,14 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
         {customers.map((c) => {
           const owes = owed.get(c.id);
           const balance = balances.get(c.id) ?? 0;
+          const owing = (owes?.paise ?? 0) + Math.max(0, -balance);
           return (
             <li
               key={c.id}
               className={cn(
                 "flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3",
                 // highlighted, always with the amount in words beside it
-                (owes || balance < 0) &&
+                owing > 0 &&
                   "border-l-4 border-l-hh-orange bg-hh-orange/10 first:rounded-t-3xl last:rounded-b-3xl",
               )}
             >
@@ -264,17 +265,35 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
                   </p>
                 )}
               </div>
-              <dl className="grid grid-cols-[repeat(3,minmax(5.5rem,auto))] gap-x-6 text-sm">
+              <dl className="grid grid-cols-[repeat(4,minmax(4.5rem,auto))] gap-x-4 text-sm sm:gap-x-6">
                 <dt className="text-xs text-muted-foreground">Visits</dt>
                 <dt className="text-xs text-muted-foreground">Spend</dt>
                 <dt className="text-xs text-muted-foreground">Last visit</dt>
+                <dt className="text-xs text-muted-foreground">Balance</dt>
                 <dd className="tabular font-semibold">{c.orderCount}</dd>
                 <dd className="tabular font-semibold">{formatINR(toRupees(c.totalSpendPaise))}</dd>
                 <dd title={`First visit ${date(c.firstVisitAt)}`}>{date(c.lastVisitAt)}</dd>
+                {/* everything they owe – unpaid bills and paying less – or their credit */}
+                <dd
+                  className={cn(
+                    "tabular font-semibold",
+                    owing > 0
+                      ? "text-brand-text"
+                      : balance > 0
+                        ? "text-hh-green dark:text-hh-green-light"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {owing > 0
+                    ? `Owes ${formatINR(toRupees(owing))}`
+                    : balance > 0
+                      ? `Credit ${formatINR(toRupees(balance))}`
+                      : "₹0"}
+                </dd>
               </dl>
               <Button asChild size="sm" variant="outline" className="rounded-full">
-                <Link href={owes ? `/admin/orders?q=${c.phone}&pay=OWED` : `/admin/orders?q=${c.phone}`}>
-                  <ReceiptText data-icon="inline-start" /> {owes ? "Unpaid orders" : "Orders"}
+                <Link href={owing > 0 ? `/admin/orders?q=${c.phone}&pay=OWED` : `/admin/orders?q=${c.phone}`}>
+                  <ReceiptText data-icon="inline-start" /> {owing > 0 ? "What they owe" : "Orders"}
                 </Link>
               </Button>
             </li>
