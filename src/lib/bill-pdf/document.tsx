@@ -263,12 +263,16 @@ export function DuesStatementPdf({ doc }: { doc: StatementDoc }) {
           <View key={g.label} style={s.group}>
             <View style={s.groupHead} wrap={false}>
               <Text>
-                {g.label} · {dateOnly(g.date)}
-                {g.label.startsWith("Bill") && ` · orders ${g.orderNumbers.map((n) => `#${n}`).join(", ")}`}
+                {g.label}
+                {g.date.getTime() > 0 && ` · ${dateOnly(g.date)}`}
+                {g.label.startsWith("Bill") &&
+                  g.orderNumbers.length > 0 &&
+                  ` · orders ${g.orderNumbers.map((n) => `#${n}`).join(", ")}`}
               </Text>
               <Text>{rupees(g.amountPaise)}</Text>
             </View>
-            <Lines lines={g.lines} />
+            {g.note && <Text style={{ fontSize: 8, color: C.orange, marginBottom: 2 }}>{g.note}</Text>}
+            {g.lines.length > 0 && <Lines lines={g.lines} />}
           </View>
         ))}
         <View style={s.rule} />

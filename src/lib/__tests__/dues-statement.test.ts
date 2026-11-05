@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { statementGroups } from "@/lib/dues-statement";
+import { statementGroups, withShortBills } from "@/lib/dues-statement";
 
 const item = (itemName: string, unitPricePaise: number, quantity = 1) => ({
   itemName,
@@ -46,5 +46,48 @@ describe("dues statement", () => {
 
   it("is empty when nothing is owed", () => {
     expect(statementGroups([])).toEqual({ groups: [], totalPaise: 0 });
+  });
+});
+
+describe("withShortBills", () => {
+  const r = (p: number) => `₹${p / 100}`;
+  const item = (name: string, paise: number) => ({
+    itemName: name,
+    unitPricePaise: paise,
+    quantity: 1,
+    addOns: [],
+  });
+  it("adds what's left of short bills by date, plus a hand-entered balance", () => {
+    const base = statementGroups([
+      {
+        number: 7,
+        createdAt: new Date(2026, 10, 3),
+        totalPaise: 26900,
+        items: [item("Bowl", 26900)],
+        bill: { number: 5, createdAt: new Date(2026, 10, 3) },
+      },
+    ]);
+    const out = withShortBills(
+      base,
+      [
+        {
+          number: 4,
+          createdAt: new Date(2026, 10, 2),
+          totalPaise: 14900,
+          paidPaise: 900,
+          leftPaise: 14000,
+          orderNumbers: [6],
+          items: [item("Soy", 14900)],
+        },
+      ],
+      5000,
+      r,
+    );
+    expect(out.groups.map((g) => [g.label, g.amountPaise, g.note ?? ""])).toEqual([
+      ["Earlier balance", 5000, ""],
+      ["Bill #4", 14000, "Paid ₹9 of ₹149 – rest still to pay"],
+      ["Bill #5", 26900, ""],
+    ]);
+    expect(out.totalPaise).toBe(5000 + 14000 + 26900);
   });
 });

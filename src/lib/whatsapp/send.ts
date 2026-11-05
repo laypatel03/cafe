@@ -15,8 +15,10 @@ import { getCafeDetails } from "@/lib/data/menu";
 import { owedOrdersWhere } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 import { publish } from "@/lib/realtime";
-import { statementGroups } from "@/lib/dues-statement";
-import { CAFE_TZ, startOfCafeDay } from "@/lib/format";
+import { statementGroups, withShortBills } from "@/lib/dues-statement";
+import { balanceOf, shortBillsDue } from "@/lib/data/customer-balance";
+import { toRupees } from "@/lib/money";
+import { CAFE_TZ, formatINR, startOfCafeDay } from "@/lib/format";
 import { payLaterSendAt } from "@/lib/pay-later-notes";
 import {
   billMessage,
@@ -96,7 +98,7 @@ export async function getStatementDoc(customerId: string) {
     where: { ...owedOrdersWhere(), customerId },
     include: { items: true, bill: { select: { number: true, createdAt: true } } },
   });
-  const { groups, totalPaise } = statementGroups(
+  const unpaid = statementGroups(
     orders.map((o) => ({
       number: o.number,
       createdAt: o.createdAt,
@@ -105,6 +107,30 @@ export async function getStatementDoc(customerId: string) {
       bill: o.bill,
     })),
   );
+  // plus what they owe from paying less: what's left of each short bill, and any hand-entered amount
+  const [balance, due] = await Promise.all([balanceOf(customerId), shortBillsDue([customerId])]);
+  const shortBills = due.size
+    ? await db.bill.findMany({
+        where: { id: { in: [...due.keys()] } },
+        include: { orders: { where: { deletedAt: null }, select: { number: true, items: true } } },
+      })
+    : [];
+  const shorts = shortBills.map((b) => ({
+    number: b.number,
+    createdAt: b.createdAt,
+    totalPaise: b.totalPaise,
+    paidPaise: b.totalPaise - (due.get(b.id) ?? 0),
+    leftPaise: due.get(b.id) ?? 0,
+    orderNumbers: b.orders.map((o) => o.number),
+    items: items(b.orders.flatMap((o) => o.items)),
+  }));
+  const owedOnBalance = Math.max(0, -balance);
+  const { groups, totalPaise } = withShortBills(
+    unpaid,
+    shorts,
+    owedOnBalance - shorts.reduce((n, b) => n + b.leftPaise, 0),
+    (paise) => formatINR(toRupees(paise)),
+  );
   const doc: StatementDoc = {
     cafe: await pdfCafe(),
     guestName: customer.name,
@@ -112,7 +138,7 @@ export async function getStatementDoc(customerId: string) {
     groups,
     totalPaise,
   };
-  return { doc, customer, orders: orders.length };
+  return { doc, customer, orders: orders.length + shorts.length };
 }
 
 /** Sends one message with its PDF and records how it went on the log row. */

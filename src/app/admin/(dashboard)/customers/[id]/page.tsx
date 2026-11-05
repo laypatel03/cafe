@@ -162,6 +162,8 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const shortDay = (d: string) =>
     new Date(`${d}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   const owes = owedMap.get(id);
+  // what a reminder asks for: unpaid orders plus paying less
+  const remindTotal = (owes?.paise ?? 0) + Math.max(0, -balance);
   const reminderSettings = await getReminderSettings();
   const waState = customer.whatsappOptOutAt ? "stopped" : customer.remindersPaused ? "paused" : "on";
   const nextReminder = nextScheduled(reminderSettings, new Date());
@@ -300,19 +302,12 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
               ? `Replied STOP on ${date(customer.whatsappOptOutAt!)} – no bills or reminders on WhatsApp until they send START.`
               : waState === "paused"
                 ? `Due reminders are paused for this guest.${customer.waBillsPaused ? "" : " Bills are still sent."}`
-                : owes
+                : remindTotal > 0
                   ? nextReminder
-                    ? `${formatINR(toRupees(owes.paise))} still to pay goes in the next reminder: ${dateTime(nextReminder)}.`
-                    : `${formatINR(toRupees(owes.paise))} still to pay. Scheduled reminders are off in Settings – send one now.`
-                  : balance < 0
-                    ? `Owes ${formatINR(toRupees(-balance))} from paying less (see Balance below) – reminders only cover unpaid bills.`
-                    : "All paid up – nothing to remind them about."}
+                    ? `${formatINR(toRupees(remindTotal))} still to pay${balance < 0 ? " (with paying less)" : ""} goes in the next reminder: ${dateTime(nextReminder)}.`
+                    : `${formatINR(toRupees(remindTotal))} still to pay. Scheduled reminders are off in Settings – send one now.`
+                  : "All paid up – nothing to remind them about."}
           </p>
-          {owes && balance < 0 && waState !== "stopped" && (
-            <p className="font-semibold">
-              Also owes {formatINR(toRupees(-balance))} from paying less (see Balance) – not in reminders.
-            </p>
-          )}
           {waState !== "stopped" && customer.waBillsPaused && (
             <p className="font-semibold">Bills aren&apos;t sent on WhatsApp to this guest.</p>
           )}
@@ -333,7 +328,9 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
               <RemindersSwitch customer={{ id: customer.id, on: !customer.remindersPaused }} />
               Reminders
             </label>
-            {owes && <SendReminderButton customer={{ id: customer.id, name: customer.name }} prominent />}
+            {remindTotal > 0 && (
+              <SendReminderButton customer={{ id: customer.id, name: customer.name }} prominent />
+            )}
           </div>
         )}
       </section>
