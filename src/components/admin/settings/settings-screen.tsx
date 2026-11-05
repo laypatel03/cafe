@@ -402,8 +402,9 @@ function WhatsAppPanel({ wa }: { wa: WaSettings }) {
             Due reminders
           </h2>
           <p className="text-sm text-muted-foreground">
-            Guests who still owe money get the amount and a PDF of their unpaid bills. Each guest gets one per
-            week or month; you can pause anyone on their customer page.
+            Guests who still owe money – unpaid bills and paying less – get the amount and a PDF of
+            what&apos;s unpaid. Each guest gets one per week or month; you can pause anyone on their customer
+            page.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">

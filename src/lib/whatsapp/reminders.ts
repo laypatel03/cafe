@@ -1,4 +1,5 @@
 import "server-only";
+import { allBalances } from "@/lib/data/customer-balance";
 import { owedByCustomer } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 import { type ReminderSettings, reminderDue } from "@/lib/reminder-schedule";
@@ -31,7 +32,7 @@ export type ReminderRun =
 
 /**
  * The scheduled run (called every hour): when the set day and hour have come, every guest who owes
- * at least the minimum – not paused, not opted out – gets one reminder for this week or month.
+ * (unpaid orders and paying less together) at least the minimum – not paused, not opted out – gets one reminder for this week or month.
  */
 export async function runDueReminders(now = new Date()): Promise<ReminderRun> {
   const set = await getReminderSettings();
@@ -40,8 +41,11 @@ export async function runDueReminders(now = new Date()): Promise<ReminderRun> {
   if (!due) return { ran: false, reason: "Not time for reminders yet." };
   if (!whatsappReady()) return { ran: false, reason: "WhatsApp isn't connected (WHATSAPP_TOKEN)." };
 
-  const owed = await owedByCustomer();
-  const ids = [...owed].filter(([, o]) => o.paise >= Math.max(set.minPaise, 1)).map(([id]) => id);
+  // what each guest owes: unpaid orders plus paying less (a minus balance)
+  const [owed, balances] = await Promise.all([owedByCustomer(), allBalances()]);
+  const total = new Map([...owed].map(([id, o]) => [id, o.paise]));
+  for (const [id, b] of balances) if (b < 0) total.set(id, (total.get(id) ?? 0) - b);
+  const ids = [...total].filter(([, paise]) => paise >= Math.max(set.minPaise, 1)).map(([id]) => id);
   const guests = await db.customer.findMany({
     where: { id: { in: ids }, remindersPaused: false, whatsappOptOutAt: null },
     select: { id: true, name: true },
