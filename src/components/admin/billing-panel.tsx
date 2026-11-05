@@ -22,6 +22,7 @@ import {
   voidBill,
 } from "@/app/admin/(dashboard)/actions";
 import { BalanceBox } from "@/components/admin/balance-box";
+import { WaStatusLine } from "@/components/admin/whatsapp/wa-status-line";
 import { MealPassBox } from "@/components/admin/passes/pass-forms";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -140,9 +141,9 @@ export function BillingPanel({
               </span>
             </summary>
             <p className="mt-1 text-sm text-muted-foreground">
-              Orders completed without payment today, one card per guest (with their earlier unpaid ones).
-              Tick the bills they&apos;re paying now and tap how they paid – it counts as a sale today. Other
-              earlier days are in Order history.
+              Orders completed without payment today, one card per guest. Tick the bills they&apos;re paying
+              now and tap how they paid – it counts as a sale today. When the day ends they move to Order
+              history and Bills (and the customer&apos;s page, to take payment).
             </p>
             <ul className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {groupByGuest(payLater).map((g) => (
@@ -470,6 +471,7 @@ function PayLaterGuestCard({ bills, onChanged }: { bills: LiveBill[]; onChanged:
                 <span className="text-muted-foreground">
                   · {b.type === "PARCEL" ? "Takeaway" : "Dine-in"} · {shortWhen(b.payLaterAt ?? b.createdAt)}
                 </span>
+                <WaStatusLine wa={b.wa} className="mt-0.5" />
               </label>
               <span className="tabular text-sm font-semibold">{formatINR(toRupees(b.totalPaise))}</span>
               <Button asChild size="icon-sm" variant="ghost" aria-label={`Print bill #${b.number}`}>

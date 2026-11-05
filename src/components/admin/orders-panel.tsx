@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import type { LivePass } from "@/lib/data/meal-passes";
 import { BillingPanel } from "./billing-panel";
 import { type EditableLine, ItemLinesEditor, otherItems, toEditableLines } from "./item-lines-editor";
+import { WaStatusLine } from "@/components/admin/whatsapp/wa-status-line";
 import { OrderStatusBadge } from "./order-status-badge";
 import { undoStep } from "./undo-step";
 
@@ -224,6 +225,8 @@ function OrderCard({
       <p className="mt-3 border-t border-border pt-2 text-right tabular font-semibold">
         {formatINR(toRupees(o.totalPaise))}
       </p>
+      {/* the bill is done – show whether it reached the guest on WhatsApp */}
+      {done && o.status !== "CANCELLED" && <WaStatusLine wa={o.wa} className="mt-2" />}
 
       {!done && (
         <div className="mt-3 flex flex-wrap items-center gap-2">

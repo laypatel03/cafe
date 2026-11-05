@@ -6,6 +6,8 @@ import { balanceBills, balancesFor } from "@/lib/data/customer-balance";
 import { type LivePass, livePasses } from "@/lib/data/meal-passes";
 import { type StatusLogEntry, stepToUndo } from "@/lib/order-flow";
 import { maskPhone } from "@/lib/phone-mask";
+import { payLaterTemplateReady, whatsappReady } from "@/lib/whatsapp";
+import { type WaLine, waLine } from "@/lib/whatsapp/live-status";
 import type { SelectionLine } from "@/lib/validators/selection";
 
 export type LiveSelection = {
@@ -56,6 +58,8 @@ export type LiveOrder = {
   /** the last step staff can take back ("Send to kitchen"), or null */
   undo: string | null;
   items: LiveOrderItem[];
+  /** what went to the guest on WhatsApp for its bill, or why nothing did */
+  wa: WaLine | null;
 };
 
 export type LiveBill = {
@@ -72,16 +76,15 @@ export type LiveBill = {
   payLaterAt: string | null;
   /** same value for every bill of one guest (their number, else the bill) – pay-later bills group by it */
   guestKey: string;
+  /** what went to the guest on WhatsApp for this bill, or why nothing did */
+  wa: WaLine | null;
 };
 
 export type LiveBoard = {
   selections: LiveSelection[];
   orders: LiveOrder[];
   bills: LiveBill[];
-  /**
-   * Bills completed with "pay later" today and still not paid, plus earlier unpaid pay-later bills of
-   * the same guests (so one guest's bills can be collected together). Others are in Order history.
-   */
+  /** Bills completed with "pay later" today and still not paid; earlier days' are in Order history. */
   payLater: LiveBill[];
   /** guests' meal passes usable today, by customer id (only for orders waiting to be billed) */
   passes: Record<string, LivePass>;
@@ -123,7 +126,8 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       orderBy: { createdAt: "desc" },
       include: {
         items: true,
-        bill: { select: { paidAt: true } },
+        bill: { select: { paidAt: true, payLaterAt: true } },
+        customer: { select: { whatsappOptOutAt: true, waBillsPaused: true } },
         statusLogs: {
           orderBy: { createdAt: "asc" },
           select: { fromStatus: true, toStatus: true, note: true },
@@ -135,7 +139,12 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       orderBy: { createdAt: "asc" },
       include: {
         orders: {
-          select: { number: true, customerId: true, customerPhone: true },
+          select: {
+            number: true,
+            customerId: true,
+            customerPhone: true,
+            customer: { select: { whatsappOptOutAt: true, waBillsPaused: true } },
+          },
           orderBy: { number: "asc" },
         },
       },
@@ -145,31 +154,18 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       orderBy: { payLaterAt: "asc" },
       include: {
         orders: {
-          select: { number: true, customerId: true, customerPhone: true },
+          select: {
+            number: true,
+            customerId: true,
+            customerPhone: true,
+            customer: { select: { whatsappOptOutAt: true, waBillsPaused: true } },
+          },
           orderBy: { number: "asc" },
         },
       },
     }),
   ]);
-  // the same guests' pay-later bills from earlier days, collected together with today's
-  const phones = [...new Set(payLater.map((b) => b.customerPhone).filter((p): p is string => !!p))];
-  const earlierPayLater = phones.length
-    ? await db.bill.findMany({
-        where: {
-          paidAt: null,
-          voidedAt: null,
-          payLaterAt: { lt: startOfDay },
-          customerPhone: { in: phones },
-        },
-        orderBy: { payLaterAt: "asc" },
-        include: {
-          orders: {
-            select: { number: true, customerId: true, customerPhone: true },
-            orderBy: { number: "asc" },
-          },
-        },
-      })
-    : [];
+  // pay-later bills leave Live orders when the day ends – after that they're in Order history and Bills
   const toLiveBill = (b: (typeof bills)[number]): LiveBill => {
     const guests = [...new Set(b.orders.map((o) => o.customerId).filter(Boolean))];
     return {
@@ -185,12 +181,62 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
       createdAt: b.createdAt.toISOString(),
       payLaterAt: b.payLaterAt?.toISOString() ?? null,
       guestKey: b.customerPhone ?? `bill:${b.id}`,
+      // called once waFor below is ready (in the return)
+      wa: waFor(b.id, b, {
+        phone: !!b.customerPhone,
+        customer: b.orders.find((o) => o.customer)?.customer ?? null,
+      }),
     };
   };
   const toBillGuests = orders
     .filter((o) => !o.billId && o.customerId && o.status !== "CANCELLED")
     .map((o) => o.customerId!);
   const balances = await balancesFor(toBillGuests);
+
+  // WhatsApp for today's bills: the newest message for each, and what decides whether one goes
+  const billIds = [
+    ...new Set([
+      ...orders.map((o) => o.billId).filter((id): id is string => !!id),
+      ...payLater.map((b) => b.id),
+    ]),
+  ];
+  const [messages, settings] = await Promise.all([
+    billIds.length
+      ? db.whatsAppMessage.findMany({
+          where: {
+            kind: { in: ["BILL", "PAYMENT_RECEIVED", "PAY_LATER"] },
+            OR: [{ billId: { in: billIds } }, { billIds: { hasSome: billIds } }],
+          },
+          orderBy: { createdAt: "desc" },
+          select: { kind: true, status: true, error: true, billId: true, billIds: true },
+        })
+      : [],
+    db.cafeSettings.findUnique({ where: { id: 1 }, select: { waBillsEnabled: true } }),
+  ]);
+  const sending = whatsappReady() && !!settings?.waBillsEnabled;
+  const now = new Date();
+  const waFor = (
+    billId: string,
+    bill: { paidAt: Date | null; payLaterAt: Date | null },
+    guest: { phone: boolean; customer: { whatsappOptOutAt: Date | null; waBillsPaused: boolean } | null },
+  ) =>
+    waLine({
+      msg:
+        messages.find(
+          (m) =>
+            (m.billId === billId || m.billIds.includes(billId)) &&
+            (bill.paidAt ? m.kind !== "PAY_LATER" : m.kind === "PAY_LATER"),
+        ) ?? null,
+      paid: !!bill.paidAt,
+      payLater: !!bill.payLaterAt,
+      paidAt: bill.paidAt,
+      now,
+      phone: guest.phone,
+      optedOut: !!guest.customer?.whatsappOptOutAt,
+      billsPaused: !!guest.customer?.waBillsPaused,
+      sending,
+      payLaterReady: payLaterTemplateReady(),
+    });
   return {
     selections: selections.map((s) => ({
       id: s.id,
@@ -228,9 +274,13 @@ export async function getLiveBoard(role: Role): Promise<LiveBoard> {
         pass: !!i.mealPassUseId,
         balance: !!i.balanceEntryId,
       })),
+      wa:
+        o.billId && o.bill
+          ? waFor(o.billId, o.bill, { phone: !!o.customerPhone, customer: o.customer })
+          : null,
     })),
     bills: bills.map(toLiveBill),
-    payLater: [...earlierPayLater, ...payLater].map(toLiveBill),
+    payLater: payLater.map(toLiveBill),
     passes: await livePasses(toBillGuests),
     balances,
     balanceBills: await balanceBills(balances),
