@@ -14,6 +14,7 @@ import { mergeBillLines } from "@/lib/billing";
 import { getCafeDetails } from "@/lib/data/menu";
 import { owedOrdersWhere } from "@/lib/data/owed";
 import { db } from "@/lib/db";
+import { publish } from "@/lib/realtime";
 import { statementGroups } from "@/lib/dues-statement";
 import { CAFE_TZ, startOfCafeDay } from "@/lib/format";
 import { payLaterSendAt } from "@/lib/pay-later-notes";
@@ -372,6 +373,7 @@ export async function runPayLaterNotes(now = new Date()): Promise<PayLaterRun> {
       }
     }
   }
+  if (run.sent || run.failed) await publish({ type: "resync" });
   return run;
 }
 
@@ -479,6 +481,8 @@ export async function autoSendPayment(billIds: string[], byId: string) {
   ]);
   for (const res of results)
     if (res && !res.ok && !res.skipped) console.warn(`WhatsApp after payment not sent: ${res.error}`);
+  // Live orders shows how it went
+  await publish({ type: "resync" });
 }
 
 /** The welcome goes once per guest – one key for all time. */

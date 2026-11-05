@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { type Access, AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
 import { db } from "@/lib/db";
+import { publish } from "@/lib/realtime";
 import { fieldErrors, type FormState } from "@/lib/validators/menu";
 import { ReminderSettingsSchema, TemplateTextSchema } from "@/lib/validators/whatsapp";
 import { paymentTemplateReady } from "@/lib/whatsapp";
@@ -66,6 +67,7 @@ export async function sendBillNow(billId: string): Promise<SendResult> {
       ? await sendPaymentReceived([id.data], { auto: false, byId: me.id })
       : await sendBill(id.data, { auto: false, byId: me.id });
   refresh();
+  await publish({ type: "resync" });
   return res;
 }
 

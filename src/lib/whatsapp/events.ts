@@ -1,9 +1,11 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { publish } from "@/lib/realtime";
 import { DELIVERY_RANK, type WebhookEvents } from "./webhook";
 
 /** Applies what WhatsApp reported: status moves forward only; STOP / START set the guest's opt-out. */
 export async function applyWebhook(events: WebhookEvents) {
+  let changed = false;
   for (const st of events.statuses) {
     const row = await db.whatsAppMessage.findUnique({
       where: { waId: st.waId },
@@ -14,7 +16,10 @@ export async function applyWebhook(events: WebhookEvents) {
       where: { id: row.id },
       data: { status: st.status, ...(st.error && { error: st.error }) },
     });
+    changed = true;
   }
+  // Live orders shows delivered / read / failed as it happens
+  if (changed) await publish({ type: "resync" });
   if (events.optOuts.length)
     await db.customer.updateMany({
       where: { phone: { in: events.optOuts }, whatsappOptOutAt: null },
