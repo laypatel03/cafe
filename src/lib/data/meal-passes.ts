@@ -46,20 +46,25 @@ export async function getPasses(where: Prisma.MealPassWhereInput, day = today())
 }
 
 /** The pass a customer can use today: running, not refunded, meals left; the one ending first. */
-export async function activePassFor(customerId: string, day = today()) {
+/** A guest's passes usable today (started, not ended, not refunded, meals left), ending soonest first. */
+export async function activePassesFor(customerId: string, day = today()) {
   const passes = await getPasses(
     { customerId, refundedAt: null, startsOn: { lte: day }, endsOn: { gte: day } },
     day,
   );
-  return (
-    passes.filter((p) => p.status === "active").sort((a, b) => a.endsOn.localeCompare(b.endsOn))[0] ?? null
-  );
+  return passes
+    .filter((p) => p.status === "active")
+    .sort((a, b) => a.endsOn.localeCompare(b.endsOn) || a.number - b.number);
+}
+
+export async function activePassFor(customerId: string, day = today()) {
+  return (await activePassesFor(customerId, day))[0] ?? null;
 }
 
 export type LivePass = { number: number; planName: string; endsOn: string; parts: string[]; left: MealsLeft };
 
-/** Active passes for the live board, by customer. */
-export async function livePasses(customerIds: string[]): Promise<Record<string, LivePass>> {
+/** Active passes for the live board, by customer – every one they can use today, ending soonest first. */
+export async function livePasses(customerIds: string[]): Promise<Record<string, LivePass[]>> {
   const day = today();
   const ids = [...new Set(customerIds)];
   if (!ids.length) return {};
@@ -67,16 +72,16 @@ export async function livePasses(customerIds: string[]): Promise<Record<string, 
     { customerId: { in: ids }, refundedAt: null, startsOn: { lte: day }, endsOn: { gte: day } },
     day,
   );
-  const out: Record<string, LivePass> = {};
+  const out: Record<string, LivePass[]> = {};
   for (const p of passes
     .filter((x) => x.status === "active")
-    .sort((a, b) => b.endsOn.localeCompare(a.endsOn)))
-    out[p.customerId!] = {
+    .sort((a, b) => a.endsOn.localeCompare(b.endsOn) || a.number - b.number))
+    (out[p.customerId!] ??= []).push({
       number: p.number,
       planName: p.planName,
       endsOn: p.endsOn,
       parts: p.parts.map((x) => x.name),
       left: p.left,
-    };
+    });
   return out;
 }

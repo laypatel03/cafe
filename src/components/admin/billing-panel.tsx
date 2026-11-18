@@ -90,7 +90,7 @@ export function BillingPanel({
   orders: LiveOrder[];
   bills: LiveBill[];
   payLater: LiveBill[];
-  passes: Record<string, LivePass>;
+  passes: Record<string, LivePass[]>;
   balances: Record<string, number>;
   balanceBills: Record<string, number[]>;
   onChanged: () => void;
@@ -109,7 +109,7 @@ export function BillingPanel({
               <ToBillCard
                 key={b.key}
                 entry={b}
-                pass={b.orders[0].customerId ? passes[b.orders[0].customerId] : undefined}
+                passes={b.orders[0].customerId ? (passes[b.orders[0].customerId] ?? []) : []}
                 balance={b.orders[0].customerId ? balances[b.orders[0].customerId] : undefined}
                 balanceBills={b.orders[0].customerId ? balanceBills[b.orders[0].customerId] : undefined}
                 onChanged={onChanged}
@@ -159,13 +159,14 @@ export function BillingPanel({
 
 function ToBillCard({
   entry,
-  pass,
+  passes,
   balance,
   balanceBills,
   onChanged,
 }: {
   entry: ToBill;
-  pass: LivePass | undefined;
+  /** every meal pass the guest can use today */
+  passes: LivePass[];
   balance: number | undefined;
   balanceBills: number[] | undefined;
   onChanged: () => void;
@@ -202,7 +203,7 @@ function ToBillCard({
           </Button>
         ))}
       <MealPassBox
-        pass={pass}
+        passes={passes}
         orderIds={entry.orders.map((o) => o.id)}
         passUsed={entry.orders.some((o) => o.items.some((i) => i.pass))}
         onChanged={onChanged}

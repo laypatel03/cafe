@@ -54,7 +54,7 @@ export function OrdersPanel({
   orders: LiveOrder[];
   bills: LiveBill[];
   payLater: LiveBill[];
-  passes: Record<string, LivePass>;
+  passes: Record<string, LivePass[]>;
   balances: Record<string, number>;
   balanceBills: Record<string, number[]>;
   menu: PublicMenu;

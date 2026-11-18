@@ -1,9 +1,10 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { AuthError, assertUser, type CurrentUser, type Access } from "@/lib/auth/dal";
 import { today } from "@/lib/data/cash";
-import { activePassFor, COUNTED_USES } from "@/lib/data/meal-passes";
+import { activePassFor, activePassesFor, COUNTED_USES } from "@/lib/data/meal-passes";
 import { getCafeDetails } from "@/lib/data/menu";
 import { retotal } from "@/lib/data/order-totals";
 import { db } from "@/lib/db";
@@ -217,9 +218,12 @@ export type MealPassChoice = {
   options: (MealOption & { orderNumber: number })[];
 };
 
+const PassNumber = z.number().int().positive().optional();
+
 /** The unbilled orders of one guest, their pass, and what the pass could cover. */
 /** Owners may swap any dish (guest pays above the cap); staff only dishes the pass covers in full. */
-async function load(orderIds: string[], swaps: SwapRule) {
+/** `passNumber`: which of the guest's passes to use (they can have several); none = the one ending soonest. */
+async function load(orderIds: string[], swaps: SwapRule, passNumber?: number) {
   const ids = [...new Set(orderIds)].slice(0, 20);
   const orders = await db.order.findMany({
     where: { id: { in: ids }, deletedAt: null },
@@ -250,8 +254,18 @@ async function load(orderIds: string[], swaps: SwapRule) {
   const customerId = orders[0].customerId;
   if (!customerId || orders.some((o) => o.customerId !== customerId))
     return { ok: false as const, error: "A meal pass needs the guest's phone number on the order." };
-  const pass = await activePassFor(customerId);
-  if (!pass) return { ok: false as const, error: "This guest has no meal pass with meals left today." };
+  const pass =
+    passNumber === undefined
+      ? await activePassFor(customerId)
+      : ((await activePassesFor(customerId)).find((p) => p.number === passNumber) ?? null);
+  if (!pass)
+    return {
+      ok: false as const,
+      error:
+        passNumber === undefined
+          ? "This guest has no meal pass with meals left today."
+          : `Meal pass #${passNumber} can't be used today – refresh the screen.`,
+    };
 
   const lines: DishLine[] = orders.flatMap((o) =>
     o.items
@@ -279,10 +293,15 @@ async function load(orderIds: string[], swaps: SwapRule) {
   return { ok: true as const, orders, pass, options: mealOptions(pass, pass.left, lines, covered, swaps) };
 }
 
-export async function mealPassChoices(orderIds: string[]): Promise<MealPassChoice | Fail> {
+export async function mealPassChoices(
+  orderIds: string[],
+  passNumber?: number,
+): Promise<MealPassChoice | Fail> {
   const me = await signedIn("team");
   if ("ok" in me) return me;
-  const res = await load(orderIds, me.role === "OWNER" ? "any" : "within cap");
+  const number_ = PassNumber.safeParse(passNumber);
+  if (!number_.success) return { ok: false, error: "Pick a meal pass." };
+  const res = await load(orderIds, me.role === "OWNER" ? "any" : "within cap", number_.data);
   if (!res.ok) return res;
   const number = new Map(res.orders.map((o) => [o.id, o.number]));
   return {
@@ -302,12 +321,15 @@ export async function mealPassChoices(orderIds: string[]): Promise<MealPassChoic
 export async function applyMealPass(
   orderIds: string[],
   picks: { orderId: string; menuItemId: string; count: number }[],
+  passNumber?: number,
 ): Promise<{ ok: true; meals: number; paise: number } | Fail> {
   const me = await signedIn("team");
   if ("ok" in me) return me;
   const parsedPicks = MealPicksSchema.safeParse(picks);
   if (!parsedPicks.success) return { ok: false, error: "Check the dishes you picked." };
-  const res = await load(orderIds, me.role === "OWNER" ? "any" : "within cap");
+  const number_ = PassNumber.safeParse(passNumber);
+  if (!number_.success) return { ok: false, error: "Pick a meal pass." };
+  const res = await load(orderIds, me.role === "OWNER" ? "any" : "within cap", number_.data);
   if (!res.ok) return res;
   const checked = checkPicks(parsedPicks.data, res.options, res.pass.left);
   if (!checked.ok) return checked;

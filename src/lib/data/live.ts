@@ -87,7 +87,7 @@ export type LiveBoard = {
   /** Bills completed with "pay later" today and still not paid; earlier days' are in Order history. */
   payLater: LiveBill[];
   /** guests' meal passes usable today, by customer id (only for orders waiting to be billed) */
-  passes: Record<string, LivePass>;
+  passes: Record<string, LivePass[]>;
   /** guests' balances (plus = credit, minus = owed), by customer id, for orders waiting to be billed */
   balances: Record<string, number>;
   /** the bill numbers each of those balances comes from */
