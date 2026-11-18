@@ -470,12 +470,13 @@ const leftSummary = (pass: { parts: string[]; left: number[] }) =>
 
 /** On a "To bill" card: the guest's pass, "Use meal pass" and "Undo meal pass". */
 export function MealPassBox({
-  pass,
+  passes,
   orderIds,
   passUsed,
   onChanged,
 }: {
-  pass: BillingPass | undefined;
+  /** every pass the guest can use today, ending soonest first */
+  passes: BillingPass[];
   orderIds: string[];
   /** these orders already have meal pass lines */
   passUsed: boolean;
@@ -484,11 +485,11 @@ export function MealPassBox({
   const [choice, setChoice] = useState<MealPassChoice | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [pending, start] = useTransition();
-  if (!pass && !passUsed) return null;
+  if (!passes.length && !passUsed) return null;
 
-  const open = () =>
+  const open = (passNumber: number) =>
     start(async () => {
-      const res = await mealPassChoices(orderIds);
+      const res = await mealPassChoices(orderIds, passNumber);
       if (!res.ok) return void toast.error(res.error);
       if (!res.options.length) return void toast.info("Nothing on these orders can use the pass.");
       // start with as many as the pass allows, dearest first; swaps only when staff add them
@@ -511,27 +512,35 @@ export function MealPassBox({
 
   return (
     <div className="mt-3 rounded-2xl border border-hh-orange/40 bg-hh-orange/10 p-3 text-sm">
-      {pass && (
-        <p>
+      {passes.length > 1 && (
+        <p className="mb-2 font-semibold">
           <Ticket className="mr-1 inline size-4 text-brand-text" aria-hidden />
-          <span className="font-semibold">Meal pass #{pass.number}</span> · {pass.planName}
-          <br />
-          <span className="text-muted-foreground">
-            {leftSummary(pass)} left · till {endsLabel(pass.endsOn)}
-          </span>
+          {passes.length} meal passes – pick which one to use
         </p>
       )}
-      <div className="mt-2 flex flex-wrap gap-2">
-        {pass && (
-          <Button size="sm" className="rounded-full" disabled={pending} onClick={open}>
-            {pending ? (
-              <LoaderCircle className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <Ticket data-icon="inline-start" />
-            )}
-            Use meal pass
-          </Button>
-        )}
+      <ul className="space-y-2">
+        {passes.map((pass) => (
+          <li key={pass.number} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="min-w-0 flex-1">
+              {passes.length === 1 && <Ticket className="mr-1 inline size-4 text-brand-text" aria-hidden />}
+              <span className="font-semibold">Meal pass #{pass.number}</span> · {pass.planName}
+              <br />
+              <span className="text-muted-foreground">
+                {leftSummary(pass)} left · till {endsLabel(pass.endsOn)}
+              </span>
+            </p>
+            <Button size="sm" className="rounded-full" disabled={pending} onClick={() => open(pass.number)}>
+              {pending ? (
+                <LoaderCircle className="animate-spin" data-icon="inline-start" />
+              ) : (
+                <Ticket data-icon="inline-start" />
+              )}
+              Use #{pass.number}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 flex flex-wrap gap-2 empty:hidden">
         {passUsed && (
           <Button
             size="sm"
@@ -622,6 +631,7 @@ export function MealPassBox({
                       menuItemId: o.menuItemId,
                       count: counts[`${o.orderId}:${o.menuItemId}`] ?? 0,
                     })),
+                    choice.pass.number,
                   );
                   if (!res.ok) return void toast.error(res.error);
                   toast.success(
