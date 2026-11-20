@@ -495,12 +495,15 @@ export function MealPassBox({
       const res = await mealPassChoices(orderIds, passNumber);
       if (!res.ok) return void toast.error(res.error);
       if (!res.options.length) return void toast.info("Nothing on these orders can use the pass.");
-      // start with as many as the pass allows, dearest first; swaps only when staff add them
+      // start with as many as the pass allows, dearest first; swaps only when staff add them. A guest
+      // with several passes (one each for a family) starts with one dish, so the next pass has dishes left.
       const left = [...res.pass.left];
+      let room = passes.length > 1 ? 1 : Infinity;
       const next: Record<string, number> = {};
       for (const o of [...res.options].sort((a, b) => b.coverPaise - a.coverPaise)) {
-        const n = o.swap ? 0 : Math.min(o.units, left[o.part]);
+        const n = o.swap ? 0 : Math.min(o.units, left[o.part], room);
         left[o.part] -= n;
+        room -= n;
         next[`${o.orderId}:${o.menuItemId}`] = n;
       }
       setCounts(next);

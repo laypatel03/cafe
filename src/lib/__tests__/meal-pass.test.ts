@@ -212,6 +212,20 @@ describe("spreadDishes", () => {
     const passes = [1, 2, 3, 4].map((n) => pass(n, [5], ["a", "b", "c", "d"]));
     expect(spreadDishes(units, passes)).toEqual([1, 2, 3, 4]);
   });
+  it("2 bowl passes + 2 smoothie passes, 2 bowls + 2 smoothies: all four passes get one", () => {
+    const units = [{ key: "bowl1" }, { key: "bowl2" }, { key: "sm1" }, { key: "sm2" }];
+    const bowls = ["bowl1", "bowl2"];
+    const smoothies = ["sm1", "sm2"];
+    const passes = [
+      pass(2, [26], bowls),
+      pass(3, [26], smoothies),
+      pass(4, [26], bowls),
+      pass(5, [18], smoothies),
+    ];
+    const got = spreadDishes(units, passes);
+    expect(got.slice(0, 2).sort()).toEqual([2, 4]);
+    expect(got.slice(2).sort()).toEqual([3, 5]);
+  });
   it("skips a pass with no meals of that type left, and passes that don't cover the dish", () => {
     const units = [{ key: "a" }, { key: "a" }, { key: "b" }];
     const passes = [pass(1, [0], ["a", "b"]), pass(2, [1], ["a"]), pass(3, [2], ["a", "b"])];
