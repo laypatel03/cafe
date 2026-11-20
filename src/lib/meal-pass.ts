@@ -195,3 +195,29 @@ export function checkPicks(
 /** Name of the discount line a use adds to the order. */
 export const passLineName = (partName: string, dish: string, passNumber: number, swap = false) =>
   `Meal pass #${passNumber} – ${partName.toLowerCase()}${swap ? " (swap)" : ""}: ${dish}`.slice(0, 120);
+
+/**
+ * The starting choice when a guest's dishes are spread over several passes: each dish (one per unit)
+ * goes on the next pass in turn that covers it and has a meal of that type left – so four dishes and
+ * four passes use one meal from each. Swaps are never picked by themselves. Returns a pass number
+ * (or null) per unit.
+ */
+export function spreadDishes(
+  units: { key: string }[],
+  passes: { number: number; left: MealsLeft; options: { key: string; part: number; swap: boolean }[] }[],
+): (number | null)[] {
+  const left = passes.map((p) => [...p.left]);
+  let next = 0;
+  return units.map((u) => {
+    for (let k = 0; k < passes.length; k++) {
+      const i = (next + k) % passes.length;
+      const o = passes[i].options.find((x) => x.key === u.key && !x.swap);
+      if (o && left[i][o.part] > 0) {
+        left[i][o.part]--;
+        next = i + 1;
+        return passes[i].number;
+      }
+    }
+    return null;
+  });
+}

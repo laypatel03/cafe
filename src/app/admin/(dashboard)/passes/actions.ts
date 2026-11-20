@@ -318,6 +318,79 @@ export async function mealPassChoices(
 }
 
 /** Covers the picked dishes with the guest's pass: one discount line per meal, meals left go down. */
+export type SpreadPassChoice = {
+  ok: true;
+  passes: (MealPassChoice["pass"] & { options: (MealOption & { orderNumber: number })[] })[];
+};
+
+/** Every pass the guest can use today, each with what it could cover on these orders – to spread dishes over them. */
+export async function mealPassesChoices(orderIds: string[]): Promise<SpreadPassChoice | Fail> {
+  const me = await signedIn("team");
+  if ("ok" in me) return me;
+  const swaps = me.role === "OWNER" ? "any" : "within cap";
+  const first = await load(orderIds, swaps);
+  if (!first.ok) return first;
+  const number = new Map(first.orders.map((o) => [o.id, o.number]));
+  const passes: SpreadPassChoice["passes"] = [];
+  for (const p of await activePassesFor(first.pass.customerId!)) {
+    const res = await load(orderIds, swaps, p.number);
+    if (!res.ok) continue;
+    passes.push({
+      number: res.pass.number,
+      planName: res.pass.planName,
+      endsOn: res.pass.endsOn,
+      parts: res.pass.parts.map((x) => x.name),
+      left: res.pass.left,
+      options: res.options.map((o) => ({ ...o, orderNumber: number.get(o.orderId)! })),
+    });
+  }
+  return { ok: true, passes };
+}
+
+const SpreadPicks = z
+  .array(
+    z.object({
+      passNumber: z.number().int().positive(),
+      orderId: z.string().min(1).max(40),
+      menuItemId: z.string().min(1).max(40),
+      count: z.number().int().min(0).max(50),
+    }),
+  )
+  .max(200);
+
+/**
+ * Dishes spread over several of the guest's passes (e.g. four people, four passes): each pass is used
+ * in turn, oldest-ending first. Stops at the first problem – passes already done stay (undo removes all).
+ */
+export async function applyMealPasses(
+  orderIds: string[],
+  picks: { passNumber: number; orderId: string; menuItemId: string; count: number }[],
+): Promise<{ ok: true; meals: number; paise: number; passes: number } | Fail> {
+  const parsed = SpreadPicks.safeParse(picks);
+  if (!parsed.success) return { ok: false, error: "Check the dishes you picked." };
+  const byPass = new Map<number, { orderId: string; menuItemId: string; count: number }[]>();
+  for (const p of parsed.data)
+    if (p.count > 0) byPass.set(p.passNumber, [...(byPass.get(p.passNumber) ?? []), p]);
+  if (byPass.size === 0) return { ok: false, error: "Pick at least one dish." };
+  let meals = 0;
+  let paise = 0;
+  const done: number[] = [];
+  for (const [passNumber, passPicks] of byPass) {
+    const res = await applyMealPass(orderIds, passPicks, passNumber);
+    if (!res.ok)
+      return {
+        ok: false,
+        error: done.length
+          ? `Passes ${done.map((n) => `#${n}`).join(", ")} used, then pass #${passNumber}: ${res.error}`
+          : `Pass #${passNumber}: ${res.error}`,
+      };
+    meals += res.meals;
+    paise += res.paise;
+    done.push(passNumber);
+  }
+  return { ok: true, meals, paise, passes: done.length };
+}
+
 export async function applyMealPass(
   orderIds: string[],
   picks: { orderId: string; menuItemId: string; count: number }[],

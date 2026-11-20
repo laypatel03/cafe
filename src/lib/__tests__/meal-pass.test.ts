@@ -10,6 +10,7 @@ import {
   type PassRules,
   passStatus,
   readParts,
+  spreadDishes,
 } from "@/lib/meal-pass";
 
 const rules: PassRules = {
@@ -197,5 +198,37 @@ describe("checkPicks", () => {
     });
     expect(checkPicks([{ orderId: "o2", menuItemId: "m1", count: 1 }], options, FULL).ok).toBe(false);
     expect(checkPicks([], options, FULL).ok).toBe(false);
+  });
+});
+
+describe("spreadDishes", () => {
+  const pass = (number: number, left: number[], keys: string[], part = 0) => ({
+    number,
+    left,
+    options: keys.map((key) => ({ key, part, swap: false })),
+  });
+  it("puts four dishes on four passes, one each", () => {
+    const units = ["a", "b", "c", "d"].map((key) => ({ key }));
+    const passes = [1, 2, 3, 4].map((n) => pass(n, [5], ["a", "b", "c", "d"]));
+    expect(spreadDishes(units, passes)).toEqual([1, 2, 3, 4]);
+  });
+  it("skips a pass with no meals of that type left, and passes that don't cover the dish", () => {
+    const units = [{ key: "a" }, { key: "a" }, { key: "b" }];
+    const passes = [pass(1, [0], ["a", "b"]), pass(2, [1], ["a"]), pass(3, [2], ["a", "b"])];
+    expect(spreadDishes(units, passes)).toEqual([2, 3, 3]);
+  });
+  it("leaves a dish off when no pass can take it, and never picks swaps", () => {
+    const units = [{ key: "a" }, { key: "x" }];
+    const passes = [
+      {
+        number: 1,
+        left: [1],
+        options: [
+          { key: "a", part: 0, swap: false },
+          { key: "x", part: 0, swap: true },
+        ],
+      },
+    ];
+    expect(spreadDishes(units, passes)).toEqual([1, null]);
   });
 });

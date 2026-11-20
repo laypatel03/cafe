@@ -12,6 +12,9 @@ import {
   sellMealPass,
   undoMealPass,
   applyMealPass,
+  applyMealPasses,
+  mealPassesChoices,
+  type SpreadPassChoice,
 } from "@/app/admin/(dashboard)/passes/actions";
 import { ActionSwitch } from "@/components/admin/action-switch";
 import { FormField } from "@/components/admin/form-field";
@@ -21,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { useFormAction } from "@/hooks/use-form-action";
 import { formatINR } from "@/lib/format";
-import { type MealPart, mealsSummary } from "@/lib/meal-pass";
+import { type MealPart, mealsSummary, spreadDishes } from "@/lib/meal-pass";
 import { toRupees } from "@/lib/money";
 import { PAY_CHOICES, PAYMENT_LABEL } from "@/lib/payments";
 import { cn } from "@/lib/utils";
@@ -541,6 +544,9 @@ export function MealPassBox({
         ))}
       </ul>
       <div className="mt-2 flex flex-wrap gap-2 empty:hidden">
+        {passes.length > 1 && (
+          <SpreadPassesButton orderIds={orderIds} disabled={pending} onChanged={onChanged} />
+        )}
         {passUsed && (
           <Button
             size="sm"
@@ -649,5 +655,186 @@ export function MealPassBox({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+type SpreadUnit = { key: string; orderId: string; menuItemId: string; name: string; orderNumber: number };
+
+/**
+ * A guest with several passes (e.g. a family, one pass each): every dish on the orders in one list,
+ * each with the pass it goes on – one dish per pass in turn to start with, changeable by staff.
+ */
+function SpreadPassesButton({
+  orderIds,
+  disabled,
+  onChanged,
+}: {
+  orderIds: string[];
+  disabled: boolean;
+  onChanged: () => void;
+}) {
+  const [choice, setChoice] = useState<SpreadPassChoice | null>(null);
+  const [units, setUnits] = useState<SpreadUnit[]>([]);
+  const [picked, setPicked] = useState<(number | null)[]>([]);
+  const [pending, start] = useTransition();
+
+  const open = () =>
+    start(async () => {
+      const res = await mealPassesChoices(orderIds);
+      if (!res.ok) return void toast.error(res.error);
+      // one row per dish on the orders that some pass could cover
+      const seen = new Map<string, SpreadUnit & { units: number }>();
+      for (const p of res.passes)
+        for (const o of p.options) {
+          const key = `${o.orderId}:${o.menuItemId}`;
+          const had = seen.get(key);
+          seen.set(key, {
+            key,
+            orderId: o.orderId,
+            menuItemId: o.menuItemId,
+            name: o.name,
+            orderNumber: o.orderNumber,
+            units: Math.max(had?.units ?? 0, o.units),
+          });
+        }
+      const list = [...seen.values()]
+        .sort((a, b) => a.orderNumber - b.orderNumber || a.name.localeCompare(b.name))
+        .flatMap((u) => Array.from({ length: u.units }, () => u));
+      if (!list.length) return void toast.info("Nothing on these orders can use a pass.");
+      setUnits(list);
+      setPicked(
+        spreadDishes(
+          list,
+          res.passes.map((p) => ({
+            number: p.number,
+            left: p.left,
+            options: p.options.map((o) => ({
+              key: `${o.orderId}:${o.menuItemId}`,
+              part: o.part,
+              swap: o.swap,
+            })),
+          })),
+        ),
+      );
+      setChoice(res);
+    });
+
+  const optionOf = (passNumber: number, key: string) =>
+    choice?.passes
+      .find((p) => p.number === passNumber)
+      ?.options.find((o) => `${o.orderId}:${o.menuItemId}` === key);
+  const chosen = units.map((u, i) => (picked[i] ? optionOf(picked[i]!, u.key) : undefined));
+  const offPaise = chosen.reduce((s, o) => s + (o?.coverPaise ?? 0), 0);
+  const meals = chosen.filter(Boolean).length;
+  // a pass can't give more meals of a type than it has left
+  const over = choice?.passes.find((p) =>
+    p.left.some(
+      (n, part) =>
+        units.filter((u, i) => picked[i] === p.number && optionOf(p.number, u.key)?.part === part).length > n,
+    ),
+  );
+
+  const save = () =>
+    start(async () => {
+      const counts = new Map<
+        string,
+        { passNumber: number; orderId: string; menuItemId: string; count: number }
+      >();
+      units.forEach((u, i) => {
+        const n = picked[i];
+        if (!n) return;
+        const k = `${n}:${u.key}`;
+        const c = counts.get(k) ?? { passNumber: n, orderId: u.orderId, menuItemId: u.menuItemId, count: 0 };
+        counts.set(k, { ...c, count: c.count + 1 });
+      });
+      const res = await applyMealPasses(orderIds, [...counts.values()]);
+      if (!res.ok) {
+        toast.error(res.error);
+        onChanged();
+        return;
+      }
+      toast.success(
+        `${res.meals} meal${res.meals === 1 ? "" : "s"} on ${res.passes} pass${res.passes === 1 ? "" : "es"} · ${rupees(res.paise)} off the bill`,
+      );
+      setChoice(null);
+      onChanged();
+    });
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        className="rounded-full"
+        disabled={disabled || pending}
+        onClick={open}
+      >
+        {pending && !choice ? (
+          <LoaderCircle className="animate-spin" data-icon="inline-start" />
+        ) : (
+          <Ticket data-icon="inline-start" />
+        )}
+        Spread over passes
+      </Button>
+      <Dialog open={choice !== null} onOpenChange={(o) => !o && setChoice(null)}>
+        <DialogContent>
+          <DialogTitle>Spread dishes over the passes</DialogTitle>
+          <DialogDescription>
+            Each dish starts on a different pass in turn. Change any of them, or pick &ldquo;Not on a
+            pass&rdquo;. A pass pays up to its plan&apos;s price per dish.
+          </DialogDescription>
+          <ul className="divide-y divide-border rounded-2xl border border-border">
+            {units.map((u, i) => {
+              const o = picked[i] ? optionOf(picked[i]!, u.key) : undefined;
+              return (
+                <li key={`${u.key}-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{u.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      #{u.orderNumber}
+                      {o &&
+                        ` · ${o.swap ? `swap, counts as a ${o.partName.toLowerCase()}` : o.partName} · pass pays ${rupees(o.coverPaise)}`}
+                    </p>
+                  </div>
+                  <NativeSelect
+                    aria-label={`Pass for ${u.name}`}
+                    value={picked[i] ?? ""}
+                    onChange={(e) =>
+                      setPicked((p) =>
+                        p.map((v, j) => (j === i ? (e.target.value ? Number(e.target.value) : null) : v)),
+                      )
+                    }
+                    className="h-9 w-40"
+                  >
+                    <option value="">Not on a pass</option>
+                    {choice?.passes
+                      .filter((p) => optionOf(p.number, u.key))
+                      .map((p) => (
+                        <option key={p.number} value={p.number}>
+                          Pass #{p.number} ({leftSummary(p)} left)
+                        </option>
+                      ))}
+                  </NativeSelect>
+                </li>
+              );
+            })}
+          </ul>
+          {over && (
+            <p className="text-sm font-semibold text-destructive">
+              Pass #{over.number} doesn&apos;t have that many meals left – move a dish to another pass.
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChoice(null)}>
+              Cancel
+            </Button>
+            <Button disabled={pending || meals === 0 || !!over} onClick={save}>
+              {pending && <LoaderCircle className="animate-spin" data-icon="inline-start" />}
+              Use {meals} meal{meals === 1 ? "" : "s"} · {rupees(offPaise)} off
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
