@@ -301,7 +301,7 @@ export async function mealPassChoices(
   if ("ok" in me) return me;
   const number_ = PassNumber.safeParse(passNumber);
   if (!number_.success) return { ok: false, error: "Pick a meal pass." };
-  const res = await load(orderIds, me.role === "OWNER" ? "any" : "within cap", number_.data);
+  const res = await load(orderIds, "any", number_.data);
   if (!res.ok) return res;
   const number = new Map(res.orders.map((o) => [o.id, o.number]));
   return {
@@ -327,7 +327,7 @@ export type SpreadPassChoice = {
 export async function mealPassesChoices(orderIds: string[]): Promise<SpreadPassChoice | Fail> {
   const me = await signedIn("team");
   if ("ok" in me) return me;
-  const swaps = me.role === "OWNER" ? "any" : "within cap";
+  const swaps = "any";
   const first = await load(orderIds, swaps);
   if (!first.ok) return first;
   const number = new Map(first.orders.map((o) => [o.id, o.number]));
@@ -402,7 +402,7 @@ export async function applyMealPass(
   if (!parsedPicks.success) return { ok: false, error: "Check the dishes you picked." };
   const number_ = PassNumber.safeParse(passNumber);
   if (!number_.success) return { ok: false, error: "Pick a meal pass." };
-  const res = await load(orderIds, me.role === "OWNER" ? "any" : "within cap", number_.data);
+  const res = await load(orderIds, "any", number_.data);
   if (!res.ok) return res;
   const checked = checkPicks(parsedPicks.data, res.options, res.pass.left);
   if (!checked.ok) return checked;
