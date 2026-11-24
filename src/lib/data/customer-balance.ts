@@ -4,11 +4,49 @@ import { type Debt, shortBillPayoffs, shortfallsLeft } from "@/lib/customer-bala
 import { owedOrdersWhere } from "@/lib/data/owed";
 import { db } from "@/lib/db";
 
-/** Entries that count: not deleted, and a settlement on a cancelled or deleted order gives the balance back. */
+/**
+ * Entries that count: not deleted; a settlement on a cancelled or deleted order gives the balance
+ * back, and so does paying over or under on a bill that was voided (e.g. its order deleted).
+ */
 export const COUNTED_BALANCE = {
   deletedAt: null,
-  OR: [{ orderId: null }, { order: { deletedAt: null, status: { not: "CANCELLED" } } }],
+  AND: [
+    { OR: [{ orderId: null }, { order: { deletedAt: null, status: { not: "CANCELLED" } } }] },
+    { OR: [{ billId: null }, { bill: { voidedAt: null } }] },
+  ],
 } satisfies Prisma.CustomerBalanceEntryWhereInput;
+
+/**
+ * A paid bill's total changed (an order edited or taken off it). When the counter recorded what came
+ * in, that money stays the same, so what the guest paid over or under follows the new total – on the
+ * bill and on their balance.
+ */
+export async function rebalanceBill(
+  tx: Prisma.TransactionClient,
+  bill: {
+    id: string;
+    paidAt: Date | null;
+    voidedAt: Date | null;
+    totalPaise: number;
+    differencePaise: number;
+  },
+  newTotalPaise: number,
+) {
+  if (!bill.paidAt || bill.voidedAt || bill.differencePaise === 0) return;
+  const difference = bill.totalPaise + bill.differencePaise - newTotalPaise;
+  await tx.bill.update({ where: { id: bill.id }, data: { differencePaise: difference } });
+  const entry = await tx.customerBalanceEntry.findFirst({
+    where: { billId: bill.id, kind: { in: ["PAID_EXTRA", "PAID_LESS"] }, deletedAt: null },
+    select: { id: true },
+  });
+  if (!entry) return;
+  if (difference === 0) await tx.customerBalanceEntry.delete({ where: { id: entry.id } });
+  else
+    await tx.customerBalanceEntry.update({
+      where: { id: entry.id },
+      data: { amountPaise: difference, kind: difference > 0 ? "PAID_EXTRA" : "PAID_LESS" },
+    });
+}
 
 type Client = Pick<Prisma.TransactionClient, "customerBalanceEntry">;
 
