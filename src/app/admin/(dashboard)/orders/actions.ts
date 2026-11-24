@@ -9,6 +9,7 @@ import { billFromOrders } from "@/lib/billing";
 import { getEditSwitches } from "@/lib/data/edit-switches";
 import { getCafeDetails } from "@/lib/data/menu";
 import { loadMenuPrices } from "@/lib/data/menu-prices";
+import { rebalanceBill } from "@/lib/data/customer-balance";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
@@ -399,6 +400,7 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
         o.id === order.id ? { subtotalPaise: totals.subtotalPaise } : o,
       );
       const billSums = billFromOrders(subtotals, bill.taxBasisPoints);
+      await rebalanceBill(tx, bill, billSums.totalPaise);
       // the bill is made out to this order's guest if it's the only order, or the guest it was for
       const isBillGuest = !shared || order.customerPhone === bill.customerPhone;
       await tx.bill.update({
@@ -489,6 +491,7 @@ export async function deleteOrder(orderId: string, reason: string): Promise<{ ok
         });
       } else {
         const sums = billFromOrders(left, bill.taxBasisPoints);
+        await rebalanceBill(tx, bill, sums.totalPaise);
         await tx.bill.update({
           where: { id: bill.id },
           data: { subtotalPaise: sums.subtotalPaise, taxPaise: sums.taxPaise, totalPaise: sums.totalPaise },
