@@ -33,7 +33,8 @@ export async function rebalanceBill(
   newTotalPaise: number,
 ) {
   if (!bill.paidAt || bill.voidedAt || bill.differencePaise === 0) return;
-  const difference = bill.totalPaise + bill.differencePaise - newTotalPaise;
+  // what came in can't be below ₹0
+  const difference = Math.max(0, bill.totalPaise + bill.differencePaise) - newTotalPaise;
   await tx.bill.update({ where: { id: bill.id }, data: { differencePaise: difference } });
   const entry = await tx.customerBalanceEntry.findFirst({
     where: { billId: bill.id, kind: { in: ["PAID_EXTRA", "PAID_LESS"] }, deletedAt: null },
