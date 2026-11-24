@@ -221,3 +221,42 @@ export function spreadDishes(
     return null;
   });
 }
+
+/** A meal already taken off a pass on an order whose prices are being edited. */
+export type UsedMeal = {
+  id: string;
+  menuItemId: string | null;
+  /** the limit of the meal type it was counted as */
+  capPaise: number;
+  coveredPaise: number;
+};
+
+/**
+ * After an order's dish prices are edited: what each pass meal on it now covers – the dish's new
+ * price without add-ons (the dearest line of that dish), up to the meal type's limit. Every covered
+ * dish must still be on the order as many times as the pass paid for it.
+ */
+export function recoverMeals(
+  uses: UsedMeal[],
+  dishes: { menuItemId: string; quantity: number; dishPaise: number }[],
+):
+  | { ok: true; covers: { id: string; coverPaise: number }[] }
+  | { ok: false; menuItemId: string; meals: number } {
+  const units = new Map<string, number>();
+  const price = new Map<string, number>();
+  for (const d of dishes) {
+    units.set(d.menuItemId, (units.get(d.menuItemId) ?? 0) + d.quantity);
+    price.set(d.menuItemId, Math.max(price.get(d.menuItemId) ?? 0, d.dishPaise));
+  }
+  const need = new Map<string, number>();
+  for (const u of uses) if (u.menuItemId) need.set(u.menuItemId, (need.get(u.menuItemId) ?? 0) + 1);
+  for (const [id, n] of need) if ((units.get(id) ?? 0) < n) return { ok: false, menuItemId: id, meals: n };
+  return {
+    ok: true,
+    covers: uses.map((u) => {
+      // a meal with no dish link (old data) keeps what it covered
+      if (!u.menuItemId) return { id: u.id, coverPaise: u.coveredPaise };
+      return { id: u.id, coverPaise: Math.max(0, Math.min(price.get(u.menuItemId)!, u.capPaise)) };
+    }),
+  };
+}

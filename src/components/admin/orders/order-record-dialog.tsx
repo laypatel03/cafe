@@ -46,6 +46,10 @@ export type EditableOrder = {
   billNumber: number | null;
   /** other orders on the same bill */
   sharedBill: boolean;
+  /** meal pass lines – not editable; the server works them out again from the new prices */
+  passLines?: { name: string; unitPrice: number }[];
+  /** why it can't be edited here (a balance is settled on it) */
+  locked?: string | null;
 };
 
 /** "Add order" on Order history: an order that already happened and was paid. */
@@ -75,10 +79,51 @@ export function EditOrderButton({ menu, order }: { menu: PublicMenu; order: Edit
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-lg">
-          {open && <OrderForm menu={menu} order={order} onClose={() => setOpen(false)} />}
+          {open &&
+            (order.locked ? (
+              <LockedOrder order={order} reason={order.locked} onClose={() => setOpen(false)} />
+            ) : (
+              <OrderForm menu={menu} order={order} onClose={() => setOpen(false)} />
+            ))}
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** An order that can't be edited: why, and its lines as they stand. */
+function LockedOrder({
+  order,
+  reason,
+  onClose,
+}: {
+  order: EditableOrder;
+  reason: string;
+  onClose: () => void;
+}) {
+  const total = order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  return (
+    <div className="space-y-4">
+      <div>
+        <DialogTitle className="text-xl">Order #{order.number} can&apos;t be edited</DialogTitle>
+        <DialogDescription>{reason}</DialogDescription>
+      </div>
+      <ul className="divide-y divide-border rounded-2xl border border-border text-sm">
+        {order.items.map((i, n) => (
+          <li key={n} className="flex items-start gap-3 px-3 py-2">
+            <span className="w-6 shrink-0 tabular text-muted-foreground">{i.quantity}×</span>
+            <span className="min-w-0 flex-1">{i.name}</span>
+            <span className="shrink-0 tabular font-semibold">{formatINR(i.unitPrice * i.quantity)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-right text-sm">
+        Items total <span className="tabular font-semibold">{formatINR(total)}</span>
+      </p>
+      <DialogFooter>
+        <Button onClick={onClose}>Close</Button>
+      </DialogFooter>
+    </div>
   );
 }
 
@@ -109,6 +154,7 @@ function OrderForm({
   const now = toCafeInput(new Date());
 
   const prices = lines.map((l) => parsePrice(l.price));
+  const passLines = order?.passLines ?? [];
   const itemsTotal = lines.reduce((s, l, i) => s + (prices[i] ?? 0) * l.quantity, 0);
 
   const save = () =>
@@ -214,6 +260,7 @@ function OrderForm({
             value={phone}
             maxLength={14}
             onChange={(e) => setPhone(e.target.value)}
+            disabled={passLines.length > 0}
             placeholder="10-digit mobile"
             className="h-10"
           />
@@ -255,10 +302,29 @@ function OrderForm({
           </p>
         )}
         <ItemLinesEditor lines={lines} onChange={setLines} menu={menu} allowSoldOut editPrices allowOther />
+        {passLines.length > 0 && (
+          <div className="rounded-xl bg-accent px-3 py-2 text-sm">
+            <p className="font-semibold">Meal pass</p>
+            <ul className="mt-1 space-y-0.5">
+              {passLines.map((p, n) => (
+                <li key={n} className="flex gap-3">
+                  <span className="min-w-0 flex-1">{p.name}</span>
+                  <span className="shrink-0 tabular">{formatINR(p.unitPrice)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs text-muted-foreground">
+              When you save, each pass meal follows the dish&apos;s new price, up to the pass limit. Keep the
+              dishes the pass paid for on the order. The guest&apos;s phone can&apos;t change.
+            </p>
+          </div>
+        )}
         {lines.length > 0 && (
           <p className="text-right text-sm">
             Items total <span className="tabular font-semibold">{formatINR(itemsTotal)}</span>
-            <span className="text-xs text-muted-foreground"> (before tax, if any)</span>
+            <span className="text-xs text-muted-foreground">
+              {passLines.length > 0 ? " (before the meal pass and tax)" : " (before tax, if any)"}
+            </span>
           </p>
         )}
       </div>

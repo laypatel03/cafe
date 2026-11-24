@@ -62,7 +62,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **S-02 – See new orders and live picks**
 *As staff I want new orders to appear instantly with a chime so that no guest waits.*
-- Rules: SSE from Postgres NOTIFY; chime + highlight until accepted (sound on by default, unlocked by the first tap/key press – browser rule; "off" remembered per device in localStorage `hh-order-sound`); guests' live pick lists visible; offline banner and catch-up (`resync`) when the connection returns.
+- Rules: SSE from Postgres NOTIFY; new-order ring (24 Nov: rising triple tone, repeats every 8 s while any order is NEW) + a popup that stays until every new order is accepted or declined (`new-order-alert.tsx`; Decline opens the cancel-reason dialog) + the tab title flashes "🔔 N new orders"; café-time clock (seconds, server-corrected) under the title; ring + popup + flashing tab only for logins with `StaffUser.orderAlerts` on (default on; owner switches it per login in Settings → Staff logins, `setStaffOrderAlerts`) – others see "New-order alert off for this login" instead of the Sound button, and the device's Sound on/off still applies on top; highlight until accepted (sound on by default, unlocked by the first tap/key press – browser rule; "off" remembered per device in localStorage `hh-order-sound`); guests' live pick lists visible; offline banner and catch-up (`resync`) when the connection returns.
 - Code: `admin/live-board.tsx`, `lib/data/live.ts`, `app/api/admin/live/*`, `lib/realtime.ts`, `admin/offline-banner.tsx`.
 
 **S-03 – Move an order through its steps**
@@ -141,6 +141,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 **O-03 – Fix past orders and payments**
 *As the owner I want to add missed orders, edit or delete past ones and change how a bill was paid so that records match reality.*
 - Rules: needs Settings switch "order edits"; deleted orders are soft-deleted (`deletedAt`), shown in red, left out of money book and reports; can set a paid bill back to pending.
+- Meal pass orders (24 Nov): Edit works – pass lines are listed read-only (not as Other items) and on save each `MealPassUse.coveredPaise` and its −line follow the dish's new price (without add-ons) up to its meal type's `capPaise` (`recoverMeals`, tested); refused if a covered dish drops below the meals paid for, or the phone changes. Orders with a settled balance line open a read-only view saying why.
 - Code: `(dashboard)/orders/actions.ts`, `admin/orders/order-record-dialog.tsx`, `lib/order-edit.ts`, `lib/validators/order-edit.ts`, `lib/data/edit-switches.ts`.
 
 **O-04 – Customers**

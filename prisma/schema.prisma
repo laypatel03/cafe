@@ -287,6 +287,8 @@ model StaffUser {
   active         Boolean                @default(true)
   // bumped on password change / deactivation to invalidate existing sessions
   sessionVersion Int                    @default(1)
+  /// Live orders rings and pops up for new guest orders on this login's screens
+  orderAlerts    Boolean                @default(true)
   lastLoginAt    DateTime?
   statusChanges  OrderStatusLog[]
   counterOrders  Order[]                @relation("CounterOrders")

@@ -14,6 +14,7 @@ import { formatINR } from "@/lib/format";
 import { toRupees } from "@/lib/money";
 import { type CustomLinesSchema, customRows, type OrderItemRow, orderRows } from "@/lib/custom-lines";
 import { customerTotals, type EditedLine, type KeptLine, lineKey, priceEditedLines } from "@/lib/order-edit";
+import { readParts, recoverMeals } from "@/lib/meal-pass";
 import { PAY_CHOICES, type PayChoice, PAYMENT_SHORT } from "@/lib/payments";
 import { billTotals } from "@/lib/pricing";
 import { publish } from "@/lib/realtime";
@@ -59,6 +60,81 @@ async function priceItems(
     : { ok: true as const, lines: [], subtotalPaise: 0 };
   if (!priced.ok) return { ok: false, error: "Fix these first:", problems: priced.problems };
   return orderRows(priced.lines, customRows(others));
+}
+
+/**
+ * The meal pass lines of an order being edited, worked out again from its new dish prices: each
+ * pass meal covers the dish's new price up to its meal type's limit.
+ */
+async function passRows(
+  orderId: string,
+  lines: { itemName: string; mealPassUseId: string | null }[],
+  dishes: OrderItemRow[],
+): Promise<
+  | {
+      ok: true;
+      rows: (OrderItemRow & { mealPassUseId: string })[];
+      covers: { id: string; coverPaise: number }[];
+    }
+  | Fail
+> {
+  if (lines.length === 0) return { ok: true, rows: [], covers: [] };
+  const uses = await db.mealPassUse.findMany({
+    where: { orderId },
+    select: { id: true, menuItemId: true, part: true, coveredPaise: true, pass: { select: { parts: true } } },
+  });
+  const res = recoverMeals(
+    uses.map((u) => ({
+      id: u.id,
+      menuItemId: u.menuItemId,
+      coveredPaise: u.coveredPaise,
+      capPaise: readParts(u.pass.parts)[u.part]?.capPaise ?? u.coveredPaise,
+    })),
+    dishes.flatMap((d) =>
+      d.custom || !d.menuItemId
+        ? []
+        : [
+            {
+              menuItemId: d.menuItemId,
+              quantity: d.quantity,
+              dishPaise: d.unitPricePaise - d.addOns.reduce((s, a) => s + a.pricePaise, 0),
+            },
+          ],
+    ),
+  );
+  if (!res.ok) {
+    const dish = lines.find(
+      (l) => l.mealPassUseId && uses.find((u) => u.id === l.mealPassUseId)?.menuItemId === res.menuItemId,
+    );
+    const name = dish?.itemName.split(": ").slice(1).join(": ") || "a dish";
+    return {
+      ok: false,
+      error: `${res.meals} × ${name} ${res.meals === 1 ? "was" : "were"} paid by a meal pass – keep at least ${res.meals} on the order.`,
+    };
+  }
+  const cover = new Map(res.covers.map((c) => [c.id, c.coverPaise]));
+  return {
+    ok: true,
+    covers: res.covers,
+    rows: lines.flatMap((l) => {
+      const paise = l.mealPassUseId ? cover.get(l.mealPassUseId) : undefined;
+      // a pass meal that now covers nothing (a ₹0 dish) keeps its line at ₹0
+      return paise === undefined
+        ? []
+        : [
+            {
+              menuItemId: null,
+              itemName: l.itemName,
+              addOns: [],
+              unitPricePaise: -paise,
+              quantity: 1,
+              lineTotalPaise: -paise,
+              custom: true,
+              mealPassUseId: l.mealPassUseId!,
+            },
+          ];
+    }),
+  };
 }
 
 /** The guest's record by phone (made if new), or none without a phone. */
@@ -224,9 +300,13 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
   if (!order) return { ok: false, error: "Order not found." };
   if (order.deletedAt)
     return { ok: false, error: `Order #${order.number} was deleted and can't be changed.` };
-  // the pass discount lines are tied to meals taken off a pass; editing would copy or lose them
-  if (order.items.some((i) => i.mealPassUseId))
-    return { ok: false, error: `A meal pass is used on order #${order.number}, so it can't be edited here.` };
+  const passLines = order.items.filter((i) => i.mealPassUseId);
+  // the pass belongs to this guest; moving the order to someone else would move their meals too
+  if (passLines.length > 0 && (phone || null) !== order.customerPhone)
+    return {
+      ok: false,
+      error: `A meal pass is used on order #${order.number}, so the guest's phone can't change.`,
+    };
   if (order.items.some((i) => i.balanceEntryId))
     return {
       ok: false,
@@ -253,8 +333,16 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
       { itemName: i.itemName, unitPricePaise: i.unitPricePaise, addOns },
     );
   }
-  const priced = await priceItems(items, others, kept);
-  if (!priced.ok) return priced;
+  const dishesPriced = await priceItems(items, others, kept);
+  if (!dishesPriced.ok) return dishesPriced;
+  const withPass = await passRows(order.id, passLines, dishesPriced.rows);
+  if (!withPass.ok) return withPass;
+  const priced = {
+    rows: [...dishesPriced.rows, ...withPass.rows],
+    subtotalPaise: dishesPriced.subtotalPaise + withPass.rows.reduce((s, r) => s + r.lineTotalPaise, 0),
+  };
+  if (priced.subtotalPaise < 0)
+    return { ok: false, error: "The discount is bigger than the order – the total can't go below ₹0." };
   const taxBps = bill ? bill.taxBasisPoints : (await getCafeDetails()).taxBasisPoints;
   const totals = billTotals(priced.subtotalPaise, taxBps);
 
@@ -280,6 +368,8 @@ export async function editOrder(input: EditOrderInput): Promise<{ ok: true } | F
   await db.$transaction(async (tx) => {
     const customerId = await customerFor(tx, name, phone, when);
     await tx.orderItem.deleteMany({ where: { orderId: order.id } });
+    for (const c of withPass.covers)
+      await tx.mealPassUse.update({ where: { id: c.id }, data: { coveredPaise: c.coverPaise } });
     await tx.order.update({
       where: { id: order.id },
       data: {

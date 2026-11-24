@@ -8,6 +8,7 @@ import { removeSelection } from "@/app/admin/(dashboard)/actions";
 import { Button } from "@/components/ui/button";
 import type { LiveBoard as LiveBoardData, LiveSelection } from "@/lib/data/live";
 import type { PublicMenu } from "@/lib/data/menu";
+import { CAFE_TZ } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { OrdersPanel } from "./orders-panel";
 
@@ -52,38 +53,85 @@ function onSoundPref(change: () => void) {
   };
 }
 
-/** Short two-tone chime for "a new order came in" (Web Audio, no file to load). */
-function chime(ctx: AudioContext) {
-  [880, 1320].forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = freq;
-    const t = ctx.currentTime + i * 0.18;
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.4);
-  });
+/**
+ * "A new order is waiting" ring (Web Audio, no file to load): two quick bursts of a rising
+ * three-note phrase – unlike any other sound on the page. Repeats until the order is handled.
+ */
+function ring(ctx: AudioContext) {
+  [0, 0.75].forEach((start) =>
+    [784, 988, 1319].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + start + i * 0.14;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.45, t + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    }),
+  );
+}
+
+const RING_EVERY_MS = 8_000;
+
+/** The café's time now, ticking every second (corrected for this device's clock). */
+function Clock({ skew }: { skew: number }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now() - skew);
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [skew]);
+  if (now === null) return null;
+  const d = new Date(now);
+  return (
+    <p className="tabular text-sm font-semibold" aria-label="Café time">
+      <time dateTime={d.toISOString()}>
+        <span className="text-2xl font-bold">
+          {d.toLocaleTimeString("en-IN", {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZone: CAFE_TZ,
+          })}
+        </span>{" "}
+        <span className="text-muted-foreground">
+          {d.toLocaleDateString("en-IN", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+            timeZone: CAFE_TZ,
+          })}
+        </span>
+      </time>
+    </p>
+  );
 }
 
 export function LiveBoard({
   initial,
   menu,
   isOwner,
+  alerts,
 }: {
   initial: LiveBoardData;
   menu: PublicMenu;
   /** the owner can add "Other item" lines (any name, plus or minus price) */
   isOwner: boolean;
+  /** this login rings and pops up for new orders (Settings → Staff logins) */
+  alerts: boolean;
 }) {
   const [data, setData] = useState(initial);
   const [connection, setConnection] = useState<Connection>("live");
   const [skew, setSkew] = useState(() => Date.now() - new Date(initial.serverTime).getTime());
   const [now, setNow] = useState(() => Date.now());
   // on by default; a "turn it off" is remembered on this device
-  const soundOn = useSyncExternalStore(onSoundPref, readSoundPref, () => true);
+  const devicePref = useSyncExternalStore(onSoundPref, readSoundPref, () => true);
+  const soundOn = alerts && devicePref;
   // browsers keep sound blocked until the first tap or key press on the page
   const [soundAllowed, setSoundAllowed] = useState(false);
   const audio = useRef<AudioContext | null>(null);
@@ -149,19 +197,47 @@ export function LiveBoard({
     };
   }, []);
 
-  // Chime when a guest places an order.
+  // a login without alerts stays quiet: no ring, popup or flashing tab
+  const waiting = alerts ? data.orders.filter((o) => o.status === "NEW").length : 0;
+
+  // Ring at once when a guest places an order…
   useEffect(() => {
     const placed = data.orders.filter((o) => o.status === "NEW").map((o) => o.id);
     const fresh = placed.filter((id) => !knownNew.current.has(id));
     knownNew.current = new Set(placed);
-    if (fresh.length > 0 && soundOn && audio.current?.state === "running") chime(audio.current);
+    if (fresh.length > 0 && soundOn && audio.current?.state === "running") ring(audio.current);
   }, [data, soundOn]);
+
+  // …and keep ringing until every new order is accepted or declined.
+  useEffect(() => {
+    if (waiting === 0 || !soundOn) return;
+    const t = setInterval(() => {
+      if (audio.current?.state === "running") ring(audio.current);
+    }, RING_EVERY_MS);
+    return () => clearInterval(t);
+  }, [waiting, soundOn]);
+
+  // The browser tab flashes while orders wait, for when another tab or app is in front.
+  useEffect(() => {
+    if (waiting === 0) return;
+    const original = document.title;
+    const alert = `🔔 ${waiting} new order${waiting === 1 ? "" : "s"}`;
+    let on = false;
+    const t = setInterval(() => {
+      on = !on;
+      document.title = on ? alert : original;
+    }, 1000);
+    return () => {
+      clearInterval(t);
+      document.title = original;
+    };
+  }, [waiting]);
 
   const toggleSound = () => {
     const next = !soundOn;
     audio.current ??= new AudioContext();
     void audio.current.resume();
-    if (next) chime(audio.current);
+    if (next) ring(audio.current);
     writeSoundPref(next);
   };
 
@@ -173,6 +249,7 @@ export function LiveBoard({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">Live orders</h1>
+          <Clock skew={skew} />
           <p className="text-sm text-muted-foreground">
             Guests order from the café QR with their name and number. Accept new orders, then send them to the
             kitchen. You can also watch what guests are picking.
@@ -184,15 +261,21 @@ export function LiveBoard({
               <Plus data-icon="inline-start" /> New counter order
             </Link>
           </Button>
-          <Button
-            variant={soundOn ? "secondary" : "outline"}
-            size="sm"
-            className="rounded-full"
-            onClick={toggleSound}
-          >
-            {soundOn ? <Bell data-icon="inline-start" /> : <BellOff data-icon="inline-start" />}
-            Sound {soundOn ? "on" : "off"}
-          </Button>
+          {alerts ? (
+            <Button
+              variant={soundOn ? "secondary" : "outline"}
+              size="sm"
+              className="rounded-full"
+              onClick={toggleSound}
+            >
+              {soundOn ? <Bell data-icon="inline-start" /> : <BellOff data-icon="inline-start" />}
+              Sound {soundOn ? "on" : "off"}
+            </Button>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <BellOff className="size-4" aria-hidden /> New-order alert off for this login
+            </span>
+          )}
           {soundOn && !soundAllowed && (
             <span className="text-xs text-muted-foreground">Tap anywhere once to allow sound</span>
           )}
@@ -225,6 +308,7 @@ export function LiveBoard({
         balanceBills={data.balanceBills}
         menu={menu}
         isOwner={isOwner}
+        alerts={alerts}
         onChanged={refresh}
       />
       <section aria-labelledby="picking-h" className="space-y-3">

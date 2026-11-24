@@ -10,6 +10,7 @@ import {
   type PassRules,
   passStatus,
   readParts,
+  recoverMeals,
   spreadDishes,
 } from "@/lib/meal-pass";
 
@@ -244,5 +245,34 @@ describe("spreadDishes", () => {
       },
     ];
     expect(spreadDishes(units, passes)).toEqual([1, null]);
+  });
+});
+
+describe("recoverMeals", () => {
+  const uses = [
+    { id: "u1", menuItemId: "bowl", capPaise: 19900, coveredPaise: 19900 },
+    { id: "u2", menuItemId: "bowl", capPaise: 19900, coveredPaise: 19900 },
+    { id: "u3", menuItemId: "shake", capPaise: 19900, coveredPaise: 18900 },
+  ];
+  it("follows a new price, up to the meal type's limit", () => {
+    const res = recoverMeals(uses, [
+      { menuItemId: "bowl", quantity: 2, dishPaise: 20900 },
+      { menuItemId: "shake", quantity: 1, dishPaise: 18000 },
+    ]);
+    expect(res).toEqual({
+      ok: true,
+      covers: [
+        { id: "u1", coverPaise: 19900 },
+        { id: "u2", coverPaise: 19900 },
+        { id: "u3", coverPaise: 18000 },
+      ],
+    });
+  });
+  it("refuses when a covered dish is taken off", () => {
+    expect(recoverMeals(uses, [{ menuItemId: "bowl", quantity: 1, dishPaise: 20000 }])).toEqual({
+      ok: false,
+      menuItemId: "bowl",
+      meals: 2,
+    });
   });
 });

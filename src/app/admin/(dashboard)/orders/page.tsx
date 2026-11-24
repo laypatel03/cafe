@@ -521,20 +521,28 @@ export default async function OrderHistoryPage({ searchParams }: PageProps<"/adm
                     name: o.customerName,
                     phone: o.customerPhone ?? "",
                     note: o.note ?? "",
-                    items: o.items.map((i) => ({
-                      itemId: i.menuItemId,
-                      name: i.itemName,
-                      quantity: i.quantity,
-                      addOns: (i.addOns as { id: string; name: string }[]).map((a) => ({
-                        id: a.id,
-                        name: a.name,
+                    items: o.items
+                      .filter((i) => !i.mealPassUseId)
+                      .map((i) => ({
+                        itemId: i.menuItemId,
+                        name: i.itemName,
+                        quantity: i.quantity,
+                        addOns: (i.addOns as { id: string; name: string }[]).map((a) => ({
+                          id: a.id,
+                          name: a.name,
+                        })),
+                        unitPrice: toRupees(i.unitPricePaise),
+                        custom: i.custom,
                       })),
-                      unitPrice: toRupees(i.unitPricePaise),
-                      custom: i.custom,
-                    })),
                     paidBy: o.bill?.paidAt && !o.bill.voidedAt ? (o.bill.paymentMethod ?? null) : null,
                     billNumber: o.bill?.number ?? null,
                     sharedBill: (o.bill?._count.orders ?? 0) > 1,
+                    passLines: o.items
+                      .filter((i) => i.mealPassUseId)
+                      .map((i) => ({ name: i.itemName, unitPrice: toRupees(i.unitPricePaise) })),
+                    locked: o.items.some((i) => i.balanceEntryId)
+                      ? "A customer balance is settled on it, so the items and prices stay as they were billed."
+                      : null,
                   }}
                 />
               )}

@@ -19,7 +19,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `/privacy` | `src/app/privacy/page.tsx` | public | Keep in step with stored data |
 | `/media/[...path]` | `src/app/media/[...path]/route.ts` | public | Serves uploads from `UPLOAD_DIR` |
 | `/admin/login` | `src/app/admin/login/{page,login-form}.tsx`, `actions.ts` | – | Rate-limited login |
-| `/admin` | `(dashboard)/page.tsx` → `components/admin/live-board.tsx` (`orders-panel`, `billing-panel`) | staff | Live orders + billing |
+| `/admin` | `(dashboard)/page.tsx` → `components/admin/live-board.tsx` (`orders-panel`, `billing-panel`, `new-order-alert`) | staff | Live orders + billing |
 | `/admin/menu` | `(dashboard)/menu/{page,actions}.ts(x)`, `menu/items/{new,[id]}`, `components/admin/menu/*` | staff (sold-out only) / owner | |
 | `/admin/offers` | `(dashboard)/offers/{page,actions}.ts(x)`, `components/admin/offers/offer-form.tsx` | owner / developer | Today's offer: dish, offer price, days |
 | `/admin/passes` | `(dashboard)/passes/{page,actions}.ts(x)`, `components/admin/passes/pass-forms.tsx` | owner (use at billing: staff) | Meal pass plans, passes, refunds |
@@ -57,7 +57,7 @@ no WebGL (hero = dish card stack), no tables (one café QR, `/t/*` redirects), l
 | `(dashboard)/passes/actions.ts` | owner: `saveMealPlan`, `setMealPlanActive`, `sellMealPass`, `refundMealPass` (switch); staff: `mealPassChoices`, `applyMealPass`, `undoMealPass` |
 | `(dashboard)/money/actions.ts` | `addExtraSale`, `deleteExtraSale`, `saveCardFees` |
 | `(dashboard)/customers/actions.ts` | notes, `withdrawConsent`, `deleteCustomer`, `addCustomer`, `updateCustomer` |
-| `(dashboard)/settings/actions.ts` | `saveCafeDetails`, switches (`setOrderingEnabled`, `setBlogEnabled`, `setOrderEdits`, `setCustomerEdits`), staff accounts, `changeMyPassword` |
+| `(dashboard)/settings/actions.ts` | `saveCafeDetails`, switches (`setOrderingEnabled`, `setBlogEnabled`, `setOrderEdits`, `setCustomerEdits`), staff accounts (`setStaffOrderAlerts`: new-order alert per login), `changeMyPassword` |
 | `src/app/admin/login/actions.ts` | `login`, `logout` |
 
 Every action: `assertUser(access?)` (throws) → Zod parse (`lib/validators/*`) → `db` write → `publish()` (realtime) and/or `updateTag(MENU_TAG|SETTINGS_TAG)`.
