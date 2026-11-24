@@ -24,6 +24,7 @@ export default async function SettingsPage() {
             phone: true,
             role: true,
             active: true,
+            orderAlerts: true,
             lastLoginAt: true,
           },
         }),

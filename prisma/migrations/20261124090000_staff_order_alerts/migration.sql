@@ -1,0 +1,1 @@
+ALTER TABLE "StaffUser" ADD COLUMN "orderAlerts" BOOLEAN NOT NULL DEFAULT true;

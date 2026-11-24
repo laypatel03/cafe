@@ -16,6 +16,7 @@ import { ACTION_LABEL, availableActions, canCancel, canEditItems } from "@/lib/o
 import { cn } from "@/lib/utils";
 import type { LivePass } from "@/lib/data/meal-passes";
 import { BillingPanel } from "./billing-panel";
+import { NewOrderAlert } from "./new-order-alert";
 import { type EditableLine, ItemLinesEditor, otherItems, toEditableLines } from "./item-lines-editor";
 import { WaStatusLine } from "@/components/admin/whatsapp/wa-status-line";
 import { OrderStatusBadge } from "./order-status-badge";
@@ -49,6 +50,7 @@ export function OrdersPanel({
   balanceBills,
   menu,
   isOwner,
+  alerts,
   onChanged,
 }: {
   orders: LiveOrder[];
@@ -59,6 +61,8 @@ export function OrdersPanel({
   balanceBills: Record<string, number[]>;
   menu: PublicMenu;
   isOwner: boolean;
+  /** show the new-order popup on this login */
+  alerts: boolean;
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState<LiveOrder | null>(null);
@@ -143,6 +147,14 @@ export function OrdersPanel({
         onSaved={onChanged}
       />
       <CancelDialog order={cancelling} onClose={() => setCancelling(null)} onDone={onChanged} />
+      {/* hidden while declining one, so the reason dialog isn't covered */}
+      {alerts && !cancelling && (
+        <NewOrderAlert
+          orders={orders.filter((o) => o.status === "NEW")}
+          onDecline={setCancelling}
+          onChanged={onChanged}
+        />
+      )}
     </>
   );
 }
@@ -174,7 +186,14 @@ function OrderCard({
     });
 
   return (
-    <li className={cn("flex flex-col rounded-3xl border border-border bg-card p-4", done && "opacity-75")}>
+    <li
+      id={`order-${o.id}`}
+      className={cn(
+        "flex scroll-mt-24 flex-col rounded-3xl border border-border bg-card p-4",
+        done && "opacity-75",
+        o.status === "NEW" && "border-2 border-hh-orange",
+      )}
+    >
       <div className="flex items-start gap-2">
         <div className="flex-1">
           <p className="text-lg font-bold">

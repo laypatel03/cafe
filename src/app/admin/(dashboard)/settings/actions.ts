@@ -2,6 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
+import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { type Access, AuthError, assertUser, type CurrentUser } from "@/lib/auth/dal";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
@@ -161,6 +162,18 @@ export async function setStaffActive(id: string, active: boolean): Promise<Resul
   }
   await db.staffUser.update({ where: { id }, data: { active, sessionVersion: { increment: 1 } } });
   revalidatePath("/admin/settings");
+  return { ok: true };
+}
+
+/** Whether Live orders rings and pops up for new guest orders when this login is signed in. */
+export async function setStaffOrderAlerts(id: string, on: boolean): Promise<Result> {
+  const me = await allowed("OWNER");
+  if ("error" in me) return me;
+  const parsed = z.object({ id: z.string().min(1).max(40), on: z.boolean() }).safeParse({ id, on });
+  if (!parsed.success) return { error: "Something went wrong – refresh and try again." };
+  await db.staffUser.update({ where: { id: parsed.data.id }, data: { orderAlerts: parsed.data.on } });
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin");
   return { ok: true };
 }
 

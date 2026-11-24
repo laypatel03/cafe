@@ -15,6 +15,7 @@ import {
   setOrderEdits,
   setOrderingEnabled,
   setStaffActive,
+  setStaffOrderAlerts,
 } from "@/app/admin/(dashboard)/settings/actions";
 import {
   saveReminderSettings,
@@ -87,6 +88,8 @@ type Staff = {
   phone: string | null;
   role: "STAFF" | "OWNER" | "DEVELOPER";
   active: boolean;
+  /** Live orders rings and pops up for new guest orders */
+  orderAlerts: boolean;
   lastLoginAt: string | null;
 };
 
@@ -793,6 +796,23 @@ function StaffPanel({ staff, meId }: { staff: Staff[]; meId: string }) {
                   : "never logged in"}
               </p>
             </div>
+            {s.role !== "DEVELOPER" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {s.orderAlerts ? "New-order alert" : "No alert"}
+                </span>
+                <ActionSwitch
+                  checked={s.orderAlerts}
+                  label={`New-order alert for ${s.name}`}
+                  action={(next) => setStaffOrderAlerts(s.id, next)}
+                  successMessage={(next) =>
+                    next
+                      ? `${s.name}'s screens ring for new orders`
+                      : `${s.name}'s screens stay quiet for new orders`
+                  }
+                />
+              </div>
+            )}
             {s.id !== meId && (
               <>
                 <Button
