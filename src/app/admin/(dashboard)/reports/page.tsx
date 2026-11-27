@@ -15,13 +15,14 @@ export const metadata = { title: "Reports" };
 const rupees = (paise: number) => formatINR(toRupees(paise));
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-/** Owner only: sales from paid bills (void bills left out), by type, hour, day, month and dish. */
+/** Owner only: sales from paid bills (void bills left out) + meal passes, by type, hour, day, month and dish. */
 export default async function ReportsPage({ searchParams }: PageProps<"/admin/reports">) {
   await requireUser("OWNER");
   const p = await searchParams;
   const range = resolveRange({ range: first(p.range), from: first(p.from), to: first(p.to) });
   const r = await getReport(range);
-  const average = r.bills > 0 ? Math.round(r.salesPaise / r.bills) : 0;
+  const billSales = r.salesPaise - r.passes.paise;
+  const average = r.bills > 0 ? Math.round(billSales / r.bills) : 0;
   const period =
     range.preset !== null
       ? RANGE_PRESETS[range.preset]
@@ -43,6 +44,11 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
       rupees(t.paise),
       `${t.bills} bill${t.bills === 1 ? "" : "s"}`,
     ]),
+    [
+      "Meal passes",
+      rupees(r.passes.paise),
+      `${r.passes.sold} sold${r.passes.refunded > 0 ? ` · ${r.passes.refunded} refunded` : ""}`,
+    ],
     ["Cancelled orders", String(r.cancelledOrders)],
     ["Expenses", rupees(r.expensesPaise), "supplies, bills, salaries…"],
     [
@@ -57,7 +63,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
       <div>
         <h1 className="text-3xl font-bold">Reports</h1>
         <p className="text-sm text-muted-foreground">
-          Sales from paid bills, counted when they were paid. Void bills are left out.
+          Sales from paid bills, counted when they were paid, plus meal passes on the day they were sold
+          (refunds taken off). Void bills are left out.
         </p>
       </div>
 

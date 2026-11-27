@@ -9,9 +9,23 @@ import { type Bucket, fillDays, fillHours, fillMonths, type ReportRange } from "
 const local = (column: string) => Prisma.raw(`(${column} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata'`);
 const PAID = Prisma.sql`b."paidAt" IS NOT NULL AND b."voidedAt" IS NULL`;
 
+// pass sales and refunds are ExtraSales linked from a MealPass
+const PASS_SALE = Prisma.sql`JOIN "MealPass" p ON p."saleId" = s."id" OR p."refundSaleId" = s."id"`;
+
 type BucketRow = { key: string; paise: bigint | number | null; bills: bigint | number };
 const rows = (r: BucketRow[]) =>
   r.map((x) => ({ key: x.key, paise: Number(x.paise ?? 0), bills: Number(x.bills) }));
+
+/** adds pass money into the bill buckets with the same key */
+function merge(a: ReturnType<typeof rows>, b: ReturnType<typeof rows>) {
+  const out = new Map(a.map((r) => [r.key, { ...r }]));
+  for (const r of b) {
+    const x = out.get(r.key);
+    if (x) x.paise += r.paise;
+    else out.set(r.key, { ...r });
+  }
+  return [...out.values()];
+}
 
 export type Report = {
   salesPaise: number;
@@ -23,6 +37,8 @@ export type Report = {
   days: Bucket[];
   months: Bucket[];
   topItems: { name: string; quantity: number; paise: number }[];
+  /** meal passes sold minus refunds (money in when sold, not on the bills they cover) */
+  passes: { paise: number; sold: number; refunded: number };
   expensesPaise: number;
   /** biggest first */
   expensesByCategory: { category: ExpenseCategory; paise: number }[];
@@ -33,13 +49,14 @@ export async function getReport(range: ReportRange): Promise<Report> {
   const inRange = Prisma.sql`${PAID} AND b."paidAt" >= ${start} AND b."paidAt" < ${end}`;
   const monthsFrom = new Date(end.getFullYear(), end.getMonth() - 11, 1);
 
-  const [byType, cancelled, guests, hours, days, months, top, spent] = await Promise.all([
-    db.$queryRaw<{ type: "DINE_IN" | "PARCEL"; paise: bigint | null; bills: bigint }[]>`
+  const [byType, cancelled, guests, hours, days, months, top, spent, passes, passDays, passMonths] =
+    await Promise.all([
+      db.$queryRaw<{ type: "DINE_IN" | "PARCEL"; paise: bigint | null; bills: bigint }[]>`
       SELECT b."type", SUM(b."totalPaise") AS paise, COUNT(*) AS bills
       FROM "Bill" b WHERE ${inRange} GROUP BY b."type"`,
-    db.order.count({ where: { status: "CANCELLED", createdAt: { gte: start, lt: end } } }),
-    // guests on this period's bills, and how many of them are regulars (2+ paid visits so far)
-    db.$queryRaw<{ total: bigint; returning: bigint }[]>`
+      db.order.count({ where: { status: "CANCELLED", createdAt: { gte: start, lt: end } } }),
+      // guests on this period's bills, and how many of them are regulars (2+ paid visits so far)
+      db.$queryRaw<{ total: bigint; returning: bigint }[]>`
       WITH g AS (
         SELECT DISTINCT o."customerId" AS id FROM "Bill" b JOIN "Order" o ON o."billId" = b."id"
         WHERE ${inRange} AND o."customerId" IS NOT NULL AND o."deletedAt" IS NULL
@@ -50,33 +67,48 @@ export async function getReport(range: ReportRange): Promise<Report> {
           WHERE o2."customerId" = g.id AND o2."deletedAt" IS NULL AND ${PAID} AND b."paidAt" < ${end}
         ) >= 2) AS returning
       FROM g`,
-    db.$queryRaw<BucketRow[]>`
+      db.$queryRaw<BucketRow[]>`
       SELECT EXTRACT(HOUR FROM ${local('b."paidAt"')})::int::text AS key, SUM(b."totalPaise") AS paise, COUNT(*) AS bills
       FROM "Bill" b WHERE ${inRange} GROUP BY 1`,
-    db.$queryRaw<BucketRow[]>`
+      db.$queryRaw<BucketRow[]>`
       SELECT to_char(${local('b."paidAt"')}, 'YYYY-MM-DD') AS key, SUM(b."totalPaise") AS paise, COUNT(*) AS bills
       FROM "Bill" b WHERE ${inRange} GROUP BY 1`,
-    db.$queryRaw<BucketRow[]>`
+      db.$queryRaw<BucketRow[]>`
       SELECT to_char(${local('b."paidAt"')}, 'YYYY-MM') AS key, SUM(b."totalPaise") AS paise, COUNT(*) AS bills
       FROM "Bill" b WHERE ${PAID} AND b."paidAt" >= ${monthsFrom} AND b."paidAt" < ${end} GROUP BY 1`,
-    db.$queryRaw<{ name: string; quantity: bigint; paise: bigint }[]>`
+      db.$queryRaw<{ name: string; quantity: bigint; paise: bigint }[]>`
       SELECT i."itemName" AS name, SUM(i."quantity") AS quantity, SUM(i."lineTotalPaise") AS paise
       FROM "OrderItem" i JOIN "Order" o ON o."id" = i."orderId" JOIN "Bill" b ON b."id" = o."billId"
       WHERE ${inRange} AND o."deletedAt" IS NULL AND NOT i."custom"
       GROUP BY i."itemName" ORDER BY quantity DESC, paise DESC LIMIT 10`,
-    db.expense.groupBy({
-      by: ["category"],
-      where: { paidAt: { gte: start, lt: end } },
-      _sum: { amountPaise: true },
-    }),
-  ]);
+      db.expense.groupBy({
+        by: ["category"],
+        where: { paidAt: { gte: start, lt: end } },
+        _sum: { amountPaise: true },
+      }),
+      db.$queryRaw<{ paise: bigint | null; sold: bigint; refunded: bigint }[]>`
+      SELECT SUM(s."amountPaise") AS paise,
+        COUNT(*) FILTER (WHERE p."saleId" = s."id") AS sold,
+        COUNT(*) FILTER (WHERE p."refundSaleId" = s."id") AS refunded
+      FROM "ExtraSale" s ${PASS_SALE}
+      WHERE s."soldAt" >= ${start} AND s."soldAt" < ${end}`,
+      db.$queryRaw<BucketRow[]>`
+      SELECT to_char(${local('s."soldAt"')}, 'YYYY-MM-DD') AS key, SUM(s."amountPaise") AS paise, 0 AS bills
+      FROM "ExtraSale" s ${PASS_SALE}
+      WHERE s."soldAt" >= ${start} AND s."soldAt" < ${end} GROUP BY 1`,
+      db.$queryRaw<BucketRow[]>`
+      SELECT to_char(${local('s."soldAt"')}, 'YYYY-MM') AS key, SUM(s."amountPaise") AS paise, 0 AS bills
+      FROM "ExtraSale" s ${PASS_SALE}
+      WHERE s."soldAt" >= ${monthsFrom} AND s."soldAt" < ${end} GROUP BY 1`,
+    ]);
   const expensesByCategory = spent
     .map((e) => ({ category: e.category, paise: e._sum.amountPaise ?? 0 }))
     .sort((a, b) => b.paise - a.paise);
 
   const types = byType.map((t) => ({ type: t.type, paise: Number(t.paise ?? 0), bills: Number(t.bills) }));
+  const passPaise = Number(passes[0]?.paise ?? 0);
   return {
-    salesPaise: types.reduce((s, t) => s + t.paise, 0),
+    salesPaise: types.reduce((s, t) => s + t.paise, 0) + passPaise,
     bills: types.reduce((s, t) => s + t.bills, 0),
     byType: (["DINE_IN", "PARCEL"] as const).map(
       (type) => types.find((t) => t.type === type) ?? { type, paise: 0, bills: 0 },
@@ -84,9 +116,14 @@ export async function getReport(range: ReportRange): Promise<Report> {
     cancelledOrders: cancelled,
     guests: { total: Number(guests[0]?.total ?? 0), returning: Number(guests[0]?.returning ?? 0) },
     hours: fillHours(rows(hours)),
-    days: fillDays(rows(days), range),
-    months: fillMonths(rows(months), new Date(end.getTime() - 1)),
+    days: fillDays(merge(rows(days), rows(passDays)), range),
+    months: fillMonths(merge(rows(months), rows(passMonths)), new Date(end.getTime() - 1)),
     topItems: top.map((t) => ({ name: t.name, quantity: Number(t.quantity), paise: Number(t.paise) })),
+    passes: {
+      paise: passPaise,
+      sold: Number(passes[0]?.sold ?? 0),
+      refunded: Number(passes[0]?.refunded ?? 0),
+    },
     expensesPaise: expensesByCategory.reduce((s, e) => s + e.paise, 0),
     expensesByCategory,
   };

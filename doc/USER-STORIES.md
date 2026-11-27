@@ -151,7 +151,7 @@ Format: **ID – title** · *As a … I want … so that …* · **Rules** (acce
 
 **O-05 – Reports**
 *As the owner I want sales by hour/day/month, dine-in vs takeaway, top dishes, regulars and expenses so that I can plan.*
-- Rules: from paid bills only, void bills and deleted orders excluded; IST days.
+- Rules: from paid bills (void bills and deleted orders excluded) plus meal pass sales minus refunds, counted on the day sold (in Sales, by day/month and their own tile; not in bills, average bill or by hour); IST days.
 - Code: `(dashboard)/reports/page.tsx`, `lib/reports.ts`, `lib/data/reports.ts`, `admin/reports/bar-chart.tsx`.
 
 **O-06 – Money book**
